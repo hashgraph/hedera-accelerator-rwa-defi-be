@@ -27,12 +27,12 @@ contract Exchange is OrderBook, ReentrancyGuard {
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenB] >= price * volume, "Not enough balance");
 
-        lastOrderId++;
+        currentOrderId++;
 
         (uint256 remainVolume) = _matchSellOrders(msg.sender, price, volume);
 
         if (remainVolume > 0) {
-            _insertBuyOrder(price, remainVolume, msg.sender);
+            _insertBuyOrder(msg.sender, price, remainVolume);
         }
     }
 
@@ -47,12 +47,12 @@ contract Exchange is OrderBook, ReentrancyGuard {
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenA] >= volume, "Not enough balance");
 
-        lastOrderId++;
+        currentOrderId++;
 
         (uint256 remainVolume) = _matchBuyOrders(msg.sender, price, volume);
 
         if (remainVolume > 0){
-            _insertSellOrder(price, remainVolume, msg.sender);
+            _insertSellOrder(msg.sender, price, remainVolume);
         }        
     }
 

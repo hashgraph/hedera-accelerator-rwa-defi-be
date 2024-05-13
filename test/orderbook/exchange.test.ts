@@ -61,19 +61,19 @@ describe('Exchange', () => {
   
         await exchange.connect(alice).deposit(tokenB, 750);
         await exchange.connect(alice).placeBuyOrder(150, 5);
-        expect(await exchange.lastOrderId()).to.equal(1);
+        expect(await exchange.currentOrderId()).to.equal(1);
 
         await exchange.connect(bob).deposit(tokenB, 750);
         await exchange.connect(bob).placeBuyOrder(150, 5);
-        expect(await exchange.lastOrderId()).to.equal(2);
+        expect(await exchange.currentOrderId()).to.equal(2);
 
         await exchange.connect(charlie).deposit(tokenB, 750);
         await exchange.connect(charlie).placeBuyOrder(150, 5);
-        expect(await exchange.lastOrderId()).to.equal(3);
+        expect(await exchange.currentOrderId()).to.equal(3);
 
         await exchange.connect(david).deposit(tokenA, 5);
         await exchange.connect(david).placeSellOrder(150, 5);
-        expect(await exchange.lastOrderId()).to.equal(4);
+        expect(await exchange.currentOrderId()).to.equal(4);
 
       });
     });
@@ -196,7 +196,7 @@ describe('Exchange', () => {
 
           await expect(trade)
             .to.emit(exchange, 'Trade').withArgs(10, 100, bob.address, alice.address)
-            .to.emit(exchange, 'NewOrder').withArgs(true, [2, 100, 5, bob.address, 0 ]);
+            .to.emit(exchange, 'NewOrder').withArgs(true, 2, bob.address, 100, 5);
 
         });
       });

@@ -12,11 +12,10 @@ abstract contract OrderBook {
     mapping(address => mapping(address => uint256)) public balanceOf;
     uint256 public firstBuyOrderId;
     uint256 public firstSellOrderId;
-    uint256 public lastOrderId;
-
+    uint256 public currentOrderId;
 
     event Trade(uint256 tradedVolume, uint256 price, address indexed buyer, address seller);
-    event NewOrder(bool isBuy, Order order);
+    event NewOrder(bool isBuy, uint256 orderId, address trader, uint256 price, uint256 volume);
     event Deposit(address indexed trader, address token, uint256 amount);
     event Withdraw(address indexed trader, address token, uint256 amount);
     event OrderCanceled(bool isBuy, uint256 indexed orderId, address indexed trader);
@@ -29,7 +28,7 @@ abstract contract OrderBook {
         uint256 next;
     }
 
-    function _insertBuyOrder(uint256 price, uint256 volume, address trader) internal {
+    function _insertBuyOrder(address trader, uint256 price, uint256 volume) internal {
         uint256 currentId = firstBuyOrderId;
         uint256 lastId = 0;
 
@@ -38,8 +37,8 @@ abstract contract OrderBook {
             currentId = buyOrders[currentId].next;
         }
 
-        buyOrders[lastOrderId] = Order({
-            id: lastOrderId,
+        buyOrders[currentOrderId] = Order({
+            id: currentOrderId,
             price: price,
             volume: volume,
             trader: trader,
@@ -49,16 +48,16 @@ abstract contract OrderBook {
         // remove tokenB balance because order was placed
         balanceOf[trader][tokenB] -= price * volume;
 
-        emit NewOrder(true, buyOrders[lastOrderId]);
+        emit NewOrder(true, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
-            firstBuyOrderId = lastOrderId;
+            firstBuyOrderId = currentOrderId;
         } else {
-            buyOrders[lastId].next = lastOrderId;
+            buyOrders[lastId].next = currentOrderId;
         }
     }
 
-    function _insertSellOrder(uint256 price, uint256 volume, address trader) internal {
+    function _insertSellOrder(address trader, uint256 price, uint256 volume) internal {
         uint256 currentId = firstSellOrderId;
         uint256 lastId = 0;
 
@@ -67,8 +66,8 @@ abstract contract OrderBook {
             currentId = sellOrders[currentId].next;
         }
 
-        sellOrders[lastOrderId] = Order({
-            id: lastOrderId,
+        sellOrders[currentOrderId] = Order({
+            id: currentOrderId,
             price: price,
             volume: volume,
             trader: trader,
@@ -78,12 +77,12 @@ abstract contract OrderBook {
         // remove balance because order was placed
         balanceOf[trader][tokenA] -= volume;
 
-        emit NewOrder(false, sellOrders[lastOrderId]);
+        emit NewOrder(false, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
-            firstSellOrderId = lastOrderId;
+            firstSellOrderId = currentOrderId;
         } else {
-            sellOrders[lastId].next = lastOrderId;
+            sellOrders[lastId].next = currentOrderId;
         }
     }
 
