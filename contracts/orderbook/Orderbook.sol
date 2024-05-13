@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 abstract contract OrderBook {
@@ -46,7 +46,7 @@ abstract contract OrderBook {
         });
 
         // remove tokenB balance because order was placed
-        balanceOf[trader][tokenB] -= price * volume;
+        balanceOf[trader][tokenB] -= price * (volume / 10 ** ERC20(tokenA).decimals());
 
         emit NewOrder(true, currentOrderId, trader, price, volume);
 
@@ -92,6 +92,7 @@ abstract contract OrderBook {
         uint256 sellVolume
     ) internal returns (uint256)  {
         uint256 currentBuyId = buyOrders[firstBuyOrderId].id; 
+        uint256 decimals = ERC20(tokenA).decimals();
 
         while (currentBuyId != 0 && sellVolume > 0) {
             Order storage buyOrder = buyOrders[currentBuyId];
@@ -101,7 +102,7 @@ abstract contract OrderBook {
                 uint256 tradedPrice = sellPrice;
 
                 // trade
-                balanceOf[sellTrader][tokenB] += tradedPrice * tradedVolume;
+                balanceOf[sellTrader][tokenB] += tradedPrice * (tradedVolume / 10 ** decimals);
 
                 balanceOf[sellTrader][tokenA] -= tradedVolume;
                 balanceOf[buyOrder.trader][tokenA] += tradedVolume;
@@ -128,6 +129,7 @@ abstract contract OrderBook {
         uint256 buyVolume
     ) internal returns (uint256) {
         uint256 currentSellId = sellOrders[firstSellOrderId].id; 
+        uint256 decimals = ERC20(tokenA).decimals();
 
         while (currentSellId != 0 && buyVolume > 0) {
             Order storage sellOrder = sellOrders[currentSellId];
@@ -138,10 +140,10 @@ abstract contract OrderBook {
 
 
                 // trade
-                balanceOf[buyTrader][tokenB] -= tradedPrice * tradedVolume;
+                balanceOf[buyTrader][tokenB] -= tradedPrice * (tradedVolume / 10 ** decimals);
                 balanceOf[buyTrader][tokenA] += tradedVolume;
 
-                balanceOf[sellOrder.trader][tokenB] += tradedPrice * tradedVolume;
+                balanceOf[sellOrder.trader][tokenB] += tradedPrice * (tradedVolume / 10 ** decimals);
 
                 // diminui tradedVolume de buyVolume e sellVolume
                 buyVolume -= tradedVolume;
@@ -163,14 +165,14 @@ abstract contract OrderBook {
     }
 
     function _deposit(address trader, address token, uint256 amount) internal {
-        IERC20(token).transferFrom(trader, address(this), amount);
+        ERC20(token).transferFrom(trader, address(this), amount);
         balanceOf[trader][token] += amount;
         emit Deposit(trader, token, amount);
     }
 
     function _withdraw(address trader, address token, uint256 amount) internal {
         balanceOf[trader][token] -= amount;
-        IERC20(token).transfer(trader, amount);
+        ERC20(token).transfer(trader, amount);
         emit Withdraw(trader, token, amount);
     }
 
@@ -212,7 +214,7 @@ abstract contract OrderBook {
         }
 
         // refund balance to trader
-        balanceOf[buyOrder.trader][tokenB] += buyOrder.volume * buyOrder.price;
+        balanceOf[buyOrder.trader][tokenB] += buyOrder.price * (buyOrder.volume / 10 ** ERC20(tokenA).decimals());
         buyOrder.volume = 0;
         
         emit OrderCanceled(true, buyOrder.id, msg.sender);

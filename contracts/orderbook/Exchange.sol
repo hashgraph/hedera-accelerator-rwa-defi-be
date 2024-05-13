@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Orderbook.sol";
 
 contract Exchange is OrderBook, ReentrancyGuard {    
@@ -25,7 +26,7 @@ contract Exchange is OrderBook, ReentrancyGuard {
     function placeBuyOrder(uint256 price, uint256 volume) public nonReentrant {
         require(price > 0, "Invalid Price");
         require(volume > 0, "Invalid Volume");
-        require(balanceOf[msg.sender][tokenB] >= price * volume, "Not enough balance");
+        require(balanceOf[msg.sender][tokenB] >= price * (volume / 10 ** ERC20(tokenA).decimals()), "Not enough balance");
 
         currentOrderId++;
 
