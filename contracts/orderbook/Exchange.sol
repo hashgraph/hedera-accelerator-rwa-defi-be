@@ -3,10 +3,7 @@ pragma solidity ^0.8.24;
 
 import "./Orderbook.sol";
 
-contract Exchange is OrderBook {
-    uint256 public firstBuyOrderId;
-    uint256 public firstSellOrderId;
-    uint256 public lastOrderId;
+contract Exchange is OrderBook {    
 
     constructor(address _tokenA, address _tokenB) {
         tokenA = _tokenA;
@@ -20,14 +17,10 @@ contract Exchange is OrderBook {
 
         lastOrderId++;
 
-        (uint256 remainVolume) = _matchSellOrders(firstSellOrderId, msg.sender, price, volume);
+        (uint256 remainVolume) = _matchSellOrders(msg.sender, price, volume);
 
         if (remainVolume > 0) {
-            uint256 newFirstBuyOrderId = _insertBuyOrder(firstBuyOrderId, price, remainVolume, msg.sender, lastOrderId);
-
-            if (newFirstBuyOrderId != firstBuyOrderId) {
-                firstBuyOrderId = newFirstBuyOrderId;
-            }
+            _insertBuyOrder(price, remainVolume, msg.sender);
         }
     }
 
@@ -38,14 +31,10 @@ contract Exchange is OrderBook {
 
         lastOrderId++;
 
-        (uint256 remainVolume) = _matchBuyOrders(firstBuyOrderId, msg.sender, price, volume);
+        (uint256 remainVolume) = _matchBuyOrders(msg.sender, price, volume);
 
         if (remainVolume > 0){
-            uint256 newFirstSellOrderId = _insertSellOrder(firstSellOrderId, price, remainVolume, msg.sender, lastOrderId);
-            
-            if (newFirstSellOrderId != firstSellOrderId) {
-                firstSellOrderId = newFirstSellOrderId;
-            }
+            _insertSellOrder(price, remainVolume, msg.sender);
         }        
     }
 
@@ -72,7 +61,7 @@ contract Exchange is OrderBook {
         require(order.volume > 0, "Order already cancelled or fulfilled");
 
         isBuyOrder 
-            ? _cancelBuyOrder(order, firstBuyOrderId)
-            : _cancelSellOrder(order, firstSellOrderId);
+            ? _cancelBuyOrder(order)
+            : _cancelSellOrder(order);
     }
 }

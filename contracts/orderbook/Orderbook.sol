@@ -9,8 +9,11 @@ abstract contract OrderBook {
     address public tokenB;
     mapping(uint256 => Order) public buyOrders;
     mapping(uint256 => Order) public sellOrders;
-
     mapping(address => mapping(address => uint256)) public balanceOf;
+    uint256 public firstBuyOrderId;
+    uint256 public firstSellOrderId;
+    uint256 public lastOrderId;
+
 
     event Trade(uint256 tradedVolume, uint256 price, address indexed buyer, address seller);
     event NewOrder(bool isBuy, Order order);
@@ -26,8 +29,8 @@ abstract contract OrderBook {
         uint256 next;
     }
 
-    function _insertBuyOrder(uint256 firstOrderId, uint256 price, uint256 volume, address trader, uint256 lastOrderId) internal returns (uint256) {
-        uint256 currentId = firstOrderId;
+    function _insertBuyOrder(uint256 price, uint256 volume, address trader) internal {
+        uint256 currentId = firstBuyOrderId;
         uint256 lastId = 0;
 
         while (currentId != 0 && buyOrders[currentId].price > price) {
@@ -49,16 +52,14 @@ abstract contract OrderBook {
         emit NewOrder(true, buyOrders[lastOrderId]);
 
         if (lastId == 0) {
-            return lastOrderId;
+            firstBuyOrderId = lastOrderId;
         } else {
             buyOrders[lastId].next = lastOrderId;
         }
-
-        return firstOrderId;
     }
 
-    function _insertSellOrder(uint256 firstOrderId, uint256 price, uint256 volume, address trader, uint256 lastOrderId) internal returns (uint256) {
-        uint256 currentId = firstOrderId;
+    function _insertSellOrder(uint256 price, uint256 volume, address trader) internal {
+        uint256 currentId = firstSellOrderId;
         uint256 lastId = 0;
 
         while (currentId != 0 && sellOrders[currentId].price < price) {
@@ -80,16 +81,13 @@ abstract contract OrderBook {
         emit NewOrder(false, sellOrders[lastOrderId]);
 
         if (lastId == 0) {
-            return lastOrderId;
+            firstSellOrderId = lastOrderId;
         } else {
             sellOrders[lastId].next = lastOrderId;
         }
-
-        return firstOrderId;
     }
 
     function _matchBuyOrders(
-        uint256 firstBuyOrderId,
         address sellTrader,
         uint256 sellPrice,
         uint256 sellVolume
@@ -126,7 +124,6 @@ abstract contract OrderBook {
     }
 
     function _matchSellOrders(
-        uint256 firstSellOrderId,
         address buyTrader,
         uint256 buyPrice,
         uint256 buyVolume
@@ -178,7 +175,7 @@ abstract contract OrderBook {
         emit Withdraw(trader, token, amount);
     }
 
-    function _cancelSellOrder(Order storage sellOrder, uint256 firstSellOrderId) internal {        
+    function _cancelSellOrder(Order storage sellOrder) internal {        
         if (sellOrder.id == firstSellOrderId) {
             firstSellOrderId = sellOrder.next;
         } else {
@@ -200,7 +197,7 @@ abstract contract OrderBook {
         emit OrderCanceled(false, sellOrder.id, msg.sender);
     }
 
-    function _cancelBuyOrder(Order storage buyOrder, uint256 firstBuyOrderId) internal {        
+    function _cancelBuyOrder(Order storage buyOrder) internal {        
         if (buyOrder.id == firstBuyOrderId) {
             firstBuyOrderId = buyOrder.next;
         } else {

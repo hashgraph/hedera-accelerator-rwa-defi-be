@@ -95,7 +95,7 @@ describe('Exchange', () => {
       });
 
       it("should place buy orders sorted by highest price", async function () {
-        const { exchange, alice, bob, charlie, addressTokenA, addressTokenB } = await loadFixture(deployExchangeFixture);
+        const { exchange, alice, bob, charlie, addressTokenB } = await loadFixture(deployExchangeFixture);
   
         await exchange.connect(alice).deposit(addressTokenB, 750);
         await exchange.connect(alice).placeBuyOrder(150, 5);
