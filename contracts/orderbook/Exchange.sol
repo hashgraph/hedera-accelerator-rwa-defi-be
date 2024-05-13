@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./Orderbook.sol";
 
-contract Exchange is OrderBook {    
+contract Exchange is OrderBook, ReentrancyGuard {    
     /**
      * .contructor
      * @dev Exchange constructor
@@ -21,7 +22,7 @@ contract Exchange is OrderBook {
      * @param price bid price in tokenB
      * @param volume bid amount in token A
      */
-    function placeBuyOrder(uint256 price, uint256 volume) public {
+    function placeBuyOrder(uint256 price, uint256 volume) public nonReentrant {
         require(price > 0, "Invalid Price");
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenB] >= price * volume, "Not enough balance");
@@ -41,7 +42,7 @@ contract Exchange is OrderBook {
      * @param price ask price in tokenB
      * @param volume ask amount in token A
      */
-    function placeSellOrder(uint256 price, uint256 volume) public {
+    function placeSellOrder(uint256 price, uint256 volume) public nonReentrant {
         require(price > 0, "Invalid Price");
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenA] >= volume, "Not enough balance");
@@ -62,7 +63,7 @@ contract Exchange is OrderBook {
      * @param amount total value of the deposit
      * @notice it's mandatory to perform an approve call before calling this function.
      */
-    function deposit(address token, uint256 amount) public {
+    function deposit(address token, uint256 amount) public nonReentrant {
         require(token == tokenA || token == tokenB, "Invalid token");
         require(amount > 0, "Invalid amount");
 
@@ -75,7 +76,7 @@ contract Exchange is OrderBook {
      * @param token address of the ERC20 token to withdraw
      * @param amount total value of the withdraw
      */
-    function withdraw(address token, uint256 amount) public {
+    function withdraw(address token, uint256 amount) public nonReentrant {
         require(token == tokenA || token == tokenB, "Invalid token");
         require(amount > 0, "Invalid amount");
         require(balanceOf[msg.sender][token] >= amount, "Not enough balance");
@@ -90,7 +91,7 @@ contract Exchange is OrderBook {
      * @param isBuyOrder boolean flag wheter the order is buy or sell
      * @notice only creator of the order can call this function
      */
-    function cancelOrder(uint256 orderId, bool isBuyOrder) public {
+    function cancelOrder(uint256 orderId, bool isBuyOrder) public nonReentrant {
         Order storage order = isBuyOrder ? buyOrders[orderId] : sellOrders[orderId];
 
         require(order.trader != address(0), "Order do not exists" );
