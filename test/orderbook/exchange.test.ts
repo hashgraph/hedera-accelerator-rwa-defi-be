@@ -462,51 +462,92 @@ describe('Exchange', () => {
     });
   });
 
-  describe('.cancelSellOrder', () => {
+  describe('.cancelOrder', () => {    
     describe('when order dont exists', () => {
       it('should revert', async () => {
         const { exchange, alice } = await loadFixture(deployExchangeFixture);
 
-        await expect(exchange.connect(alice).cancelSellOrder(1)).to.be.revertedWith('Order do not exists');
+        await expect(exchange.connect(alice).cancelOrder(1, true)).to.be.revertedWith('Order do not exists');
       });
     });
 
     describe('when order exists', () => {
-      describe('when caller is not the order owner', () => {
-        it('should revert', async () => {
-          const { exchange, alice, bob, addressTokenA } = await loadFixture(deployExchangeFixture);
-          await exchange.connect(alice).deposit(addressTokenA, 1000);
-          await exchange.connect(alice).placeSellOrder(100, 1000);
-          await expect(exchange.connect(bob).cancelSellOrder(1)).to.be.revertedWith('Only the order creator can cancel this order');
+      describe('when is buy Order', () => {
+        describe('when caller is not the order owner', () => {
+          it('should revert', async () => {
+            const { exchange, alice, bob, addressTokenB } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenB, 1000);
+            await exchange.connect(alice).placeBuyOrder(100, 10);
+            await expect(exchange.connect(bob).cancelOrder(1, true)).to.be.revertedWith('Only the order creator can cancel this order');
+          });
+        });
+        describe('when order is fulfilled', () => {
+          it('should revert', async () => {
+            const { exchange, alice, bob, addressTokenA, addressTokenB } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenB, 1000);
+            await exchange.connect(alice).placeBuyOrder(100, 10);
+            await exchange.connect(bob).deposit(addressTokenA, 10);
+            await exchange.connect(bob).placeSellOrder(100, 10);
+  
+            await expect(exchange.connect(alice).cancelOrder(1, true)).to.be.revertedWith('Order already cancelled or fulfilled');
+          });
+        });
+  
+        describe('when caller is the orders owner', () => {
+          it('should cancel order and refund balance', async () => {
+            const { exchange, alice, addressTokenB } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenB, 1000);
+            await exchange.connect(alice).placeBuyOrder(100, 10);
+  
+            expect(await exchange.balanceOf(alice.address, addressTokenB)).to.be.equal(0);
+  
+            const cancelation = await exchange.connect(alice).cancelOrder(1, true);
+  
+            expect(await exchange.balanceOf(alice.address, addressTokenB)).to.be.equal(1000);
+  
+            await expect(cancelation).to.emit(exchange, 'OrderCanceled').withArgs(true, 1, alice.address);          
+  
+          });
         });
       });
 
-      describe('when order is fulfilled', () => {
-        it('should revert', async () => {
-          const { exchange, alice, bob, addressTokenA, addressTokenB } = await loadFixture(deployExchangeFixture);
-          await exchange.connect(alice).deposit(addressTokenA, 10);
-          await exchange.connect(alice).placeSellOrder(100, 10);
-          await exchange.connect(bob).deposit(addressTokenB, 1000);
-          await exchange.connect(bob).placeBuyOrder(100, 10);
-
-          await expect(exchange.connect(alice).cancelSellOrder(1)).to.be.revertedWith('Order already cancelled or fulfilled');
+      describe('when is sell Order', () => {
+        describe('when caller is not the order owner', () => {
+          it('should revert', async () => {
+            const { exchange, alice, bob, addressTokenA } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenA, 10);
+            await exchange.connect(alice).placeSellOrder(100, 10);
+            await expect(exchange.connect(bob).cancelOrder(1, false)).to.be.revertedWith('Only the order creator can cancel this order');
+          });
         });
-      });
 
-      describe('when caller is the orders owner', () => {
-        it('should cancel order and refund balance', async () => {
-          const { exchange, alice, addressTokenA } = await loadFixture(deployExchangeFixture);
-          await exchange.connect(alice).deposit(addressTokenA, 10);
-          await exchange.connect(alice).placeSellOrder(100, 10);
-
-          expect(await exchange.balanceOf(alice.address, addressTokenA)).to.be.equal(0);
-
-          const cancelation = await exchange.connect(alice).cancelSellOrder(1);
-
-          expect(await exchange.balanceOf(alice.address, addressTokenA)).to.be.equal(10);
-
-          await expect(cancelation).to.emit(exchange, 'OrderCanceled').withArgs(false, 1, alice.address);          
-
+        describe('when order is fulfilled', () => {
+          it('should revert', async () => {
+            const { exchange, alice, bob, addressTokenA, addressTokenB } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenA, 10);
+            await exchange.connect(alice).placeSellOrder(100, 10);
+            await exchange.connect(bob).deposit(addressTokenB, 1000);
+            await exchange.connect(bob).placeBuyOrder(100, 10);
+  
+            await expect(exchange.connect(alice).cancelOrder(1, false)).to.be.revertedWith('Order already cancelled or fulfilled');
+          });
+        });
+  
+        describe('when caller is the orders owner', () => {
+          it('should cancel order and refund balance', async () => {
+            const { exchange, alice, addressTokenA } = await loadFixture(deployExchangeFixture);
+            await exchange.connect(alice).deposit(addressTokenA, 10);
+            await exchange.connect(alice).placeSellOrder(100, 10);
+  
+            expect(await exchange.balanceOf(alice.address, addressTokenA)).to.be.equal(0);
+  
+            const cancelation = await exchange.connect(alice).cancelOrder(1, false);
+  
+            expect(await exchange.balanceOf(alice.address, addressTokenA)).to.be.equal(10);
+  
+            await expect(cancelation).to.emit(exchange, 'OrderCanceled').withArgs(false, 1, alice.address);          
+  
+          });
         });
       });
     });
