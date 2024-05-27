@@ -29,6 +29,7 @@ abstract contract OrderBook {
     }
 
     function _insertBuyOrder(address trader, uint256 price, uint256 volume) internal {
+        currentOrderId++;
         uint256 currentId = firstBuyOrderId;
         uint256 lastId = 0;
 
@@ -45,9 +46,7 @@ abstract contract OrderBook {
             next: currentId
         });
 
-        // remove tokenB balance because order was placed
         balanceOf[trader][tokenB] -= price * (volume / 10 ** ERC20(tokenA).decimals());
-
         emit NewOrder(true, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
@@ -55,9 +54,11 @@ abstract contract OrderBook {
         } else {
             buyOrders[lastId].next = currentOrderId;
         }
+
     }
 
     function _insertSellOrder(address trader, uint256 price, uint256 volume) internal {
+        currentOrderId++;  // Increment order ID for the next order
         uint256 currentId = firstSellOrderId;
         uint256 lastId = 0;
 
@@ -74,9 +75,7 @@ abstract contract OrderBook {
             next: currentId
         });
 
-        // remove balance because order was placed
         balanceOf[trader][tokenA] -= volume;
-
         emit NewOrder(false, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
@@ -84,6 +83,7 @@ abstract contract OrderBook {
         } else {
             sellOrders[lastId].next = currentOrderId;
         }
+
     }
 
     function _matchBuyOrders(
@@ -91,7 +91,7 @@ abstract contract OrderBook {
         uint256 sellPrice,
         uint256 sellVolume
     ) internal returns (uint256)  {
-        uint256 currentBuyId = buyOrders[firstBuyOrderId].id; 
+        uint256 currentBuyId = firstBuyOrderId;
         uint256 decimals = ERC20(tokenA).decimals();
 
         while (currentBuyId != 0 && sellVolume > 0) {
@@ -101,9 +101,7 @@ abstract contract OrderBook {
                 uint256 tradedVolume = (buyOrder.volume < sellVolume) ? buyOrder.volume : sellVolume;
                 uint256 tradedPrice = sellPrice;
 
-                // trade
                 balanceOf[sellTrader][tokenB] += tradedPrice * (tradedVolume / 10 ** decimals);
-
                 balanceOf[sellTrader][tokenA] -= tradedVolume;
                 balanceOf[buyOrder.trader][tokenA] += tradedVolume;
                 
@@ -113,13 +111,16 @@ abstract contract OrderBook {
                 emit Trade(tradedVolume, buyOrder.price, sellTrader, buyOrder.trader);
 
                 if (buyOrder.volume == 0) {
-                    currentBuyId = buyOrder.next;
+                    uint256 nextId = buyOrder.next;
+                    delete buyOrders[currentBuyId];  // Remove the order after it is fully matched
+                    currentBuyId = nextId;
                 }
             } else {
                 break; // No more matches possible
             }
         }
 
+        firstBuyOrderId = currentBuyId;  // Update the first buy order ID
         return sellVolume;
     }
 
@@ -128,31 +129,31 @@ abstract contract OrderBook {
         uint256 buyPrice,
         uint256 buyVolume
     ) internal returns (uint256) {
-        uint256 currentSellId = sellOrders[firstSellOrderId].id; 
+        uint256 currentSellId = firstSellOrderId; 
         uint256 decimals = ERC20(tokenA).decimals();
 
         while (currentSellId != 0 && buyVolume > 0) {
             Order storage sellOrder = sellOrders[currentSellId];
 
+            // emit Trade(1, 1, address(0), address(this));
             if (buyPrice >= sellOrder.price) {
                 uint256 tradedVolume = (sellOrder.volume < buyVolume) ? sellOrder.volume : buyVolume;
                 uint256 tradedPrice = sellOrder.price;
 
 
-                // trade
                 balanceOf[buyTrader][tokenB] -= tradedPrice * (tradedVolume / 10 ** decimals);
                 balanceOf[buyTrader][tokenA] += tradedVolume;
-
                 balanceOf[sellOrder.trader][tokenB] += tradedPrice * (tradedVolume / 10 ** decimals);
 
-                // diminui tradedVolume de buyVolume e sellVolume
                 buyVolume -= tradedVolume;
                 sellOrder.volume -= tradedVolume;
 
                 emit Trade(tradedVolume, sellOrder.price, buyTrader, sellOrder.trader);
 
                 if (sellOrder.volume == 0) {
-                    currentSellId = sellOrder.next;
+                    uint256 nextId = sellOrder.next;
+                    delete sellOrders[currentSellId];  // Remove the order after it is fully matched
+                    currentSellId = nextId;
                 }
             } else {
                 // since the sell order book is sorter by the lowest price
@@ -161,6 +162,7 @@ abstract contract OrderBook {
             }
         }
 
+        firstSellOrderId = currentSellId;  // Update the first sell order ID
         return buyVolume;
     }
 

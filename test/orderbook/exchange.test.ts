@@ -87,7 +87,11 @@ describe('Exchange', () => {
 
         await exchange.connect(david).deposit(tokenA, toTokenA(5n));
         await exchange.connect(david).placeSellOrder(toTokenB(150n), toTokenA(5n));
-        expect(await exchange.currentOrderId()).to.equal(4);
+        expect(await exchange.currentOrderId()).to.equal(3); // matched orders does not increment id
+
+        await exchange.connect(david).deposit(tokenA, toTokenA(750n));
+        await exchange.connect(david).placeBuyOrder(toTokenB(150n), toTokenA(5n));
+        expect(await exchange.currentOrderId()).to.equal(4); // matched orders does not increment id
 
       });
     });
@@ -111,34 +115,38 @@ describe('Exchange', () => {
       it("should place buy orders sorted by highest price", async function () {
         const { exchange, alice, bob, charlie, addressTokenB, toTokenA, toTokenB } = await loadFixture(deployExchangeFixture);
   
-        await exchange.connect(alice).deposit(addressTokenB, toTokenB(750n));
-        await exchange.connect(alice).placeBuyOrder(toTokenB(150n), toTokenA(5n));
-
-        await exchange.connect(bob).deposit(addressTokenB, toTokenB(600n));
-        await exchange.connect(bob).placeBuyOrder(toTokenB(200n), toTokenA(3n));
-
+        await exchange.connect(alice).deposit(addressTokenB, toTokenB(600n));
+        await exchange.connect(bob).deposit(addressTokenB, toTokenB(750n));
         await exchange.connect(charlie).deposit(addressTokenB, toTokenB(4600n));
-        await exchange.connect(charlie).placeBuyOrder(toTokenB(100n), toTokenA(10n));
+
+        await exchange.connect(alice).placeBuyOrder(toTokenB(200n), toTokenA(3n));
+        await exchange.connect(bob).placeBuyOrder(toTokenB(150n), toTokenA(5n));
         await exchange.connect(charlie).placeBuyOrder(toTokenB(110n), toTokenA(10n));
+        await exchange.connect(charlie).placeBuyOrder(toTokenB(100n), toTokenA(10n));
   
-        const firstOrder = await exchange.buyOrders(2); // The order with the highest price
-        const secondOrder = await exchange.buyOrders(1);
+        const firstOrder = await exchange.buyOrders(1); // The order with the highest price
+        const secondOrder = await exchange.buyOrders(2);
         const thirdOrder = await exchange.buyOrders(3);
+        const fourthOrder = await exchange.buyOrders(4);
   
         expect(firstOrder.price).to.equal(toTokenB(200n));
         expect(secondOrder.price).to.equal(toTokenB(150n));
-        expect(thirdOrder.price).to.equal(toTokenB(100n));
+        expect(thirdOrder.price).to.equal(toTokenB(110n));
+        expect(fourthOrder.price).to.equal(toTokenB(100n));
   
-        expect(firstOrder.next).to.equal(1); // Points to second highest price
-        expect(secondOrder.next).to.equal(4); // Points to lowest price
-        expect(thirdOrder.next).to.equal(0); // No next order
+        expect(firstOrder.next).to.equal(2); // Points to second highest price
+        expect(secondOrder.next).to.equal(3);
+        expect(thirdOrder.next).to.equal(4); 
+        expect(fourthOrder.next).to.equal(0); 
 
         // check if firstBuyOrderId is set correctly to the bid with the hihgest price
-        expect(await exchange.firstBuyOrderId()).to.equal(2);
+        expect(await exchange.firstBuyOrderId()).to.equal(1);
 
         await exchange.connect(charlie).placeBuyOrder(toTokenB(250n), toTokenA(10n));
+        const fifthOrder_2 = await exchange.buyOrders(5);
 
-        expect(await exchange.firstBuyOrderId()).to.equal(5);
+        expect(await exchange.firstBuyOrderId()).to.equal(5); 
+        expect(fifthOrder_2.next).to.equal(1); 
       });
     });
 
@@ -148,12 +156,10 @@ describe('Exchange', () => {
           const { exchange, alice, bob, addressTokenB, addressTokenA, toTokenA, toTokenB } = await loadFixture(deployExchangeFixture);
         
           await exchange.connect(alice).deposit(addressTokenA, toTokenA(10n));
-          await exchange.connect(alice).placeSellOrder(toTokenB(100n), toTokenA(10n)); // price, volume
-
           await exchange.connect(bob).deposit(addressTokenB, toTokenB(1000n));
-          const trade = await exchange.connect(bob).placeBuyOrder(toTokenB(100n), toTokenA(10n)); // price, volume
 
-          await trade.wait();
+          await exchange.connect(alice).placeSellOrder(toTokenB(100n), toTokenA(10n)); // price, volume
+          const trade = await exchange.connect(bob).placeBuyOrder(toTokenB(100n), toTokenA(10n)); // price, volume
 
           await expect(trade).to.emit(exchange, 'Trade').withArgs(toTokenA(10n), toTokenB(100n), bob.address, alice.address);          
 
@@ -503,7 +509,7 @@ describe('Exchange', () => {
             await exchange.connect(bob).deposit(addressTokenA, toTokenA(10n));
             await exchange.connect(bob).placeSellOrder(toTokenB(100n), toTokenA(10n));
   
-            await expect(exchange.connect(alice).cancelOrder(1, true)).to.be.revertedWith('Order already cancelled or fulfilled');
+            await expect(exchange.connect(alice).cancelOrder(1, true)).to.be.revertedWith('Order do not exists');
           });
         });
   
@@ -539,11 +545,12 @@ describe('Exchange', () => {
           it('should revert', async () => {
             const { exchange, alice, bob, addressTokenA, addressTokenB, toTokenA, toTokenB } = await loadFixture(deployExchangeFixture);
             await exchange.connect(alice).deposit(addressTokenA, toTokenA(10n));
-            await exchange.connect(alice).placeSellOrder(toTokenB(100n), toTokenA(10n));
             await exchange.connect(bob).deposit(addressTokenB, toTokenB(1000n));
+            
+            await exchange.connect(alice).placeSellOrder(toTokenB(100n), toTokenA(10n));
             await exchange.connect(bob).placeBuyOrder(toTokenB(100n), toTokenA(10n));
   
-            await expect(exchange.connect(alice).cancelOrder(1, false)).to.be.revertedWith('Order already cancelled or fulfilled');
+            await expect(exchange.connect(alice).cancelOrder(1, false)).to.be.revertedWith('Order do not exists');
           });
         });
   

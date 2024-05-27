@@ -23,18 +23,18 @@ contract Exchange is OrderBook, ReentrancyGuard {
      * @param price bid price in tokenB
      * @param volume bid amount in token A
      */
-    function placeBuyOrder(uint256 price, uint256 volume) public nonReentrant {
+    function placeBuyOrder(uint256 price, uint256 volume) public nonReentrant returns(uint256) {
         require(price > 0, "Invalid Price");
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenB] >= price * (volume / 10 ** ERC20(tokenA).decimals()), "Not enough balance");
-
-        currentOrderId++;
 
         (uint256 remainVolume) = _matchSellOrders(msg.sender, price, volume);
 
         if (remainVolume > 0) {
             _insertBuyOrder(msg.sender, price, remainVolume);
         }
+
+        return currentOrderId;
     }
 
      /**
@@ -43,18 +43,18 @@ contract Exchange is OrderBook, ReentrancyGuard {
      * @param price ask price in tokenB
      * @param volume ask amount in token A
      */
-    function placeSellOrder(uint256 price, uint256 volume) public nonReentrant {
+    function placeSellOrder(uint256 price, uint256 volume) public nonReentrant returns(uint256) {
         require(price > 0, "Invalid Price");
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenA] >= volume, "Not enough balance");
-
-        currentOrderId++;
 
         (uint256 remainVolume) = _matchBuyOrders(msg.sender, price, volume);
 
         if (remainVolume > 0){
             _insertSellOrder(msg.sender, price, remainVolume);
-        }        
+        }   
+
+        return currentOrderId;
     }
 
     /**
