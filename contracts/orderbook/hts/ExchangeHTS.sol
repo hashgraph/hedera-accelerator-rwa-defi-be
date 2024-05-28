@@ -8,7 +8,7 @@ import "./OrderBookHTS.sol";
 
 contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {    
     /**
-     * .contructor
+     * .constructor
      * @dev Exchange constructor
      * @param _tokenA address of token A
      * @param _tokenB address of token B
@@ -23,7 +23,7 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
 
     /**
      * .placeBuyOrder
-     * @dev match buy order with existing sell oreders, the remaining volume is created as a buy order
+     * @dev match buy order with existing sell orders, the remaining volume is created as a buy order
      * @param price bid price in tokenB
      * @param volume bid amount in token A
      */
@@ -32,20 +32,18 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenB] >= price * (volume / 10 ** 8), "Not enough balance");
 
-        currentOrderId++;
-
-        (int64 remainVolume) = _matchSellOrders(msg.sender, price, volume);
+        int64 remainVolume = _matchSellOrders(msg.sender, price, volume);
 
         if (remainVolume > 0) {
             _insertBuyOrder(msg.sender, price, remainVolume);
         }
 
-        return currentOrderId;
+        return 0;
     }
 
-     /**
+    /**
      * .placeSellOrder
-     * @dev match sell order with existing buy oreders, the remaining volume is created as a sell order
+     * @dev match sell order with existing buy orders, the remaining volume is created as a sell order
      * @param price ask price in tokenB
      * @param volume ask amount in token A
      */
@@ -54,11 +52,9 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
         require(volume > 0, "Invalid Volume");
         require(balanceOf[msg.sender][tokenA] >= volume, "Not enough balance");
 
-        currentOrderId++;
+        int64 remainVolume = _matchBuyOrders(msg.sender, price, volume);
 
-        (int64 remainVolume) = _matchBuyOrders(msg.sender, price, volume);
-
-        if (remainVolume > 0){
+        if (remainVolume > 0) {
             _insertSellOrder(msg.sender, price, remainVolume);
         }
 
@@ -67,7 +63,7 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
 
     /**
      * .deposit
-     * @dev make an ERC20 from deposit from the sender to this contract given the token and amount
+     * @dev make an ERC20 deposit from the sender to this contract given the token and amount
      * @param token address of the ERC20 token to deposit
      * @param amount total value of the deposit
      * @notice it's mandatory to perform an approve call before calling this function.
@@ -83,7 +79,7 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
      * .withdraw
      * @dev make an ERC20 withdraw from this contract to the sender given the token and amount
      * @param token address of the ERC20 token to withdraw
-     * @param amount total value of the withdraw
+     * @param amount total value of the withdrawal
      */
     function withdraw(address token, int64 amount) public nonReentrant {
         require(token == tokenA || token == tokenB, "Invalid token");
@@ -97,18 +93,20 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
      * .cancelOrder
      * @dev cancel an order by id
      * @param orderId uint256 id of the order
-     * @param isBuyOrder boolean flag wheter the order is buy or sell
+     * @param isBuyOrder boolean flag whether the order is buy or sell
      * @notice only creator of the order can call this function
      */
     function cancelOrder(uint256 orderId, bool isBuyOrder) public nonReentrant {
         Order storage order = isBuyOrder ? buyOrders[orderId] : sellOrders[orderId];
 
-        require(order.trader != address(0), "Order do not exists" );
+        require(order.trader != address(0), "Order does not exist");
         require(order.trader == msg.sender, "Only the order creator can cancel this order");
         require(order.volume > 0, "Order already cancelled or fulfilled");
 
-        isBuyOrder 
-            ? _cancelBuyOrder(order)
-            : _cancelSellOrder(order);
+        if (isBuyOrder) {
+            _cancelBuyOrder(order);
+        } else {
+            _cancelSellOrder(order);
+        }
     }
 }

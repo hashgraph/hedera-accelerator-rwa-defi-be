@@ -18,7 +18,7 @@ abstract contract OrderBookHTS {
     event Trade(int64 tradedVolume, int64 price, address buyer, address seller);
     event NewOrder(bool isBuy, uint256 orderId, address trader, int64 price, int64 volume);
     event Deposit(address indexed trader, address token, int64 amount);
-    event Withdraw(address indexed trader, address token, int64 amount);
+    event Withdraw(address trader, address token, int64 amount);
     event OrderCanceled(bool isBuy, uint256 indexed orderId, address indexed trader);
 
     struct Order {
@@ -30,6 +30,7 @@ abstract contract OrderBookHTS {
     }
 
     function _insertBuyOrder(address trader, int64 price, int64 volume) internal {
+        currentOrderId++;  // Increment order ID for the next order
         uint256 currentId = firstBuyOrderId;
         uint256 lastId = 0;
 
@@ -46,9 +47,7 @@ abstract contract OrderBookHTS {
             next: currentId
         });
 
-        // remove tokenB balance because order was placed
         balanceOf[trader][tokenB] -= price * (volume / 10 ** 8);
-
         emit NewOrder(true, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
@@ -56,9 +55,11 @@ abstract contract OrderBookHTS {
         } else {
             buyOrders[lastId].next = currentOrderId;
         }
+
     }
 
     function _insertSellOrder(address trader, int64 price, int64 volume) internal {
+        currentOrderId++;  // Increment order ID for the next order
         uint256 currentId = firstSellOrderId;
         uint256 lastId = 0;
 
@@ -75,9 +76,7 @@ abstract contract OrderBookHTS {
             next: currentId
         });
 
-        // remove balance because order was placed
         balanceOf[trader][tokenA] -= volume;
-
         emit NewOrder(false, currentOrderId, trader, price, volume);
 
         if (lastId == 0) {
@@ -85,14 +84,15 @@ abstract contract OrderBookHTS {
         } else {
             sellOrders[lastId].next = currentOrderId;
         }
+
     }
 
     function _matchBuyOrders(
         address sellTrader,
         int64 sellPrice,
         int64 sellVolume
-    ) internal returns (int64)  {
-        uint256 currentBuyId = buyOrders[firstBuyOrderId].id; 
+    ) internal returns (int64) {
+        uint256 currentBuyId = firstBuyOrderId;
 
         while (currentBuyId != 0 && sellVolume > 0) {
             Order storage buyOrder = buyOrders[currentBuyId];
@@ -101,25 +101,26 @@ abstract contract OrderBookHTS {
                 int64 tradedVolume = (buyOrder.volume < sellVolume) ? buyOrder.volume : sellVolume;
                 int64 tradedPrice = sellPrice;
 
-                // trade
                 balanceOf[sellTrader][tokenB] += tradedPrice * (tradedVolume / 10 ** 8);
-
                 balanceOf[sellTrader][tokenA] -= tradedVolume;
                 balanceOf[buyOrder.trader][tokenA] += tradedVolume;
-                
+
                 sellVolume -= tradedVolume;
                 buyOrder.volume -= tradedVolume;
 
                 emit Trade(tradedVolume, buyOrder.price, sellTrader, buyOrder.trader);
 
                 if (buyOrder.volume == 0) {
-                    currentBuyId = buyOrder.next;
+                    uint256 nextId = buyOrder.next;
+                    delete buyOrders[currentBuyId];  // Remove the order after it is fully matched
+                    currentBuyId = nextId;
                 }
             } else {
-                break; // No more matches possible
+                break;
             }
         }
 
+        firstBuyOrderId = currentBuyId;  // Update the first buy order ID
         return sellVolume;
     }
 
@@ -128,7 +129,7 @@ abstract contract OrderBookHTS {
         int64 buyPrice,
         int64 buyVolume
     ) internal returns (int64) {
-        uint256 currentSellId = sellOrders[firstSellOrderId].id; 
+        uint256 currentSellId = firstSellOrderId;
 
         while (currentSellId != 0 && buyVolume > 0) {
             Order storage sellOrder = sellOrders[currentSellId];
@@ -137,34 +138,30 @@ abstract contract OrderBookHTS {
                 int64 tradedVolume = (sellOrder.volume < buyVolume) ? sellOrder.volume : buyVolume;
                 int64 tradedPrice = sellOrder.price;
 
-
-                // trade
                 balanceOf[buyTrader][tokenB] -= tradedPrice * (tradedVolume / 10 ** 8);
                 balanceOf[buyTrader][tokenA] += tradedVolume;
-
                 balanceOf[sellOrder.trader][tokenB] += tradedPrice * (tradedVolume / 10 ** 8);
 
-                // diminui tradedVolume de buyVolume e sellVolume
                 buyVolume -= tradedVolume;
                 sellOrder.volume -= tradedVolume;
 
                 emit Trade(tradedVolume, sellOrder.price, buyTrader, sellOrder.trader);
 
                 if (sellOrder.volume == 0) {
-                    currentSellId = sellOrder.next;
+                    uint256 nextId = sellOrder.next;
+                    delete sellOrders[currentSellId];  // Remove the order after it is fully matched
+                    currentSellId = nextId;
                 }
             } else {
-                // since the sell order book is sorter by the lowest price
-                // no more matches possible and we interrupt the loop.
-                break; 
+                break;
             }
         }
 
+        firstSellOrderId = currentSellId;  // Update the first sell order ID
         return buyVolume;
     }
 
     function _deposit(address trader, address token, int64 amount) internal {
-        // ERC20(token).transferFrom(trader, address(this), amount);
         SafeHTS.safeTransferToken(token, trader, address(this), amount);
         balanceOf[trader][token] += amount;
         emit Deposit(trader, token, amount);
@@ -172,52 +169,45 @@ abstract contract OrderBookHTS {
 
     function _withdraw(address trader, address token, int64 amount) internal {
         balanceOf[trader][token] -= amount;
-        // ERC20(token).transfer(trader, amount);
         SafeHTS.safeTransferToken(token, address(this), trader, amount);
         emit Withdraw(trader, token, amount);
     }
 
-    function _cancelSellOrder(Order storage sellOrder) internal {        
+    function _cancelSellOrder(Order storage sellOrder) internal {
         if (sellOrder.id == firstSellOrderId) {
             firstSellOrderId = sellOrder.next;
         } else {
-            // Find the previous order
             Order storage currentOrder = sellOrders[firstSellOrderId];
 
             while (currentOrder.next != sellOrder.id) {
                 require(currentOrder.next != 0, "Order not found");
                 currentOrder = sellOrders[currentOrder.next];
             }
-            // Adjust pointers
             currentOrder.next = sellOrder.next;
         }
 
-        // refund balance to trader
         balanceOf[sellOrder.trader][tokenA] += sellOrder.volume;
         sellOrder.volume = 0;
-        
+
         emit OrderCanceled(false, sellOrder.id, msg.sender);
     }
 
-    function _cancelBuyOrder(Order storage buyOrder) internal {        
+    function _cancelBuyOrder(Order storage buyOrder) internal {
         if (buyOrder.id == firstBuyOrderId) {
             firstBuyOrderId = buyOrder.next;
         } else {
-            // Find the previous order
             Order storage currentOrder = buyOrders[firstBuyOrderId];
 
             while (currentOrder.next != buyOrder.id) {
                 require(currentOrder.next != 0, "Order not found");
                 currentOrder = buyOrders[currentOrder.next];
             }
-            // Adjust pointers
             currentOrder.next = buyOrder.next;
         }
 
-        // refund balance to trader
-        balanceOf[buyOrder.trader][tokenB] += buyOrder.price * (buyOrder.volume / 10 ** 8); // HTS tokens have 8 decimal places
+        balanceOf[buyOrder.trader][tokenB] += buyOrder.price * (buyOrder.volume / 10 ** 8);
         buyOrder.volume = 0;
-        
+
         emit OrderCanceled(true, buyOrder.id, msg.sender);
     }
 }
