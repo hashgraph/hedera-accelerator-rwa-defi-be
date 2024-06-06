@@ -433,6 +433,7 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
      */
     function claimAllReward(uint256 _startPosition) public payable returns (uint256, uint256) {
         uint256 rewardTokensSize = rewardTokens.length;
+        address _token = feeConfig.token;
 
         for (uint256 i = _startPosition; i < rewardTokensSize && i < _startPosition + 10; i++) {
             uint256 reward;
@@ -441,7 +442,7 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
                 .mulDivDown(1, userContribution[msg.sender].sharesAmount);
             userContribution[msg.sender].lastClaimedAmountT[token] = tokensRewardInfo[token].amount;
             SafeHTS.safeTransferToken(token, address(this), msg.sender, int64(uint64(reward)));
-            _deductFee(reward);
+            if (_token != address(0)) _deductFee(reward);
         }
         return (_startPosition, rewardTokensSize);
     }
