@@ -74,13 +74,8 @@ abstract contract FeeConfiguration is AccessControl {
         address _token = feeConfig.token;
         uint256 fee = _calculateFee(_amount, feeConfig.feePercentage);
 
-        if (_token == address(0)) {
-            require(msg.value == fee, "FC: Not enough HBAR to pay fee");
-            Address.sendValue(payable(feeConfig.receiver), fee);
-        } else {
-            require(IERC20(_token).balanceOf(msg.sender) >= fee, "FC: Insufficient token balance");
-            SafeHTS.safeTransferToken(_token, msg.sender, feeConfig.receiver, int64(uint64(fee)));
-        }
+        require(IERC20(_token).balanceOf(msg.sender) >= fee, "FC: Insufficient token balance");
+        SafeHTS.safeTransferToken(_token, msg.sender, feeConfig.receiver, int64(uint64(fee)));
     }
 
     /**
@@ -91,7 +86,6 @@ abstract contract FeeConfiguration is AccessControl {
      * @param _feePercentage The fee percentage.
      */
     function _updateFeeConfigInternally(address _receiver, address _token, uint256 _feePercentage) private {
-        require(_feePercentage > 0 && _receiver != address(0), "FC: Invalid fee config data");
         require(_feePercentage < BASIS_POINTS, "FC: Invalid fee");
         feeConfig.receiver = _receiver;
         feeConfig.token = _token;
@@ -105,7 +99,7 @@ abstract contract FeeConfiguration is AccessControl {
      * @param _amount The amount of the transfer.
      * @param _feePercentage The fee percentage.
      */
-    function _calculateFee(uint256 _amount, uint256 _feePercentage) private pure returns (uint256) {
+    function _calculateFee(uint256 _amount, uint256 _feePercentage) internal pure returns (uint256) {
         require(_amount * _feePercentage >= BASIS_POINTS, "FC: Too small amount to consider fee");
         return (_amount * _feePercentage) / BASIS_POINTS;
     }

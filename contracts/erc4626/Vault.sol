@@ -13,8 +13,6 @@ import {SafeTransferLib} from "./SafeTransferLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-
 import "../common/safe-HTS/SafeHTS.sol";
 import "../common/safe-HTS/IHederaTokenService.sol";
 
@@ -446,6 +444,32 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
             _deductFee(reward);
         }
         return (_startPosition, rewardTokensSize);
+    }
+
+    /**
+     * @dev Returns all rewards for a user with fee considering.
+     *
+     * @param _user The user address.
+     * @return rewards The calculated rewards.
+     */
+    function getUserRewards(address _user) public view returns (uint256[] memory rewards) {
+        uint256 currentReward;
+        uint256 currentFee;
+        uint256 rewardsSize = rewardTokens.length;
+        for (uint256 i = 0; i < rewardsSize; i++) {
+            currentReward = (tokensRewardInfo[rewardTokens[i]].amount -
+                userContribution[_user].lastClaimedAmountT[rewardTokens[i]]).mulDivDown(
+                    1,
+                    userContribution[_user].sharesAmount
+                );
+
+            if (feeConfig.feePercentage > 0) {
+                currentFee = _calculateFee(currentReward, feeConfig.feePercentage);
+                rewards[i] = currentReward - currentFee;
+            } else {
+                rewards[i] = currentReward;
+            }
+        }
     }
 
     function calculateReward(uint256 _id) public view returns (uint256 reward) {
