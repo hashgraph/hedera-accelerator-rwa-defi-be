@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import {ERC20} from "./ERC20.sol";
 import {IERC4626} from "./IERC4626.sol";
+import {IHRC} from "../common/hedera/IHRC.sol";
 
 import {FeeConfiguration} from "../common/FeeConfiguration.sol";
 
@@ -254,7 +255,7 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
             for (uint256 i; i < rewardTokensSize; i++) {
                 address token = rewardTokens[i];
                 userContribution[msg.sender].lastClaimedAmountT[token] = tokensRewardInfo[token].amount;
-                SafeHTS.safeAssociateToken(token, msg.sender);
+                IHRC(token).associate();
             }
             userContribution[msg.sender].sharesAmount = _amount;
             userContribution[msg.sender].exist = true;
