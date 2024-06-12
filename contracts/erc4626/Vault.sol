@@ -48,6 +48,7 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
     // User Info struct
     struct UserInfo {
         uint256 sharesAmount;
+        uint256 lastLockedTime;
         mapping(address => uint256) lastClaimedAmountT;
         bool exist;
     }
@@ -56,6 +57,14 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
     struct RewardsInfo {
         uint256 amount;
         bool exist;
+    }
+
+    struct ClaimCallResponse {
+        uint256 alreadyClaimedCount;
+        uint256 claimedRewardsCount;
+        uint256 unclaimedRewardsCount;
+        uint256 totalRewardsCount;
+        address[] claimedRewardsTokens;
     }
 
     /**
@@ -259,10 +268,12 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
             }
             userContribution[msg.sender].sharesAmount = _amount;
             userContribution[msg.sender].exist = true;
+            userContribution[msg.sender].lastLockedTime = block.timestamp;
             assetTotalSupply += _amount;
         } else {
             claimAllReward(0);
             userContribution[msg.sender].sharesAmount += _amount;
+            userContribution[msg.sender].lastLockedTime = block.timestamp;
             assetTotalSupply += _amount;
         }
     }
@@ -449,37 +460,35 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Returns all rewards for a user with fee considering.
+     * @dev Returns rewards for a user with fee considering.
      *
      * @param _user The user address.
-     * @return rewards The calculated rewards.
+     * @param _rewardToken The reward address.
+     * @return unclaimedAmount The calculated rewards.
      */
-    function getUserRewards(address _user) public view returns (uint256[] memory rewards) {
-        uint256 currentReward;
-        uint256 currentFee;
-        uint256 rewardsSize = rewardTokens.length;
-        for (uint256 i = 0; i < rewardsSize; i++) {
-            currentReward = (tokensRewardInfo[rewardTokens[i]].amount -
-                userContribution[_user].lastClaimedAmountT[rewardTokens[i]]).mulDivDown(
-                    1,
-                    userContribution[_user].sharesAmount
-                );
+    function getUserReward(address _user, address _rewardToken) public view returns (uint256 unclaimedAmount) {
+        RewardsInfo storage _rewardInfo = tokensRewardInfo[_rewardToken];
 
-            if (feeConfig.feePercentage > 0) {
-                currentFee = _calculateFee(currentReward, feeConfig.feePercentage);
-                rewards[i] = currentReward - currentFee;
-            } else {
-                rewards[i] = currentReward;
-            }
+        uint256 perShareAmount = _rewardInfo.amount;
+        UserInfo storage cInfo = userContribution[_user];
+        uint256 userStakingTokenTotal = cInfo.sharesAmount;
+        uint256 perShareClaimedAmount = cInfo.lastClaimedAmountT[_rewardToken];
+        uint256 perShareUnclaimedAmount = perShareAmount - perShareClaimedAmount;
+        unclaimedAmount = perShareUnclaimedAmount.mulDivDown(1, userStakingTokenTotal);
+
+        if (feeConfig.feePercentage > 0) {
+            uint256 currentFee = _calculateFee(unclaimedAmount, feeConfig.feePercentage);
+            unclaimedAmount -= currentFee;
         }
     }
 
-    function calculateReward(uint256 _id) public view returns (uint256 reward) {
-        address token = rewardTokens[_id];
-        reward = (tokensRewardInfo[token].amount - userContribution[msg.sender].lastClaimedAmountT[token]).mulDivDown(
-            1,
-            userContribution[msg.sender].sharesAmount
-        );
+    function getAllRewards(address _user) public view returns (uint256[] memory) {
+        uint256[] memory _rewards;
+
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            _rewards[i] = getUserReward(_user, rewardTokens[i]);
+        }
+        return _rewards;
     }
 }
 
