@@ -36,7 +36,7 @@
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-n": "^16.6.2",
     "eslint-plugin-promise": "^6.1.1",
-    "ethers": "^6.11.1",
+    "ethers": "^6.13.0",
     "hardhat": "^2.21.0",
     "hardhat-gas-reporter": "^1.0.10",
     "solhint": "^4.1.1",
