@@ -24,7 +24,7 @@ import {
   FileId,
   ContractCallQuery,
   AccountBalanceQuery,
-  TransactionRecord
+  TransactionRecord,
 } from '@hashgraph/sdk';
 import axios from 'axios';
 
@@ -35,6 +35,28 @@ export interface Operator {
 }
 
 class Utils {
+  async transferHbar(client: Client, from: Operator, to: string | AccountId, amount: number) {
+    client.setOperator(
+      from.accountId,
+      from.key
+    );
+
+    const transferTx = new TransferTransaction()
+      .addHbarTransfer(from.accountId, -amount)
+      .addHbarTransfer(to, amount)
+      .freezeWith(client);
+
+      const transferSign = await transferTx.sign(from.key);
+      const tx = await transferSign.execute(client);
+      const rx = await tx.getReceipt(client);
+
+      if (rx.status._code != 22) {
+        throw new Error('Error transfer token status code' + rx.status._code);
+      }
+
+      console.log(`- transferHbar success with id: ${tx.transactionId}`)
+  }
+
   async createAccount(client: Client): Promise<Operator> {
     const key = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY as string);
     const adminAccountTx = await new AccountCreateTransaction()
@@ -165,7 +187,14 @@ class Utils {
       .freezeWith(client);
 
     const associateSign = await associateTx.sign(account.key); // Use the recipient's private key
-    await associateSign.execute(client);
+    const result = await associateSign.execute(client);
+    const receipt = await result.getReceipt(client);
+
+    if (receipt.status._code != 22) {
+      throw new Error('Error Associating token code' + receipt.status._code);
+    }
+
+    console.log(`- Associate token transaciton executed ${result.transactionId}`);
   }
 
   async transferToken(client: Client, tokenId: TokenId | string, from: Operator, to: AccountId, amount: number) {
@@ -175,8 +204,8 @@ class Utils {
     );
 
     const transferTx = new TransferTransaction()
-      .addTokenTransfer(tokenId, from.accountId, -amount)
-      .addTokenTransfer(tokenId, to, amount)  
+      .addTokenTransfer(tokenId, from.accountId, amount * -1)
+      .addTokenTransfer(tokenId, to, amount * 1)  
       .freezeWith(client);
 
       const transferSign = await transferTx.sign(from.key);
@@ -218,10 +247,10 @@ class Utils {
     console.log(`- AccountAllowanceApproveTransaction success with id: ${tx.transactionId}`)
   }
 
-  async executeContract(client: Client, operator: Operator, contract: ContractId | string, functionName: string, params: ContractFunctionParameters): Promise<{ receipt: TransactionReceipt, record : TransactionRecord }> {
+  async executeContract(client: Client, operator: Operator, contract: ContractId | string, functionName: string, params: ContractFunctionParameters, config?: any): Promise<{ receipt: TransactionReceipt, record : TransactionRecord }> {
     const contractExecuteTx = new ContractExecuteTransaction()
         .setContractId(contract)
-        .setGas(1000000) // Adjust based on the complexity of your function
+        .setGas(config?.gas || 1000000) // Adjust based on the complexity of your function
         .setFunction(functionName, params)
         .setMaxTransactionFee(new Hbar(2)) // Set an appropriate max transaction fee
         .freezeWith(client)
@@ -230,7 +259,7 @@ class Utils {
     const contractExecuteSign = await contractExecuteTx.sign(operator.key);
     const contractExecuteSubmit = await contractExecuteSign.execute(client);
 
-    console.log(` - Contract Execute with transaction ${contractExecuteSubmit.transactionId.toString()}`);
+    console.log(` - Contract Execute ${functionName} with transaction ${contractExecuteSubmit.transactionId.toString()}`);
 
     return { 
       receipt: await contractExecuteSubmit.getReceipt(client),

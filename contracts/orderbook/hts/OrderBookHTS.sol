@@ -17,9 +17,9 @@ abstract contract OrderBookHTS {
 
     event Trade(int64 tradedVolume, int64 price, address buyer, address seller);
     event NewOrder(bool isBuy, uint256 orderId, address trader, int64 price, int64 volume);
-    event Deposit(address indexed trader, address token, int64 amount);
+    event Deposit(address trader, address token, int64 amount);
     event Withdraw(address trader, address token, int64 amount);
-    event OrderCanceled(bool isBuy, uint256 indexed orderId, address indexed trader);
+    event OrderCanceled(bool isBuy, uint256 orderId, address trader);
 
     struct Order {
         uint256 id;
@@ -93,8 +93,10 @@ abstract contract OrderBookHTS {
         int64 sellVolume
     ) internal returns (int64) {
         uint256 currentBuyId = firstBuyOrderId;
+        uint256 maxIterations = 10; // Define a maximum number of iterations per call
+        uint256 iterations = 0;
 
-        while (currentBuyId != 0 && sellVolume > 0) {
+        while (currentBuyId != 0 && sellVolume > 0 && iterations < maxIterations) {
             Order storage buyOrder = buyOrders[currentBuyId];
 
             if (sellPrice <= buyOrder.price) {
@@ -118,6 +120,7 @@ abstract contract OrderBookHTS {
             } else {
                 break;
             }
+            iterations++;
         }
 
         firstBuyOrderId = currentBuyId;  // Update the first buy order ID
@@ -130,8 +133,10 @@ abstract contract OrderBookHTS {
         int64 buyVolume
     ) internal returns (int64) {
         uint256 currentSellId = firstSellOrderId;
+        uint256 maxIterations = 10; // Define a maximum number of iterations per call
+        uint256 iterations = 0;
 
-        while (currentSellId != 0 && buyVolume > 0) {
+        while (currentSellId != 0 && buyVolume > 0 && iterations < maxIterations) {
             Order storage sellOrder = sellOrders[currentSellId];
 
             if (buyPrice >= sellOrder.price) {
@@ -155,6 +160,7 @@ abstract contract OrderBookHTS {
             } else {
                 break;
             }
+            iterations++;
         }
 
         firstSellOrderId = currentSellId;  // Update the first sell order ID

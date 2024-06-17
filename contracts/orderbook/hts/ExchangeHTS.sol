@@ -38,7 +38,7 @@ contract ExchangeHTS is OrderBookHTS, ReentrancyGuard {
             _insertBuyOrder(msg.sender, price, remainVolume);
         }
 
-        return 0;
+        return currentOrderId;
     }
 
     /**
