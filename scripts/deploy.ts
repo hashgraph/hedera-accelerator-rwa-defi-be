@@ -173,9 +173,7 @@ async function deployVault(contracts: Record<string, any>): Promise<Record<strin
   console.log("Vault deployed with address: ", await hederaVault.getAddress());
 
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
-  const vaultFactory = await VaultFactory.deploy(
-    deployer.address
-  );
+  const vaultFactory = await VaultFactory.deploy({ from: deployer.address });
   console.log("Hash ", vaultFactory.deploymentTransaction()?.hash);
   await vaultFactory.waitForDeployment();
 
@@ -191,6 +189,24 @@ async function deployVault(contracts: Record<string, any>): Promise<Record<strin
       RewardToken: "0x" + rewardToken!.toSolidityAddress()
     }
   };
+}
+
+// deploy HTS Token Factory
+async function deployHTSTokenFactory(contracts: Record<string, any>): Promise<Record<string, any>>  {
+  const [owner] = await ethers.getSigners();
+
+  const htsTokenFactoryDeployer = await ethers.getContractFactory("HTSTokenFactory");
+
+  const htsTokenFactory = await htsTokenFactoryDeployer.connect(owner).deploy({ gasLimit: 4800000 });
+  await htsTokenFactory.waitForDeployment();
+
+  return {
+    ...contracts,
+    factories: {
+      ...contracts.factories,
+      HTSTokenFactory: await htsTokenFactory.getAddress()
+    }
+  }
 }
 
 // creates a deployment file into data/deployments (eg: data/deployments/mainnet.json)
@@ -216,6 +232,7 @@ init()
   .then(deployERC3643)
   .then(deployComplianceModules)
   .then(deployVault)
+  .then(deployHTSTokenFactory)
   .then(exportDeploymentVersion)
   .then(finish)
   .catch((error) => {

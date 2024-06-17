@@ -14,7 +14,8 @@
     "TREXImplementationAuthority": "0x94eDe092ea4480e00174C73BC615c2466743f3dA",
     "TREXFactory": "0xf17A4C9E2B00398fB11c88060FdE39066b6269b0",
     "TREXGateway": "0x56C433eca9E534FF5024Eaedb95C652d31B44a09",
-    "IdentityGateway": "0xcfCF11BEe5575c59e1F4a9D5a53c90A4e5e49D0C"
+    "IdentityGateway": "0xcfCF11BEe5575c59e1F4a9D5a53c90A4e5e49D0C",
+    "HTSTokenFactory": "0x7ae9b7b41A17F586B12226B3a50bF98Ecf641B5b"
   },
   "compliance": {
     "RequiresNFTModule": "0xA318d349488531882b4fCa6b412A8766F7421044",
