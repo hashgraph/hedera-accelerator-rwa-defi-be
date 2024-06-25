@@ -489,6 +489,7 @@ contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
             _rewards[i] = getUserReward(_user, rewardTokens[i]);
         }
         return _rewards;
+
     }
 }
 
