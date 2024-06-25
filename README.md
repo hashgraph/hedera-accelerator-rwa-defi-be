@@ -1,6 +1,10 @@
+# WARNING
+* no audits have been done on this code base.
+* no warranties.
+* this code is 'in progress', and is intended for demonstration and/or start of your project. you need to do your own QA & Audits before using this.
 # hedera-accelerator-defi-eip
 
-smart contracts for accelerator-defi-EIP
+smart contracts for EIP 3643 & EIP 4626 that can be used on Hedera's EVM
 
 ## Support
 
