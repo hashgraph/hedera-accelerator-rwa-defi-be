@@ -2,9 +2,17 @@ import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
 import { createFungibleToken, TokenTransfer } from "../scripts/utils";
 import { Client, AccountId, PrivateKey } from "@hashgraph/sdk";
-import { HederaVault } from "../typechain-types";
+import { ZeroAddress } from "ethers";
 
 dotenv.config();
+
+const deployedOracle = "0xC48277F42d738A06B8bD6a61700aF35018Cf5AEc";
+const deployedSaucerSwap = "0xACE99ADFd95015dDB33ef19DCE44fee613DB82C2";
+const rw1Token = "0x000000000000000000000000000000000044b66c";
+const rw2Token = "0x000000000000000000000000000000000044b66e";
+const rw1Id = ethers.keccak256(ethers.toUtf8Bytes("RT1"));
+const rw2Id = ethers.keccak256(ethers.toUtf8Bytes("RT2"));
+
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -44,12 +52,19 @@ async function main() {
 
   const stakingTokenAddress = "0x" + stakingToken!.toSolidityAddress();
 
+  // Zero fee
   const feeConfig = {
-    receiver: "0x091b4a7ea614a3bd536f9b62ad5641829a1b174f",
-    token: "0x" + stakingToken!.toSolidityAddress(),
-    minAmount: 0,
-    feePercentage: 1000,
+    receiver: ZeroAddress,
+    token: ZeroAddress,
+    feePercentage: 0,
   };
+
+  // const feeConfig = {
+  //   receiver: "0x091b4a7ea614a3bd536f9b62ad5641829a1b174f",
+  //   token: "0x" + stakingToken!.toSolidityAddress(),
+  //   minAmount: 0,
+  //   feePercentage: 1000,
+  // };
 
   const HederaVault = await ethers.getContractFactory("HederaVault");
   const hederaVault = await HederaVault.deploy(
@@ -59,8 +74,15 @@ async function main() {
     feeConfig,
     deployer.address,
     deployer.address,
-    // deployer.address,
-    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("12", 18) }
+    deployedOracle,
+    deployedSaucerSwap,
+    [rw1Token, rw2Token],
+    [50000, 50000],
+    [
+      rw1Id,
+      rw2Id
+    ],
+    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("16", 18) }
   );
   console.log("Hash ", hederaVault.deploymentTransaction()?.hash);
   await hederaVault.waitForDeployment();
