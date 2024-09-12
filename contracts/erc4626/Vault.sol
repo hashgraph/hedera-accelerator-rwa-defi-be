@@ -7,6 +7,7 @@ import {IERC4626} from "./IERC4626.sol";
 import {IHRC} from "../common/hedera/IHRC.sol";
 
 import {FeeConfiguration} from "../common/FeeConfiguration.sol";
+import {TokenBalancer} from "./TokenBalancer.sol";
 
 import {FixedPointMathLib} from "./FixedPointMathLib.sol";
 import {SafeTransferLib} from "./SafeTransferLib.sol";
@@ -22,7 +23,7 @@ import "../common/safe-HTS/IHederaTokenService.sol";
  *
  * The contract which represents a custom Vault with Hedera HTS support.
  */
-contract HederaVault is IERC4626, FeeConfiguration, Ownable, ReentrancyGuard {
+contract HederaVault is IERC4626, FeeConfiguration, TokenBalancer, Ownable, ReentrancyGuard {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
     using Bits for uint256;

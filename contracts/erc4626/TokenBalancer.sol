@@ -7,6 +7,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {PythUtils} from "@pythnetwork/pyth-sdk-solidity/PythUtils.sol";
 
 import {ISaucerSwap} from "./interfaces/ISaucerSwap.sol";
 
@@ -18,6 +19,7 @@ import "../common/safe-HTS/SafeHTS.sol";
  * The contract that helps to maintain reward token balances.
  */
 abstract contract TokenBalancer is AccessControl {
+    using PythUtils for int64;
     // Allocation percentages for rebalance
     mapping(address => uint256 allocationPercentage) internal targetPercentages;
 
@@ -79,12 +81,7 @@ abstract contract TokenBalancer is AccessControl {
      */
     function _getPrice(address token) public view returns (uint256 oneDollarInHbar) {
         PythStructs.Price memory price = pyth.getPrice(priceIds[token]);
-
-        uint256 decimals = IERC20Metadata(token).decimals();
-
-        uint256 hbarPrice8Decimals = (uint(uint64(price.price)) * (18 ** decimals)) /
-            (18 ** uint8(uint32(-1 * price.expo)));
-        oneDollarInHbar = ((18 ** decimals) * (18 ** decimals)) / hbarPrice8Decimals;
+        return price.price.convertToUint(price.expo, IERC20Metadata(token).decimals());
     }
 
     /**
