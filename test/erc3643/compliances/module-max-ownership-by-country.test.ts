@@ -369,108 +369,34 @@ describe('Compliance Module: MaxOwnershipByCountry', () => {
       });
     });
 
-    describe('when calling via compliance', () => {
-      describe('when value exceeds the max percentage', () => {
-        it('should revert', async () => {
-          const context = await loadFixture(deployMaxOwnershipFullSuite);
-          const toAlice = context.accounts.aliceWallet.address;
-          const toBob = context.accounts.bobWallet.address;
-          const decimals = await context.suite.token.decimals();
-          const tenPercent = ethers.parseUnits('10', 2);
-          const twentyPercent = ethers.parseUnits('20', 2);
-          const oneHundred = ethers.parseUnits('100', decimals);
+    describe('when calling via compliance', () => {    
+      it('should update minter balance', async () => {
+        const context = await loadFixture(deployMaxOwnershipFullSuite);
+        const to = context.accounts.aliceWallet.address;
+        const receiverIdentity = await context.suite.identityRegistry.identity(context.accounts.aliceWallet.address);
 
-          // mint one thousand tokens to create total supply
-          await context.suite.token
-            .connect(context.accounts.tokenAgent)
-            .mint(context.accounts.aliceWallet, ethers.parseUnits('1000', decimals));
+        const decimals = await context.suite.token.decimals();
+        const twentyPercent = ethers.parseUnits("20", 2);
 
-          // set local max percentage of 20% and non local 10%
-          await context.suite.compliance.callModuleFunction(
-            new ethers.Interface(['function setMaxPercentage(uint16 _country, uint16 _maxLocal, uint16 _maxNonlocal)']).encodeFunctionData('setMaxPercentage', [context.complianceCountry, twentyPercent, tenPercent]),
-            await context.suite.complianceModule.getAddress(),
-          );
+        // mint one thousand tokens to create total supply
+        await context.suite.token
+          .connect(context.accounts.tokenAgent)
+          .mint(context.accounts.aliceWallet, ethers.parseUnits("1000", decimals));
 
-          // send 300 tokens (exceeds 20%) to alice which is local resident
-          await expect(
-            context.suite.compliance.callModuleFunction(
-              new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [
-                toAlice,
-                3n * oneHundred,
-              ]),
-              await context.suite.complianceModule.getAddress(),
-            ),
-          ).to.be.revertedWithCustomError(context.suite.complianceModule, `MaxOwnershipExceeded`);
+        await context.suite.compliance.callModuleFunction(
+          new ethers.Interface(['function setMaxPercentage(uint16 _country, uint16 _maxLocal, uint16 _maxNonlocal)']).encodeFunctionData('setMaxPercentage', [context.complianceCountry, twentyPercent, twentyPercent]),
+          await context.suite.complianceModule.getAddress(),
+        );
 
-          // send 200 tokens (exceeds 10%) to bob which is non local resident
-          await expect(
-            context.suite.compliance.callModuleFunction(
-              new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [
-                toBob,
-                2n * oneHundred,
-              ]),
-              await context.suite.complianceModule.getAddress(),
-            ),
-          ).to.be.revertedWithCustomError(context.suite.complianceModule, `MaxOwnershipExceeded`);
-        });
-      });
+        await context.suite.compliance.callModuleFunction(
+          new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [to, ethers.parseUnits("20", decimals)]),
+          await context.suite.complianceModule.getAddress(),
+        );
 
-      describe('when value does not exceed the max balance', () => {
-        it('should update minter balance', async () => {
-          const context = await loadFixture(deployMaxOwnershipFullSuite);
-          const to = context.accounts.aliceWallet.address;
-          const receiverIdentity = await context.suite.identityRegistry.identity(context.accounts.aliceWallet.address);
-
-          const decimals = await context.suite.token.decimals();
-          const twentyPercent = ethers.parseUnits("20", 2);
-
-          // mint one thousand tokens to create total supply
-          await context.suite.token
-            .connect(context.accounts.tokenAgent)
-            .mint(context.accounts.aliceWallet, ethers.parseUnits("1000", decimals));
-
-          await context.suite.compliance.callModuleFunction(
-            new ethers.Interface(['function setMaxPercentage(uint16 _country, uint16 _maxLocal, uint16 _maxNonlocal)']).encodeFunctionData('setMaxPercentage', [context.complianceCountry, twentyPercent, twentyPercent]),
-            await context.suite.complianceModule.getAddress(),
-          );
-
-          await context.suite.compliance.callModuleFunction(
-            new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [to, ethers.parseUnits("20", decimals)]),
-            await context.suite.complianceModule.getAddress(),
-          );
-
-          const receiverBalance = await context.suite.complianceModule.getIDBalance(await context.suite.compliance.getAddress(), receiverIdentity);
-          expect(receiverBalance).to.be.eq(ethers.parseUnits("20", decimals));
-        });
-      });
-
-      describe('when token total supply is zero', () => {
-        it('should revert', async () => {
-          const context = await loadFixture(deployMaxOwnershipFullSuite);
-          const to = context.accounts.bobWallet.address;
-  
-          const decimals = await context.suite.token.decimals();
-          const twentyPercent = ethers.parseUnits('20', 2);
-          const oneHundred = ethers.parseUnits('100', decimals) 
-  
-          await context.suite.compliance.callModuleFunction(
-            new ethers.Interface(['function setMaxPercentage(uint16 _country, uint16 _maxLocal, uint16 _maxNonlocal)']).encodeFunctionData('setMaxPercentage', [context.complianceCountry, twentyPercent, twentyPercent]),
-            await context.suite.complianceModule.getAddress(),
-          );
-
-          await expect(
-            context.suite.compliance.callModuleFunction(
-              new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [
-                to,
-                oneHundred,
-              ]),
-              await context.suite.complianceModule.getAddress(),
-            ),
-          ).to.be.revertedWith('MaxOwnershipByCountryModule: token total supply is zero')
-        });
+        const receiverBalance = await context.suite.complianceModule.getIDBalance(await context.suite.compliance.getAddress(), receiverIdentity);
+        expect(receiverBalance).to.be.eq(ethers.parseUnits("20", decimals));
       });
     });
-    
   });
 
   describe('.moduleBurnAction', () => {

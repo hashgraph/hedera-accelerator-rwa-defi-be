@@ -149,7 +149,6 @@ contract MaxOwnershipModule is AbstractModule {
     function moduleMintAction(address _to, uint256 _value) external override onlyComplianceCall {
         address _idTo = _getIdentity(msg.sender, _to);
         _IDBalance[msg.sender][_idTo] += _value;
-        if (_getPercentage(msg.sender, _IDBalance[msg.sender][_idTo]) > _maxPercentage[msg.sender]) revert MaxOwnershipExceeded(msg.sender, _value);
     }
 
     /**

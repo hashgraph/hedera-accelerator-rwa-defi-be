@@ -154,9 +154,7 @@ contract MaxOwnershipByCountryModule is AbstractModule {
      */
     function moduleMintAction(address _to, uint256 _value) external override onlyComplianceCall {
         address _idTo = _getIdentity(msg.sender, _to);
-        bool localFlag = _isLocalUser(msg.sender, _to);
         _IDBalance[msg.sender][_idTo] += _value;
-        if (_getPercentage(msg.sender, _IDBalance[msg.sender][_idTo]) > _maxPercentage[msg.sender][localFlag]) revert MaxOwnershipExceeded(msg.sender, _value);
     }
 
     /**
@@ -268,8 +266,6 @@ contract MaxOwnershipByCountryModule is AbstractModule {
         uint256 totalSupply = token.totalSupply();
 
         require(totalSupply > 0, "MaxOwnershipByCountryModule: token total supply is zero");
-
-        uint256 decimals = token.decimals();
 
         // percentage is set in basis point so 10000 = 100%
         uint256 oneHundred = 100 * 10 ** 2;
