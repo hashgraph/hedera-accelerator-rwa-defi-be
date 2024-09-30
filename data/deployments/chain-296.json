@@ -21,9 +21,9 @@
   "compliance": {
     "RequiresNFTModule": "0xA318d349488531882b4fCa6b412A8766F7421044",
     "CountryAllowModule": "0x73627F621c88A37B3cf212D33716531E53ffd460",
-    "MaxOwnershipModule": "0x5Bb5732c130D20Dc3Dd2adD54A95A575A81Bb2e9",
-    "MaxOwnershipByCountryModule": "0xd7b3c4377ce31E91Ea53ba67F25EE8E736e6eA0d",
-    "MaxTenPercentOwnershipModule": "0xDb6D7Fc6BfDF937c21506717Cd4ac52F498BF0E1",
+    "MaxOwnershipModule": "0xa3B5124108F934fc5F10230A42422bb08931e481",
+    "MaxOwnershipByCountryModule": "0x57dE371eB7b1b044E1dd3bF77682fDF0474f9f30",
+    "MaxTenPercentOwnershipModule": "0x1c9F4C244018C5BaEAc13e4f67d905376b11BC20",
     "OnlyUsaModule": "0xDaBdA04476928f0beeFA428721eD2a7E0E6Eb07a",
     "TransferLimitOneHundredModule": "0xF29a8A633018984A19315D1080975FA793118076"
   },
