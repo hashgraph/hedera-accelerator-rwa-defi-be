@@ -22,6 +22,7 @@ contract MaxOwnershipByCountryModule is AbstractModule {
     mapping(address => uint16) private _localCountry;
 
     /// maximum percetage ownership per investor per local/non local ONCHAINID per modular compliance
+    // percentage is set in basis point so 10000 = 100%
     mapping(address => mapping(bool => uint16)) private _maxPercentage;
 
     /// mapping of balances per ONCHAINID per modular compliance
@@ -264,15 +265,14 @@ contract MaxOwnershipByCountryModule is AbstractModule {
     function _getPercentage(address _compliance, uint256 _amount) internal view returns (uint16) {
         IToken token = IToken(IModularCompliance(_compliance).getTokenBound());
         uint256 totalSupply = token.totalSupply();
-
-        require(totalSupply > 0, "MaxOwnershipByCountryModule: token total supply is zero");
-
         // percentage is set in basis point so 10000 = 100%
         uint256 oneHundred = 100 * 10 ** 2;
 
-        return uint16(
-            _amount.mulDiv(oneHundred, totalSupply)
-        );
+        if (totalSupply > 0){
+            return uint16(_amount.mulDiv(oneHundred, totalSupply));
+        } else {
+            return 0;
+        }
     }
 
     /**

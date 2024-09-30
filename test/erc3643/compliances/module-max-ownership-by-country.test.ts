@@ -577,7 +577,7 @@ describe('Compliance Module: MaxOwnershipByCountry', () => {
     });
 
     describe('when token total supply is zero', () => {
-      it('should revert', async () => {
+      it('should return true', async () => {
         const context = await loadFixture(deployMaxOwnershipFullSuite);
         const to = context.accounts.bobWallet.address;
         const from = context.accounts.aliceWallet.address;
@@ -591,9 +591,7 @@ describe('Compliance Module: MaxOwnershipByCountry', () => {
           await context.suite.complianceModule.getAddress(),
         );
 
-        await expect(context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.revertedWith(
-          'MaxOwnershipByCountryModule: token total supply is zero',
-        );
+        expect(await context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.be.equal(true);
       });
     });
   });

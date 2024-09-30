@@ -20,7 +20,8 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
     mapping(address => bool) private _compliancePresetStatus;
 
     /// maximum percetage ownership per investor ONCHAINID 
-    uint256 private _maxPercentage = 10;
+    // percentage is set in basis point so 10000 = 100%
+    uint256 private _maxPercentage = 10 * 10 ** 2; // 10%
 
     /// mapping of balances per ONCHAINID per modular compliance
     // solhint-disable-next-line var-name-mixedcase
@@ -242,9 +243,13 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
     function _getPercentage(address _compliance, uint256 _amount) internal view returns (uint256) {
         IToken token = IToken(IModularCompliance(_compliance).getTokenBound());
         uint256 totalSupply = token.totalSupply();
+        // percentage is set in basis point so 10000 = 100%
+        uint256 oneHundred = 100 * 10 ** 2;
 
-        require(totalSupply > 0, "MaxTenPercentOwnershipModule: token total supply is zero");
-
-        return _amount.mulDiv(100, totalSupply);
+        if (totalSupply > 0){
+            return _amount.mulDiv(oneHundred, totalSupply);
+        } else {
+            return 0;
+        }
     }
 }

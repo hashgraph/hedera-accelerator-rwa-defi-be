@@ -487,7 +487,7 @@ describe('Compliance Module: MaxTenPercentOwnership', () => {
     });
 
     describe('when token total supply is zero', () => {
-      it('should revert', async () => {
+      it('should return true', async () => {
         const context = await loadFixture(deployMaxTenPercentOwnershipFullSuite);
         const to = context.accounts.bobWallet.address;
         const from = context.accounts.aliceWallet.address;
@@ -495,9 +495,7 @@ describe('Compliance Module: MaxTenPercentOwnership', () => {
         const decimals = await context.suite.token.decimals();
         const oneHundred = 100n * 10n ** decimals;        
 
-        await expect(context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.revertedWith(
-          'MaxTenPercentOwnershipModule: token total supply is zero',
-        );
+        expect(await context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.be.equal(true);
       });
     });
   });
