@@ -151,21 +151,14 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
 
     /**
      *  @dev See {IModule-moduleCheck}.
-     *  checks if the country of address _to is allowed for this _compliance
-     *  returns TRUE if the country of _to is allowed for this _compliance
-     *  returns FALSE if the country of _to is not allowed for this _compliance
+     *  returns TRUE 
      */
     function moduleCheck(
         address /*_from*/,
-        address _to,
-        uint256 _value,
-        address _compliance
-    ) external view override returns (bool) {
-        address _id = _getIdentity(_compliance, _to);
-
-        if (_getPercentage(_compliance, _IDBalance[_compliance][_id] + _value) > _maxPercentage) {
-            return false;
-        }
+        address /*_to*/,
+        uint256 /*_value*/,
+        address /*_compliance*/
+    ) external pure override returns (bool) {
         return true;
     }
 

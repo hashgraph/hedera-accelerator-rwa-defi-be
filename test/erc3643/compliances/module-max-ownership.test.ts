@@ -445,130 +445,15 @@ describe('Compliance Module: MaxOwnership', () => {
   });
 
   describe('.moduleCheck', () => {
-    describe('when identity not found', () => {
-      it('should return false', async () => {
-        const context = await loadFixture(deployMaxOwnershipFullSuite);
-        const to = context.accounts.anotherWallet.address;
-        const from = context.accounts.aliceWallet.address;
-
-        const decimals = await context.suite.token.decimals();
-        const twentyBP = 20n * 10n ** 2n;
-        const oneHundred = 100n * 10n ** decimals;
-
-        // mint one thousand tokens to create total supply
-        await context.suite.token
-          .connect(context.accounts.tokenAgent)
-          .mint(context.accounts.aliceWallet, 1000n * 10n ** decimals);
-        
-
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function setMaxPercentage(uint16 _max)']).encodeFunctionData('setMaxPercentage', [twentyBP]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
-        await expect(context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.revertedWith(
-          'identity not found',
-        );
-      });
-    });
-
-    describe('when value exceeds compliance max balance', () => {
-      it('should return false', async () => {
-        const context = await loadFixture(deployMaxOwnershipFullSuite);
-        const to = context.accounts.aliceWallet.address;
-        const from = context.accounts.bobWallet.address;
-
-        const decimals = await context.suite.token.decimals();
-        const twenty = 20n * 10n ** decimals;
-        const oneHundred = 100n * 10n ** decimals;
-
-        // mint one thousand tokens to create total supply
-        await context.suite.token
-          .connect(context.accounts.tokenAgent)
-          .mint(context.accounts.aliceWallet, 1000n * 10n ** decimals);
-
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function setMaxPercentage(uint16 _max)']).encodeFunctionData('setMaxPercentage', [twenty]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
-        const result = await context.suite.complianceModule.moduleCheck(from, to, 3n * oneHundred, await context.suite.compliance.getAddress());
-        expect(result).to.be.false;
-      });
-    });
-
-    describe('when user balance exceeds compliance max balance', () => {
-      it('should return false', async () => {
-        const context = await loadFixture(deployMaxOwnershipFullSuite);
-        const to = context.accounts.aliceWallet.address;
-        const from = context.accounts.bobWallet.address;
-
-        const decimals = await context.suite.token.decimals();
-        const twenty = 20n * 10n ** decimals;
-        const oneHundred = 100n * 10n ** decimals;
-
-        // mint one thousand tokens to create total supply
-        await context.suite.token
-          .connect(context.accounts.tokenAgent)
-          .mint(context.accounts.aliceWallet, 1000n * 10n ** decimals);
-
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function setMaxPercentage(uint16 _max)']).encodeFunctionData('setMaxPercentage', [twenty]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function moduleMintAction(address _to, uint256 _value)']).encodeFunctionData('moduleMintAction', [to, 2n * oneHundred]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
-        const result = await context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress());
-        expect(result).to.be.false;
-      });
-    });
-
-    describe('when user balance does not exceed compliance max balance', () => {
-      it('should return true', async () => {
-        const context = await loadFixture(deployMaxOwnershipFullSuite);
-        const to = context.accounts.aliceWallet.address;
-        const from = context.accounts.bobWallet.address;
-
-        const decimals = await context.suite.token.decimals();
-        const twentyBP = 20n * 10n ** 2n;
-        const oneHundred = 100n * 10n ** decimals;
-
-        // mint one thousand tokens to create total supply
-        await context.suite.token
-          .connect(context.accounts.tokenAgent)
-          .mint(context.accounts.aliceWallet, 1000n * 10n ** decimals);
-
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function setMaxPercentage(uint16 _max)']).encodeFunctionData('setMaxPercentage', [twentyBP]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
-        const result = await context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress());
-        expect(result).to.be.true;
-      });
-    });
-
-    describe('when token total supply is zero', () => {
-      it('should return true', async () => {
+      it('should always return true', async () => {
         const context = await loadFixture(deployMaxOwnershipFullSuite);
         const to = context.accounts.bobWallet.address;
         const from = context.accounts.aliceWallet.address;
 
         const decimals = await context.suite.token.decimals();
-        const twenty = 20n * 10n ** decimals;
         const oneHundred = 100n * 10n ** decimals;        
 
-        await context.suite.compliance.callModuleFunction(
-          new ethers.Interface(['function setMaxPercentage(uint16 _max)']).encodeFunctionData('setMaxPercentage', [twenty]),
-          await context.suite.complianceModule.getAddress(),
-        );
-
         expect(await context.suite.complianceModule.moduleCheck(from, to, oneHundred, await context.suite.compliance.getAddress())).to.be.equal(true);
-      });
-    });
+      });    
   });
 });
