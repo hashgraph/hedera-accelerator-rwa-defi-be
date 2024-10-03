@@ -102,6 +102,9 @@ async function deployComplianceModules(contracts: Record<string, any>): Promise<
   const requiresNFTModule = await ethers.deployContract('RequiresNFTModule', deployer);
   const countryAllowModule = await ethers.deployContract('CountryAllowModule', deployer);
   const maxOwnershipByCountryModule = await ethers.deployContract('MaxOwnershipByCountryModule', deployer);
+  const maxTenPercentOwnershipModule = await ethers.deployContract('MaxTenPercentOwnershipModule', deployer);
+  const onlyUsaModule = await ethers.deployContract('OnlyUsaModule', deployer);
+  const transferLimitOneHundredModule = await ethers.deployContract('TransferLimitOneHundredModule', deployer);
 
   return {
     ...contracts,
@@ -109,6 +112,9 @@ async function deployComplianceModules(contracts: Record<string, any>): Promise<
       RequiresNFTModule: await requiresNFTModule.getAddress(),
       CountryAllowModule: await countryAllowModule.getAddress(),
       MaxOwnershipByCountryModule: await maxOwnershipByCountryModule.getAddress(),
+      MaxTenPercentOwnershipModule: await maxTenPercentOwnershipModule.getAddress(),
+      OnlyUsaModule: await onlyUsaModule.getAddress(),
+      TransferLimitOneHundredModule: await transferLimitOneHundredModule.getAddress(),
     }
   }
 }

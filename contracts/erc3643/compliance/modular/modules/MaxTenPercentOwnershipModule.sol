@@ -8,10 +8,10 @@ import "../../../token/IToken.sol";
 import "./AbstractModule.sol";
 
 /**
-* _@title MaxOwnershipModule
+* _@title MaxTenPercentOwnershipModule
 * This module manage the token percentage (relative to the token supply) each ONCHAINID is allowed to own
 */ 
-contract MaxOwnershipModule is AbstractModule {
+contract MaxTenPercentOwnershipModule is AbstractModule {
     using Math for uint256;
 
     /// state variables
@@ -19,8 +19,9 @@ contract MaxOwnershipModule is AbstractModule {
     /// mapping of preset status of compliance addresses
     mapping(address => bool) private _compliancePresetStatus;
 
-    /// maximum percetage ownership per investor ONCHAINID per modular compliance
-    mapping(address => uint16) private _maxPercentage;
+    /// maximum percetage ownership per investor ONCHAINID 
+    // percentage is set in basis point so 10000 = 100%
+    uint256 private _maxPercentage = 10 * 10 ** 2; // 10%
 
     /// mapping of balances per ONCHAINID per modular compliance
     // solhint-disable-next-line var-name-mixedcase
@@ -53,17 +54,6 @@ contract MaxOwnershipModule is AbstractModule {
     error TokenAlreadyBound(address _compliance);
 
     /// functions
-
-    /**
-     *  @dev sets max percentage ownership limit for a bound compliance contract
-     *  @param _max max amount of tokens owned by an individual
-     *  @notice Only the owner of the Compliance smart contract can call this function
-     *  emits an `MaxPercentageSet` event
-     */
-    function setMaxPercentage(uint16 _max) external onlyComplianceCall {
-        _maxPercentage[msg.sender] = _max;
-        emit MaxPercentageSet(msg.sender, _max);
-    }
 
     /**
      *  @dev pre-set the balance of a token holder per ONCHAINID
@@ -140,7 +130,7 @@ contract MaxOwnershipModule is AbstractModule {
         address _idTo = _getIdentity(msg.sender, _to);
         _IDBalance[msg.sender][_idTo] += _value;
         _IDBalance[msg.sender][_idFrom] -= _value;
-        if (_getPercentage(msg.sender, _IDBalance[msg.sender][_idTo]) > _maxPercentage[msg.sender]) revert MaxOwnershipExceeded(msg.sender, _value);
+        if (_getPercentage(msg.sender, _IDBalance[msg.sender][_idTo]) > _maxPercentage) revert MaxOwnershipExceeded(msg.sender, _value);
     }
 
     /**
@@ -161,7 +151,7 @@ contract MaxOwnershipModule is AbstractModule {
 
     /**
      *  @dev See {IModule-moduleCheck}.
-     *  returns TRUE
+     *  returns TRUE 
      */
     function moduleCheck(
         address /*_from*/,
@@ -209,7 +199,7 @@ contract MaxOwnershipModule is AbstractModule {
      *  @dev See {IModule-name}.
      */
     function name() public pure returns (string memory _name) {
-        return "MaxOwnershipModule";
+        return "MaxTenPercentOwnershipModule";
     }
 
     /**
