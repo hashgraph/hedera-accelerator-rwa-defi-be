@@ -8,7 +8,7 @@
     "ModularCompliance": "0x3134520cBB0cC9d0fEA9EAE182cCc29b3b20f0C8",
     "Identity": "0xdf72070C2bCA419215f1b4A57837396F52c0e1B8",
     "ImplementationAuthority": "0x0EE2CDdFFcDe197319Ba2Ea8684469bbD25c2e79",
-    "HTSToken": "0xA5c414Cc5004B4e84Be5A156c4D343CBF6a1b2E1"
+    "HTSToken": "0xDCf36eAd241EB927E1046abcF17fE9FB31ecc646"
   },
   "factories": {
     "IdFactory": "0xCe444169a11761b361D212005334b13A9d454061",
@@ -16,13 +16,14 @@
     "TREXFactory": "0xf17A4C9E2B00398fB11c88060FdE39066b6269b0",
     "TREXGateway": "0x56C433eca9E534FF5024Eaedb95C652d31B44a09",
     "IdentityGateway": "0xcfCF11BEe5575c59e1F4a9D5a53c90A4e5e49D0C",
-    "HTSTokenFactory": "0x92eC9DDB4da01d421c2650E41dcAFdA7DD49a4a8"
+    "HTSTokenFactory": "0x1Ed9b9832A84E312d1B2670A3a9b853FAd499189"
   },
   "compliance": {
     "RequiresNFTModule": "0xA318d349488531882b4fCa6b412A8766F7421044",
     "CountryAllowModule": "0x73627F621c88A37B3cf212D33716531E53ffd460",
-    "MaxOwnershipByCountryModule": "0x66bf2c085f88AF1b1993364ddB1332095B7AD3Ae",
-    "MaxTenPercentOwnershipModule": "0xb4224765b8d201D536d56Ce84654d687c26B3B7b",
+    "MaxOwnershipModule": "0xE9eAfa62d44291f0F4690404a5FD28300E9d1c47",
+    "MaxOwnershipByCountryModule": "0x5B971fCDD9Ea663d054a47B6c13fbe9D23E5cDda",
+    "MaxTenPercentOwnershipModule": "0xC5568d78718418c827c358E8f9C1618e522d40C3",
     "OnlyUsaModule": "0xDaBdA04476928f0beeFA428721eD2a7E0E6Eb07a",
     "TransferLimitOneHundredModule": "0xF29a8A633018984A19315D1080975FA793118076"
   },

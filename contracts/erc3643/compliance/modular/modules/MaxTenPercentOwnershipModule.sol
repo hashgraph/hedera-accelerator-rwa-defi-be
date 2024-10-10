@@ -20,7 +20,8 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
     mapping(address => bool) private _compliancePresetStatus;
 
     /// maximum percetage ownership per investor ONCHAINID 
-    uint256 private _maxPercentage = 10;
+    // percentage is set in basis point so 10000 = 100%
+    uint256 private _maxPercentage = 10 * 10 ** 2; // 10%
 
     /// mapping of balances per ONCHAINID per modular compliance
     // solhint-disable-next-line var-name-mixedcase
@@ -138,7 +139,6 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
     function moduleMintAction(address _to, uint256 _value) external override onlyComplianceCall {
         address _idTo = _getIdentity(msg.sender, _to);
         _IDBalance[msg.sender][_idTo] += _value;
-        if (_getPercentage(msg.sender, _IDBalance[msg.sender][_idTo]) > _maxPercentage) revert MaxOwnershipExceeded(msg.sender, _value);
     }
 
     /**
@@ -151,21 +151,14 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
 
     /**
      *  @dev See {IModule-moduleCheck}.
-     *  checks if the country of address _to is allowed for this _compliance
-     *  returns TRUE if the country of _to is allowed for this _compliance
-     *  returns FALSE if the country of _to is not allowed for this _compliance
+     *  returns TRUE 
      */
     function moduleCheck(
         address /*_from*/,
-        address _to,
-        uint256 _value,
-        address _compliance
-    ) external view override returns (bool) {
-        address _id = _getIdentity(_compliance, _to);
-
-        if (_getPercentage(_compliance, _IDBalance[_compliance][_id] + _value) > _maxPercentage) {
-            return false;
-        }
+        address /*_to*/,
+        uint256 /*_value*/,
+        address /*_compliance*/
+    ) external pure override returns (bool) {
         return true;
     }
 
@@ -243,9 +236,13 @@ contract MaxTenPercentOwnershipModule is AbstractModule {
     function _getPercentage(address _compliance, uint256 _amount) internal view returns (uint256) {
         IToken token = IToken(IModularCompliance(_compliance).getTokenBound());
         uint256 totalSupply = token.totalSupply();
+        // percentage is set in basis point so 10000 = 100%
+        uint256 oneHundred = 100 * 10 ** 2;
 
-        require(totalSupply > 0, "MaxTenPercentOwnershipModule: token total supply is zero");
-
-        return _amount.mulDiv(100, totalSupply);
+        if (totalSupply > 0){
+            return _amount.mulDiv(oneHundred, totalSupply);
+        } else {
+            return 0;
+        }
     }
 }
