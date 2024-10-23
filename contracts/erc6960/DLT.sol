@@ -291,6 +291,8 @@ contract DLT is Context, IDLT{
             uint256 amount = amounts[i];
             uint256 senderBalance = _balances[mainId][sender][subId];
 
+            _beforeTokenTransfer(sender, recipient, mainId, subId, amount, "");
+
             require(
                 senderBalance >= amount,
                 "DLT: insufficient balance for transfer"
@@ -299,6 +301,8 @@ contract DLT is Context, IDLT{
                 _balances[mainId][sender][subId] = senderBalance - amount;
             }
             _balances[mainId][recipient][subId] += amount;
+
+            _afterTokenTransfer(sender, recipient, mainId, subId, amount, "");
         }
 
         emit TransferBatch(
