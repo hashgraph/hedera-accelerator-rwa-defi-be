@@ -1,10 +1,10 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { TestDLTERC20 } from "../../typechain-types";
+import { TestDLTERC20RoundRobin } from "../../typechain-types";
 import { Signer } from "ethers";
 
-describe("DLTERC20", async function () {
-  let DLT: TestDLTERC20;
+describe("DLTERC20RoundRobin", async function () {
+  let DLT: TestDLTERC20RoundRobin;
 
   let owner: Signer;
   let user1: Signer;
@@ -14,7 +14,7 @@ describe("DLTERC20", async function () {
   });
 
   beforeEach("Restart Deployment DLT at each test use case", async function () {
-    const DLTFactory = await ethers.getContractFactory("TestDLTERC20");
+    const DLTFactory = await ethers.getContractFactory("TestDLTERC20RoundRobin");
     DLT = await DLTFactory.deploy("Polytrade DLT", "PLT");
 
     await DLT.mint(owner.getAddress(), 1, 1, ethers.parseEther("10000"));
@@ -90,7 +90,7 @@ describe("DLTERC20", async function () {
       });
     });
 
-    describe("Should transfer using FIFO strategy", async function () {
+    describe("Should transfer using Round Robin strategy", async function () {
       it("Should transfer", async function () {
         await DLT.mint(owner.getAddress(), 2, 1, ethers.parseEther("10000"));
         await DLT.mint(owner.getAddress(), 3, 1, ethers.parseEther("10000"));
@@ -99,11 +99,29 @@ describe("DLTERC20", async function () {
         expect(await DLT.subBalanceOf(owner.getAddress(), 2,1)).to.equal(ethers.parseEther("10000"));
         expect(await DLT.subBalanceOf(owner.getAddress(), 3,1)).to.equal(ethers.parseEther("10000"));
 
-        await DLT.transfer(user1.getAddress(), ethers.parseEther("10001"));
+        await DLT.transfer(user1.getAddress(), ethers.parseEther("1"));
 
-        expect(await DLT.subBalanceOf(owner.getAddress(), 1,1)).to.equal(ethers.parseEther("0"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 1,1)).to.equal(ethers.parseEther("9999"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 2,1)).to.equal(ethers.parseEther("10000"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 3,1)).to.equal(ethers.parseEther("10000"));
+
+        await DLT.transfer(user1.getAddress(), ethers.parseEther("1"));
+
+        expect(await DLT.subBalanceOf(owner.getAddress(), 1,1)).to.equal(ethers.parseEther("9999"));
         expect(await DLT.subBalanceOf(owner.getAddress(), 2,1)).to.equal(ethers.parseEther("9999"));
         expect(await DLT.subBalanceOf(owner.getAddress(), 3,1)).to.equal(ethers.parseEther("10000"));
+
+        await DLT.transfer(user1.getAddress(), ethers.parseEther("1"));
+
+        expect(await DLT.subBalanceOf(owner.getAddress(), 1,1)).to.equal(ethers.parseEther("9999"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 2,1)).to.equal(ethers.parseEther("9999"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 3,1)).to.equal(ethers.parseEther("9999"));
+        
+        await DLT.transfer(user1.getAddress(), ethers.parseEther("1"));
+
+        expect(await DLT.subBalanceOf(owner.getAddress(), 1,1)).to.equal(ethers.parseEther("9998"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 2,1)).to.equal(ethers.parseEther("9999"));
+        expect(await DLT.subBalanceOf(owner.getAddress(), 3,1)).to.equal(ethers.parseEther("9999"));
 
       });
     });

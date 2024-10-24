@@ -6,15 +6,17 @@ import { DLTEnumerable } from "./DLTEnumerable.sol";
 
 /*
  * @dev This implements an optional extension of {DLT} defined in the EIP 6960 that adds
- * ERC20 support using a FIFO strategy for transfering amounts.
+ * ERC20 support using a RoundRobin strategy for transfering amounts.
  */
-abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
+abstract contract DLTERC20RoundRobin is DLTEnumerable, IERC20 {
     uint256 private totalTokenSupply; // erc20 total supply
     mapping (address => int64[]) private mainStack; // stack of main asset IDs
     mapping (address => mapping(int64 => int64[])) private subStack; // stack of sub asset IDs
     mapping (address => mapping(int64 => bool)) private isMainIdPresent; // maps if an main asset id is present in the stack
     mapping (address => mapping(int64 => mapping(int64 => bool))) private isSubIdPresent; // maps if an sub asset id is present in the stack
     mapping (address => mapping(address => uint256)) private allowances; // erc20 allowances map
+    mapping (address => uint256) private nextMainIndex; // map with a pointer to the next main asset id
+    mapping (address => mapping(int64 => uint256)) private nextSubIndex; // map with a pointer to the next sub asset id
 
     /**
      * Data structure to handle token transfer 
@@ -106,7 +108,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
     
     /**
      * Internal function to handle ERC20 transfers. It uses _safeBatchTransferFrom to send actual tokens
-     * Using the FIFO strategy, meaning that it first collects the oldest record in the stack to include 
+     * Using the RoundRobin strategy, meaning that it first collects the newest record in the stack to include 
      * on the batch transfer until the remaining amount to send is zero
      * @param from address of token owner
      * @param to  address of the recipient of tokens
@@ -140,7 +142,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         );
     }
 
-     /**
+    /**
      * Internal function used to colelct tokens to be transfered
      * @param from address to collect tokens from
      * @param data data structure to handle the collection
@@ -148,15 +150,20 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
     function _collectAssetsForTransfer(
         address from,
         TransferData memory data
-    ) internal view {
+    ) internal {
         // Fetch the main and sub-assets of the user
         int64[] memory userMainAssets = mainStack[from];
 
+        if (nextMainIndex[from] == userMainAssets.length) {
+            nextMainIndex[from] = 0;
+        }
+
         // Collect from main and sub-assets
-        for (uint i = 0; i < userMainAssets.length; i++) {
+        for (uint i = nextMainIndex[from]; i < userMainAssets.length; i++) {
             _collectFromMainAsset(from, userMainAssets[i], data);
 
             if (data.remainingAmount == 0) {
+                nextMainIndex[from] = i + 1;
                 break;
             }
         }
@@ -172,10 +179,14 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         address from,
         int64 mainAssetId,
         TransferData memory data
-    ) internal view {
+    ) internal {
         int64[] memory userSubAssets = subStack[from][mainAssetId];
 
-        for (uint j = 0; j < userSubAssets.length; j++) {
+        if (nextSubIndex[from][mainAssetId] == userSubAssets.length) {
+            nextSubIndex[from][mainAssetId] = 0;
+        }
+
+        for (uint j = nextSubIndex[from][mainAssetId]; j < userSubAssets.length; j++) {
             int64 subAssetId = userSubAssets[j];
             uint256 subBalance = subBalanceOf(from, mainAssetId, subAssetId);
 
@@ -187,6 +198,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
                     data.totalCollected += data.remainingAmount;
                     data.selectedCount++;
                     data.remainingAmount = 0;
+                    nextSubIndex[from][mainAssetId] = j + 1;
                     break;
                 } else {
                     data.selectedMainAssetIds[data.selectedCount] = mainAssetId;
@@ -217,7 +229,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         super._mint(recipient, mainId, subId, amount);
     }
 
-   /**
+    /**
      * @dev Internal function to handle ERC20 burn and decrease token total supply
      * @param account address of the account to burn the tokens from
      * @param mainId id of the main asset

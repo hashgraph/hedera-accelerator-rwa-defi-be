@@ -6,9 +6,9 @@ import { DLTEnumerable } from "./DLTEnumerable.sol";
 
 /*
  * @dev This implements an optional extension of {DLT} defined in the EIP 6960 that adds
- * ERC20 support using a FIFO strategy for transfering amounts.
+ * ERC20 support using a LIFO strategy for transfering amounts.
  */
-abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
+abstract contract DLTERC20LIFO is DLTEnumerable, IERC20 {
     uint256 private totalTokenSupply; // erc20 total supply
     mapping (address => int64[]) private mainStack; // stack of main asset IDs
     mapping (address => mapping(int64 => int64[])) private subStack; // stack of sub asset IDs
@@ -104,6 +104,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         return true;
     }
     
+
     /**
      * Internal function to handle ERC20 transfers. It uses _safeBatchTransferFrom to send actual tokens
      * Using the FIFO strategy, meaning that it first collects the oldest record in the stack to include 
@@ -153,8 +154,8 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         int64[] memory userMainAssets = mainStack[from];
 
         // Collect from main and sub-assets
-        for (uint i = 0; i < userMainAssets.length; i++) {
-            _collectFromMainAsset(from, userMainAssets[i], data);
+        for (int i = int(userMainAssets.length) - 1; i >= 0; i--) {
+            _collectFromMainAsset(from, userMainAssets[uint(i)], data);
 
             if (data.remainingAmount == 0) {
                 break;
@@ -175,8 +176,8 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
     ) internal view {
         int64[] memory userSubAssets = subStack[from][mainAssetId];
 
-        for (uint j = 0; j < userSubAssets.length; j++) {
-            int64 subAssetId = userSubAssets[j];
+        for (int j = int(userSubAssets.length) -1; j >= 0; j--) {
+            int64 subAssetId = userSubAssets[uint(j)];
             uint256 subBalance = subBalanceOf(from, mainAssetId, subAssetId);
 
             if (subBalance > 0) {
