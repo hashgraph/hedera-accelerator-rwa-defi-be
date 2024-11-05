@@ -64,8 +64,8 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
      * @param value amount of tokens to send
      * @return bool true on success.
      */
-    function transfer(address to, uint256 value) external override returns (bool) {
-        _transfer(_msgSender(), to, value);
+    function transfer(address to, uint256 value) external override virtual returns (bool) {
+        _transfer(msg.sender, to, value);
         return true;
     }
 
@@ -86,7 +86,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
      * @return bool true on success
      */
     function approve(address spender, uint256 value) external override returns (bool) {
-        return _approve(_msgSender(), spender, value);
+        return _approve(msg.sender, spender, value);
     }
 
     function _approve(address from, address spender, uint256 value) internal returns (bool) {
@@ -101,7 +101,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
      * @param value amount of tokens to send
      * @return bool true on success
      */
-    function transferFrom(address from, address to, uint256 value) external override returns (bool) {
+    function transferFrom(address from, address to, uint256 value) external override virtual returns (bool) {
         require(allowances[from][to] >= value, "ERC20: not enough allowance"); 
         _transfer(from, to, value);
         allowances[from][to] -= value;
@@ -216,9 +216,9 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         int64 mainId,
         int64 subId,
         uint256 amount
-    ) internal virtual override(DLTEnumerable) {
+    ) internal virtual {
         totalTokenSupply += amount;
-        super._mint(recipient, mainId, subId, amount);
+        super._mintToken(recipient, mainId, subId, amount);
     }
 
    /**
@@ -233,7 +233,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
         int64 mainId,
         int64 subId,
         uint256 amount
-    ) internal virtual override(DLTEnumerable) {
+    ) internal virtual override {
         unchecked {
             totalTokenSupply -= amount;
         }
