@@ -76,7 +76,7 @@ contract TokenDLT is ITokenDLT, AgentRoleUpgradeable, TokenDLTStorage, DLTERC20F
      *  @dev See {ERC20-increaseAllowance}.
      */
     function increaseAllowance(address _spender, uint256 _addedValue) external virtual returns (bool) {
-        _approve(msg.sender, _spender, _allowances[msg.sender][_spender] + (_addedValue));
+        _approve(msg.sender, _spender, allowances[msg.sender][_spender] + (_addedValue));
         return true;
     }
 
@@ -84,7 +84,7 @@ contract TokenDLT is ITokenDLT, AgentRoleUpgradeable, TokenDLTStorage, DLTERC20F
      *  @dev See {ERC20-decreaseAllowance}.
      */
     function decreaseAllowance(address _spender, uint256 _subtractedValue) external virtual returns (bool) {
-        _approve(msg.sender, _spender, _allowances[msg.sender][_spender] - _subtractedValue);
+        _approve(msg.sender, _spender, allowances[msg.sender][_spender] - _subtractedValue);
         return true;
     }
 
@@ -158,7 +158,7 @@ contract TokenDLT is ITokenDLT, AgentRoleUpgradeable, TokenDLTStorage, DLTERC20F
         require(!_frozen[_to] && !_frozen[_from], "wallet is frozen");
         require(_amount <= super.balanceOf(_from) - (_frozenTokens[_from]), "Insufficient Balance");
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(_from, _to, _amount)) {
-            super._approve(_from, msg.sender, _allowances[_from][msg.sender] - (_amount));
+            super._approve(_from, msg.sender, allowances[_from][msg.sender] - (_amount));
             super._transfer(_from, _to, _amount);
             _tokenCompliance.transferred(_from, _to, _amount);
             return true;
@@ -374,7 +374,7 @@ contract TokenDLT is ITokenDLT, AgentRoleUpgradeable, TokenDLTStorage, DLTERC20F
     function mint(address _to, int64 _mainId, int64 _subId, uint256 _amount) public onlyAgent {
         require(_tokenIdentityRegistry.isVerified(_to), "Identity is not verified.");
         require(_tokenCompliance.canTransfer(address(0), _to, _amount), "Compliance not followed");
-        super._safeMint(_to, _mainId, _subId, _amount);
+        super._mint(_to, _mainId, _subId, _amount);
         _tokenCompliance.created(_to, _amount);
     }
 

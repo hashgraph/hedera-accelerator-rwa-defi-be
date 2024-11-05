@@ -5,17 +5,16 @@ import { deployFullSuiteFixture, deploySuiteWithModularCompliancesFixture } from
 
 describe('Toke DLT - Transfers', () => {
   describe('.approve()', () => {
-    it.only('should approve a contract to spend a certain amount of tokens', async () => {
+    it('should approve a contract to spend a certain amount of tokens', async () => {
       const {
         suite: { token },
         accounts: { aliceWallet, anotherWallet },
       } = await loadFixture(deployFullSuiteFixture);
-      await loadFixture(deployFullSuiteFixture);
 
-      const tx = await token.connect(aliceWallet).approve(anotherWallet.address, 100);
-      await expect(tx).to.emit(token, 'Approval').withArgs(aliceWallet.address, anotherWallet.address, 100);
+      const tx = await token.connect(aliceWallet)['approve(address,uint256)'](anotherWallet.address, 100);
+      await expect(tx).to.emit(token, 'Approval(address,address,uint256)').withArgs(aliceWallet.address, anotherWallet.address, 100);
 
-      await expect(token.allowance(aliceWallet.address, anotherWallet.address)).to.eventually.equal(100);
+      await expect(token['allowance(address,address)'](aliceWallet.address, anotherWallet.address)).to.eventually.equal(100);
     });
   });
 
@@ -26,12 +25,12 @@ describe('Toke DLT - Transfers', () => {
         accounts: { aliceWallet, anotherWallet },
       } = await loadFixture(deployFullSuiteFixture);
 
-      await token.connect(aliceWallet).approve(anotherWallet.address, 100);
+      const tx1 = await token.connect(aliceWallet)['approve(address,uint256)'](anotherWallet.address, 100);
+      const tx2 = await token.connect(aliceWallet).increaseAllowance(anotherWallet.address, 100);
+      
+      await expect(tx2).to.emit(token, 'Approval(address,address,uint256)').withArgs(aliceWallet.address, anotherWallet.address, 200);
 
-      const tx = await token.connect(aliceWallet).increaseAllowance(anotherWallet.address, 100);
-      await expect(tx).to.emit(token, 'Approval').withArgs(aliceWallet.address, anotherWallet.address, 200);
-
-      await expect(token.allowance(aliceWallet.address, anotherWallet.address)).to.eventually.equal(200);
+      await expect(token['allowance(address,address)'](aliceWallet.address, anotherWallet.address)).to.eventually.equal(200);
     });
   });
 
@@ -42,12 +41,12 @@ describe('Toke DLT - Transfers', () => {
         accounts: { aliceWallet, anotherWallet },
       } = await loadFixture(deployFullSuiteFixture);
 
-      await token.connect(aliceWallet).approve(anotherWallet.address, 150);
+      await token.connect(aliceWallet)['approve(address,uint256)'](anotherWallet.address, 150);
 
       const tx = await token.connect(aliceWallet).decreaseAllowance(anotherWallet.address, 100);
-      await expect(tx).to.emit(token, 'Approval').withArgs(aliceWallet.address, anotherWallet.address, 50);
+      await expect(tx).to.emit(token, 'Approval(address,address,uint256)').withArgs(aliceWallet.address, anotherWallet.address, 50);
 
-      await expect(token.allowance(aliceWallet.address, anotherWallet.address)).to.eventually.equal(50);
+      await expect(token['allowance(address,address)'](aliceWallet.address, anotherWallet.address)).to.eventually.equal(50);
     });
   });
 
@@ -152,7 +151,7 @@ describe('Toke DLT - Transfers', () => {
         } = await loadFixture(deployFullSuiteFixture);
 
         const tx = await token.connect(aliceWallet).transfer(bobWallet.address, 100);
-        await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, 100);
+        await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, 100);
       });
     });
   });
@@ -165,8 +164,8 @@ describe('Toke DLT - Transfers', () => {
       } = await loadFixture(deployFullSuiteFixture);
 
       const tx = await token.connect(aliceWallet).batchTransfer([bobWallet.address, bobWallet.address], [100, 200]);
-      await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, 100);
-      await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, 200);
+      await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, 100);
+      await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, 200);
     });
   });
 
@@ -180,7 +179,7 @@ describe('Toke DLT - Transfers', () => {
 
         await token.connect(tokenAgent).pause();
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('Pausable: paused');
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('Pausable: paused');
       });
     });
 
@@ -193,7 +192,7 @@ describe('Toke DLT - Transfers', () => {
 
         await token.connect(tokenAgent).setAddressFrozen(aliceWallet.address, true);
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('wallet is frozen');
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('wallet is frozen');
       });
     });
 
@@ -206,7 +205,7 @@ describe('Toke DLT - Transfers', () => {
 
         await token.connect(tokenAgent).setAddressFrozen(bobWallet.address, true);
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('wallet is frozen');
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith('wallet is frozen');
       });
     });
 
@@ -219,7 +218,7 @@ describe('Toke DLT - Transfers', () => {
 
         const balance = await token.balanceOf(aliceWallet.address);
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, balance + 1000n)).to.be.revertedWith(
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, balance + 1000n)).to.be.revertedWith(
           'Insufficient Balance',
         );
       });
@@ -235,7 +234,7 @@ describe('Toke DLT - Transfers', () => {
         const balance = await token.balanceOf(aliceWallet.address);
         await token.connect(tokenAgent).freezePartialTokens(aliceWallet.address, balance -100n);
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, balance)).to.be.revertedWith(
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, balance)).to.be.revertedWith(
           'Insufficient Balance',
         );
       });
@@ -248,7 +247,7 @@ describe('Toke DLT - Transfers', () => {
           accounts: { aliceWallet, anotherWallet },
         } = await loadFixture(deployFullSuiteFixture);
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, anotherWallet.address, 100)).to.be.revertedWith(
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, anotherWallet.address, 100)).to.be.revertedWith(
           'Transfer not possible',
         );
       });
@@ -265,7 +264,7 @@ describe('Toke DLT - Transfers', () => {
         await compliance.addModule(await complianceModuleA.getAddress());
         await token.setCompliance(await compliance.getAddress());
 
-        await expect(token.connect(aliceWallet).transferFrom(aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith(
+        await expect(token.connect(aliceWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, 100)).to.be.revertedWith(
           'Transfer not possible',
         );
       });
@@ -278,12 +277,12 @@ describe('Toke DLT - Transfers', () => {
           accounts: { aliceWallet, bobWallet, anotherWallet },
         } = await loadFixture(deployFullSuiteFixture);
 
-        await token.connect(aliceWallet).approve(anotherWallet.address, 100);
+        await token.connect(aliceWallet)['approve(address,uint256)'](anotherWallet.address, 100);
 
-        const tx = await token.connect(anotherWallet).transferFrom(aliceWallet.address, bobWallet.address, 100);
-        await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, 100);
+        const tx = await token.connect(anotherWallet)['transferFrom(address,address,uint256)'](aliceWallet.address, bobWallet.address, 100);
+        await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, 100);
 
-        await expect(token.allowance(aliceWallet.address, anotherWallet.address)).to.be.eventually.equal(0);
+        await expect(token['allowance(address,address)'](aliceWallet.address, anotherWallet.address)).to.be.eventually.equal(0);
       });
     });
   });
@@ -342,7 +341,7 @@ describe('Toke DLT - Transfers', () => {
         await token.setCompliance(await compliance.getAddress());
 
         const tx = await token.connect(tokenAgent).forcedTransfer(aliceWallet.address, bobWallet.address, 100);
-        await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, 100);
+        await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, 100);
       });
     });
 
@@ -357,7 +356,7 @@ describe('Toke DLT - Transfers', () => {
         await token.connect(tokenAgent).freezePartialTokens(aliceWallet.address, balance - 100n);
 
         const tx = await token.connect(tokenAgent).forcedTransfer(aliceWallet.address, bobWallet.address, balance - 50n);
-        await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, bobWallet.address, balance - 50n);
+        await expect(tx).to.emit(token, 'Transfer(address,address,uint256)').withArgs(aliceWallet.address, bobWallet.address, balance - 50n);
         await expect(tx).to.emit(token, 'TokensUnfrozen').withArgs(aliceWallet.address, balance - 150n);
         await expect(token.getFrozenTokens(aliceWallet.address)).to.be.eventually.equal(50);
       });
@@ -372,7 +371,7 @@ describe('Toke DLT - Transfers', () => {
           accounts: { aliceWallet },
         } = await loadFixture(deployFullSuiteFixture);
 
-        await expect(token.connect(aliceWallet).mint(aliceWallet.address, 100)).to.be.revertedWith('AgentRole: caller does not have the Agent role');
+        await expect(token.connect(aliceWallet).mint(aliceWallet.address,1, 1, 100)).to.be.revertedWith('AgentRole: caller does not have the Agent role');
       });
     });
 
@@ -383,7 +382,7 @@ describe('Toke DLT - Transfers', () => {
           accounts: { anotherWallet, tokenAgent },
         } = await loadFixture(deployFullSuiteFixture);
 
-        await expect(token.connect(tokenAgent).mint(anotherWallet.address, 100)).to.be.revertedWith('Identity is not verified.');
+        await expect(token.connect(tokenAgent).mint(anotherWallet.address,1, 1, 100)).to.be.revertedWith('Identity is not verified.');
       });
     });
 
@@ -398,7 +397,7 @@ describe('Toke DLT - Transfers', () => {
         await compliance.addModule(await complianceModuleA.getAddress());
         await token.setCompliance(await compliance.getAddress());
 
-        await expect(token.connect(tokenAgent).mint(aliceWallet.address, 100)).to.be.revertedWith('Compliance not followed');
+        await expect(token.connect(tokenAgent).mint(aliceWallet.address,1,1, 100)).to.be.revertedWith('Compliance not followed');
       });
     });
   });
@@ -411,7 +410,7 @@ describe('Toke DLT - Transfers', () => {
           accounts: { aliceWallet },
         } = await loadFixture(deployFullSuiteFixture);
 
-        await expect(token.connect(aliceWallet).burn(aliceWallet.address, 100)).to.be.revertedWith('AgentRole: caller does not have the Agent role');
+        await expect(token.connect(aliceWallet).burn(aliceWallet.address,1,1, 100)).to.be.revertedWith('AgentRole: caller does not have the Agent role');
       });
     });
 
@@ -424,7 +423,7 @@ describe('Toke DLT - Transfers', () => {
 
         const balance = await token.balanceOf(aliceWallet.address);
 
-        await expect(token.connect(tokenAgent).burn(aliceWallet.address, balance + 1000n)).to.be.revertedWith('cannot burn more than balance');
+        await expect(token.connect(tokenAgent).burn(aliceWallet.address, 1,1, balance + 1000n)).to.be.revertedWith('cannot burn more than balance');
       });
     });
 
@@ -438,8 +437,8 @@ describe('Toke DLT - Transfers', () => {
         const balance = await token.balanceOf(aliceWallet.address);
         await token.connect(tokenAgent).freezePartialTokens(aliceWallet.address, balance - 100n);
 
-        const tx = await token.connect(tokenAgent).burn(aliceWallet.address, balance - 50n);
-        await expect(tx).to.emit(token, 'Transfer').withArgs(aliceWallet.address, ethers.ZeroAddress, balance - 50n);
+        const tx = await token.connect(tokenAgent).burn(aliceWallet.address, 1, 1, balance - 50n);
+        await expect(tx).to.emit(token, 'Transfer(address,address,int64,int64,uint256)').withArgs(aliceWallet.address, ethers.ZeroAddress, 1, 1, balance - 50n);
         await expect(tx).to.emit(token, 'TokensUnfrozen').withArgs(aliceWallet.address, balance - 150n);
         await expect(token.getFrozenTokens(aliceWallet.address)).to.be.eventually.equal(50);
       });

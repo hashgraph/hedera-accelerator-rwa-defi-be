@@ -9,12 +9,12 @@ import { DLTEnumerable } from "./DLTEnumerable.sol";
  * ERC20 support using a FIFO strategy for transfering amounts.
  */
 abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
-    uint256 private totalTokenSupply; // erc20 total supply
+    uint256 internal totalTokenSupply; // erc20 total supply
     mapping (address => int64[]) private mainStack; // stack of main asset IDs
     mapping (address => mapping(int64 => int64[])) private subStack; // stack of sub asset IDs
     mapping (address => mapping(int64 => bool)) private isMainIdPresent; // maps if an main asset id is present in the stack
     mapping (address => mapping(int64 => mapping(int64 => bool))) private isSubIdPresent; // maps if an sub asset id is present in the stack
-    mapping (address => mapping(address => uint256)) private allowances; // erc20 allowances map
+    mapping (address => mapping(address => uint256)) internal allowances; // erc20 allowances map
 
     /**
      * Data structure to handle token transfer 
@@ -91,6 +91,7 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
 
     function _approve(address from, address spender, uint256 value) internal returns (bool) {
         allowances[from][spender] = value;
+        emit Approval(from, spender, value);
         return true;
     }
 
@@ -142,6 +143,8 @@ abstract contract DLTERC20FIFO is DLTEnumerable, IERC20 {
             _resizeUintArray(data.selectedAmounts, data.selectedCount),
             new bytes(0)
         );
+
+        emit Transfer(from, to, value);
     }
 
      /**
