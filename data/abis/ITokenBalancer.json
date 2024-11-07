@@ -1,0 +1,91 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ITokenBalancer",
+  "sourceName": "contracts/erc4626/interfaces/ITokenBalancer.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "allocationPercentage",
+          "type": "uint256"
+        }
+      ],
+      "name": "TargetAllocationPercentageChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "priceId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "allocationPercentage",
+          "type": "uint256"
+        }
+      ],
+      "name": "TokenAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "priceId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "percentage",
+          "type": "uint256"
+        }
+      ],
+      "name": "addTrackingToken",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "_rewardTokens",
+          "type": "address[]"
+        }
+      ],
+      "name": "rebalance",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

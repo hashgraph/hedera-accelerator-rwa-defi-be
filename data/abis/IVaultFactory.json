@@ -61,6 +61,11 @@
               "internalType": "address",
               "name": "feeConfigController",
               "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "tokenBalancer",
+              "type": "address"
             }
           ],
           "internalType": "struct IVaultFactory.VaultDetails",
