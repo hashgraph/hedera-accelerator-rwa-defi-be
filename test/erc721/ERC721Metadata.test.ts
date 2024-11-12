@@ -352,4 +352,73 @@ describe('ERC721Metadata', () => {
       );
     });
   });
+
+  describe('.filterTokens(string,string)', () => {
+    it('should filter tokens', async () => {
+      const { token, owner } = await loadFixture(deployFixture);
+      
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location1', ['color', 'size', 'type'], ['blue', '3', 'fixed']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location2', ['color', 'size', 'type'], ['green', '3', 'relative']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location3', ['color', 'size', 'type'], ['red', '7', 'fixed']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location4', ['color', 'size', 'type'], ['blue', '4', 'relative']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location5', ['color', 'size', 'type'], ['yellow', '1', 'fixed']);
+
+      const blueTokens = await token['filterTokens(string,string)']('color', 'blue');
+      
+      expect(blueTokens).to.deep.equal(
+        [
+          [
+            0n,
+            "ipfs://location1",
+            await owner.getAddress(),
+            [
+              ['color', 'blue', true],
+              ['size', '3', true],
+              ['type', 'fixed', true],
+            ]
+          ],
+          [
+            3n,
+            "ipfs://location4",
+            await owner.getAddress(),
+            [
+              ['color', 'blue', true],
+              ['size', '4', true],
+              ['type', 'relative', true],
+            ]
+          ]
+        ]
+      )
+    });
+  })
+
+  describe('.filterTokens(string[],string[])', () => {
+    it('should filter tokens', async () => {
+      const { token, owner } = await loadFixture(deployFixture);
+      
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location1', ['color', 'size', 'type'], ['blue', '3', 'fixed']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location2', ['color', 'size', 'type'], ['green', '3', 'relative']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location3', ['color', 'size', 'type'], ['red', '7', 'fixed']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location4', ['color', 'size', 'type'], ['blue', '4', 'relative']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location5', ['color', 'size', 'type'], ['yellow', '1', 'fixed']);
+      await token['mint(address,string,string[],string[])'](owner.getAddress(), 'ipfs://location6', ['color', 'size', 'type'], ['blue', '5', 'fixed']);
+
+      const blueTokens = await token['filterTokens(string[],string[])'](['color', 'type', 'size'], ['yellow', 'fixed', '1']);
+      
+      expect(blueTokens).to.deep.equal(
+        [
+          [
+            4n,
+            "ipfs://location5",
+            await owner.getAddress(),
+            [
+              ['color', 'yellow', true],
+              ['size', '1', true],
+              ['type', 'fixed', true],
+            ]
+          ]
+        ]
+      )
+    });
+  })
 });

@@ -4,9 +4,12 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
-    uint256 private _nextTokenId;
+    using Strings for string;
+
+    uint256 private nextTokenId;
     mapping(uint256 => mapping(string => KeyValue)) internal metadataByKey;
     mapping(uint256 => KeyValue[]) internal metadata;
     mapping(uint256 => bool) internal isFrozen;
@@ -17,6 +20,13 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         string key;
         string value;
         bool exists;
+    }
+
+    struct TokenDetails {
+        uint256 id;
+        string uri;
+        address owner;
+        KeyValue[] metadata;
     }
 
     modifier onlyTokenOwner(uint256 _tokenId) {
@@ -33,18 +43,12 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         ERC721(_name, _symbol) 
         Ownable(_msgSender()) {}
 
-    function getMetadata(uint256 _tokenId) external view returns(KeyValue[] memory) {
-        KeyValue[] memory data = new KeyValue[](metadata[_tokenId].length);
-
-        for (uint i = 0; i < metadata[_tokenId].length; i++) {
-            KeyValue memory keyvalue = metadata[_tokenId][i];
-            data[i] = (metadataByKey[_tokenId][keyvalue.key]);
-        }
-
-        return data;
+    // view calls
+    function getMetadata(uint256 _tokenId) public view returns(KeyValue[] memory) {
+        return metadata[_tokenId];
     }
 
-    function getMetadata(uint256 _tokenId, string memory _key) external view returns(KeyValue memory) {
+    function getMetadata(uint256 _tokenId, string memory _key) public view returns(KeyValue memory) {
         return metadataByKey[_tokenId][_key];
     }
 
@@ -63,6 +67,59 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         return collectionMetadataByKey[_key];
     }
 
+
+    function filterTokens(string memory _key, string memory _value) external view returns(TokenDetails[] memory) {
+        uint256 _tokenIndex;
+        uint256[] memory _tokensIds = new uint256[](nextTokenId);
+        for (uint i = 0; i < nextTokenId; i++) {
+            KeyValue[] memory _metadata = metadata[i];
+
+            for (uint j = 0; j < _metadata.length; j++) {
+                KeyValue memory _keyValue = _metadata[j];
+
+                if (_keyValue.key.equal(_key) && _keyValue.value.equal(_value)) {
+                    _tokensIds[_tokenIndex++] = i;
+                }
+            }
+        }
+
+        return _getTokenDetails(_resizeArray(_tokensIds, _tokenIndex));
+    }
+
+    function filterTokens(string[] memory _keys, string[] memory _values) external view returns (TokenDetails[] memory) {
+        require(_keys.length == _values.length, "ERC721Metadata: array length mismatch");
+
+        uint256[] memory matchingTokenIds = new uint256[](nextTokenId);
+        uint256 matchCount = 0;
+
+        for (uint256 tokenId = 0; tokenId < nextTokenId; tokenId++) {
+            bool matchesAll = true;
+
+            // Check if the token has all specified key-value pairs
+            for (uint256 i = 0; i < _keys.length; i++) {
+                string memory key = _keys[i];
+                string memory value = _values[i];
+                
+                KeyValue memory keyValue = metadataByKey[tokenId][key];
+                
+                // If key does not exist or value does not match, mark as unmatched
+                if (!keyValue.exists || !keyValue.key.equal(key) || !keyValue.value.equal(value)){
+                    matchesAll = false;
+                    break;
+                }
+            }
+
+            // If token has all matching key-value pairs, add it to the result
+            if (matchesAll) {
+                matchingTokenIds[matchCount++] = tokenId;
+            }
+        }
+
+        // Resize the array to match count and return token details
+        return _getTokenDetails(_resizeArray(matchingTokenIds, matchCount));
+    }
+
+    // mutable calls
     function setMetadata(uint256 _tokenId, string memory _key, string memory _newValue) external onlyTokenOwner(_tokenId) whenUnfrozen(_tokenId) {
         _setMetadata(_tokenId, _key, _newValue);
     }
@@ -95,7 +152,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
     // internal functions
     function _mint(address _to, string memory _uri) internal returns(uint256 _tokenId) {
-        _tokenId = _nextTokenId++;
+        _tokenId = nextTokenId++;
         _safeMint(_to, _tokenId);
         _setTokenURI(_tokenId, _uri);
     }
@@ -129,6 +186,28 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
             collectionMetadataByKey[_keys[i]] = data;
         }
+    }
+
+    function _getTokenDetails(uint256[] memory _ids) internal view returns (TokenDetails[] memory) {
+        TokenDetails[] memory _details = new TokenDetails[](_ids.length);
+        
+        for (uint i = 0; i < _ids.length; i++) {
+            _details[i] = _getTokenDetails(_ids[i]);
+        }
+
+        return _details;
+    }
+
+    function _getTokenDetails(uint256 _id) internal view returns (TokenDetails memory _details) {
+        return TokenDetails(_id, tokenURI(_id), ownerOf(_id), getMetadata(_id));
+    }
+
+    function _resizeArray(uint256[] memory array, uint256 newSize) internal pure returns (uint256[] memory) {
+        uint256[] memory resizedArray = new uint256[](newSize);
+        for (uint256 i = 0; i < newSize; i++) {
+            resizedArray[i] = array[i];
+        }
+        return resizedArray;
     }
 
     // The following functions are overrides required by Solidity.
