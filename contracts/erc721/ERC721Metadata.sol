@@ -6,15 +6,47 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+/**
+ * @title ERC721Metadata
+ * @author Hashgraph
+ * @notice ERC721 custom contract to handle onchain metadata
+ */
 contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     using Strings for string;
 
+    /**
+     * @dev nextTokenId used to autogenerate token ids
+     */
     uint256 private nextTokenId;
+
+    /**
+     * @dev metadata tokenId/key hash map to store token metadata
+     */
     mapping(bytes32 => KeyValue) internal metadata;
+
+    /**
+     * @dev metadataIndex key/value hash map to perform gas optmized metadata based filtering
+     */
     mapping(bytes32 => uint256[]) private metadataIndex;
+
+    /**
+     * @dev metadataKeys tokenId map to store a list of included keys for gas optmized metadata based filtering
+     */
     mapping(uint256 => string[]) internal metadataKeys;
+
+    /**
+     * @dev isFrozen boolean flag to check if token metadata is frozen
+     */
     mapping(uint256 => bool) internal isFrozen;
+
+    /**
+     * @dev collectionMetadata map to store collection metadata
+     */
     mapping(string => KeyValue) internal collectionMetadata;
+
+    /**
+     * @dev collectionMetadataKeys list of included keys for gas optmized metadata based filtering
+     */
     string[] internal collectionMetadataKeys;
 
     struct KeyValue {
@@ -40,11 +72,21 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         _;
     }
 
+    /**
+     * Contructor
+     * @param _name Token Name
+     * @param _symbol Token Symbol
+     */
     constructor (string memory _name, string memory _symbol) 
         ERC721(_name, _symbol) 
         Ownable(_msgSender()) {}
 
     // view calls
+    /**
+     * .getMetadata(uint256) get metadata list  of a given token
+     * @param _tokenId uint256 NFT id
+     * @return KeyValue[] list of metadata key/value pairs
+     */
     function getMetadata(uint256 _tokenId) public view returns(KeyValue[] memory) {
         KeyValue[] memory data = new KeyValue[](metadataKeys[_tokenId].length);
 
@@ -56,10 +98,20 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         return data;
     }
 
+    /**
+     * .getMetadata(uint256,string) get single metada by token Id and key
+     * @param _tokenId uint256 NFT id
+     * @param _key string key to 
+     * @return KeyValue metadata
+     */
     function getMetadata(uint256 _tokenId, string memory _key) public view returns(KeyValue memory) {
         return metadata[_tokenIdKeyHash(_tokenId,_key)];
     }
 
+    /**
+     * .getCollectionMetadata() return collection metadata list
+     * @return KeyValue[] metadata lists
+     */
     function getCollectionMetadata() external view returns(KeyValue[] memory) {
         KeyValue[] memory data = new KeyValue[](collectionMetadataKeys.length);
 
@@ -71,16 +123,32 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         return data;
     }
 
+    /**
+     * .getCollectionMetadata(string) return collection metadata
+     * @param _key key string
+     * @return KeyValue metadata
+     */
     function getCollectionMetadata(string memory _key) external view returns(KeyValue memory) {
         return collectionMetadata[_key];
     }
 
-
+    /**
+     * .filterTokens(string, string) filter tokens that have the given key/value metadata pair
+     * @param _key string key to filter 
+     * @param _value  string value to filter
+     * @return TokenDetails[] list of filtered tokens 
+     */
     function filterTokens(string memory _key, string memory _value) external view returns(TokenDetails[] memory) {
         uint256[] memory _tokensIds = metadataIndex[_keyValueHash(_key, _value)];
         return _getTokenDetails(_tokensIds);
     }
 
+    /**
+     * .filterTokens(string[], string[]) filter tokens that have all the given key/value metadata pairs
+     * @param _keys string[] list of keys to filter 
+     * @param _values  string[] list of values to filter
+     * @return TokenDetails[] list of filtered tokens 
+     */
     function filterTokens(string[] memory _keys, string[] memory _values)
         external
         view
@@ -101,56 +169,94 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         return _getTokenDetails(filteredTokens);
     }
 
-    function _intersectArrays(uint256[] memory arr1, uint256[] memory arr2)
-        internal
-        pure
-        returns (uint256[] memory)
-    {
-        // Use a memory mapping to track common elements
-        uint256 maxLength = arr1.length > arr2.length ? arr2.length : arr1.length;
-        uint256[] memory tempResult = new uint256[](maxLength);
-        uint256 index = 0;
-
-        for (uint256 i = 0; i < arr1.length; i++) {
-            for (uint256 j = 0; j < arr2.length; j++) {
-                if (arr1[i] == arr2[j]) {
-                    tempResult[index++] = arr1[i];
-                    break;
-                }
-            }
-        }
-
-        // Resize the array to match the actual number of common elements
-        return _resizeArray(tempResult, index);
-    }
 
     // mutable calls
-    function setMetadata(uint256 _tokenId, string memory _key, string memory _newValue) external onlyTokenOwner(_tokenId) whenUnfrozen(_tokenId) {
+    /**
+     * .setMetadata(uint256,string,string) upsert single metadata
+     * @param _tokenId uint256 NFT id
+     * @param _key string key
+     * @param _newValue string value to be setted
+     * @notice Only token owner can call this function
+     * @notice Only when the token is unfrozen this function can be called
+     */
+    function setMetadata(uint256 _tokenId, string memory _key, string memory _newValue) 
+        external 
+        onlyTokenOwner(_tokenId) 
+        whenUnfrozen(_tokenId) 
+    {
         _setMetadata(_tokenId, _key, _newValue);
     }
     
-    function setMetadata(uint256 _tokenId, string[] memory _keys, string[] memory _values) external onlyTokenOwner(_tokenId) whenUnfrozen(_tokenId) {
+    /**
+     * .setMetadata(uint256,string,string) upsert multiple metadata
+     * @param _tokenId uint256 NFT id
+     * @param _keys string keys to include
+     * @param _values string value to be setted
+     * @notice Only token owner can call this function
+     * @notice Only when the token is unfrozen this function can be called
+     */
+    function setMetadata(uint256 _tokenId, string[] memory _keys, string[] memory _values)
+        external 
+        onlyTokenOwner(_tokenId) 
+        whenUnfrozen(_tokenId) 
+    {
         _setMetadata(_tokenId, _keys, _values);
     }
 
+    /**
+     * .freezeMetadata(uint256) freeze metadata for a given token
+     * @param _tokenId uint256 NFT id
+     * @notice Only the contract owner can call this function
+     * @notice Only when the token is unfrozen this function can be called
+     */
     function freezeMetadata(uint256 _tokenId) external onlyOwner whenUnfrozen(_tokenId) {
         isFrozen[_tokenId] = true;
     }
 
     // mint functions
+    /**
+     * .mint(address,string) mint token
+     * @param _to address to mint the address to
+     * @param _uri string token URI
+     * @notice only the contract owner can call this function
+     */
     function mint(address _to, string memory _uri) external onlyOwner {
        _mint(_to, _uri);
     }
 
-    function mint(address _to, string memory _uri, string[] memory _keys, string[] memory _values) external onlyOwner {
+    /**
+     * .mint(address, string, string[], string[]) mint token and set metadata
+     * @param _to address to mint address to
+     * @param _uri string token uri
+     * @param _keys metadata keys
+     * @param _values metadata values
+     * @notice Only contract owner can call this function
+     */
+    function mint(address _to, string memory _uri, string[] memory _keys, string[] memory _values) 
+        external 
+        onlyOwner 
+    {
        uint256 tokenId = _mint(_to, _uri);
        _setMetadata(tokenId, _keys, _values);
     }
 
+    /**
+     * .setTokenURI(uint256,string) set token URI
+     * @param _tokenId uint256 NFT id
+     * @param _newURI string token uri
+     * @notice Only contract owner can call this function
+     * @notice Only when the token is unfrozen this function can be called
+     */
     function setTokenURI(uint256 _tokenId, string memory _newURI) external onlyOwner whenUnfrozen(_tokenId) {
         _setTokenURI(_tokenId, _newURI);
     }
     
+    /**
+     * .setCollectionMetadata(string[],string[]) sets collection metadata
+     * @param _keys list of keys
+     * @param _values list of values
+     * @notice Only contract owner can call this function
+     */
     function setCollectionMetadata(string[] memory _keys, string[] memory _values) external onlyOwner {
         _setCollectionMetadata(_keys, _values);
     }
@@ -236,6 +342,29 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
         // Add tokenId to the index
         tokens.push(tokenId);
+    }
+
+    function _intersectArrays(uint256[] memory arr1, uint256[] memory arr2)
+        internal
+        pure
+        returns (uint256[] memory)
+    {
+        // Use a memory mapping to track common elements
+        uint256 maxLength = arr1.length > arr2.length ? arr2.length : arr1.length;
+        uint256[] memory tempResult = new uint256[](maxLength);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < arr1.length; i++) {
+            for (uint256 j = 0; j < arr2.length; j++) {
+                if (arr1[i] == arr2[j]) {
+                    tempResult[index++] = arr1[i];
+                    break;
+                }
+            }
+        }
+
+        // Resize the array to match the actual number of common elements
+        return _resizeArray(tempResult, index);
     }
 
 
