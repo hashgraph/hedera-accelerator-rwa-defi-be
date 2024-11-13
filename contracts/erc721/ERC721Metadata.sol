@@ -11,6 +11,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
     uint256 private nextTokenId;
     mapping(bytes32 => KeyValue) internal metadata;
+    mapping(bytes32 => uint256[]) private metadataIndex;
     mapping(uint256 => string[]) internal metadataKeys;
     mapping(uint256 => bool) internal isFrozen;
     mapping(string => KeyValue) internal collectionMetadata;
@@ -76,55 +77,51 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
 
     function filterTokens(string memory _key, string memory _value) external view returns(TokenDetails[] memory) {
-        uint256 _tokenIndex;
-        uint256[] memory _tokensIds = new uint256[](nextTokenId);
-
-        for (uint _tokenId = 0; _tokenId < nextTokenId; _tokenId++) {
-            string[] memory _metadataKeys = metadataKeys[_tokenId];
-
-            for (uint j = 0; j < _metadataKeys.length; j++) {
-                KeyValue memory _metadata = getMetadata(_tokenId, _metadataKeys[j]);
-
-                if (_metadata.key.equal(_key) && _metadata.value.equal(_value)) {
-                    _tokensIds[_tokenIndex++] = _tokenId;
-                }
-            }
-        }
-
-        return _getTokenDetails(_resizeArray(_tokensIds, _tokenIndex));
+        uint256[] memory _tokensIds = metadataIndex[_keyValueHash(_key, _value)];
+        return _getTokenDetails(_tokensIds);
     }
 
-    function filterTokens(string[] memory _keys, string[] memory _values) external view returns (TokenDetails[] memory) {
-        require(_keys.length == _values.length, "ERC721Metadata: array length mismatch");
+    function filterTokens(string[] memory _keys, string[] memory _values)
+        external
+        view
+        returns (TokenDetails[] memory)
+    {
+        require(_keys.length == _values.length, "ERC721Metadata: keys and values length mismatch");
 
-        uint256[] memory matchingTokenIds = new uint256[](nextTokenId);
-        uint256 matchCount = 0;
+        // Retrieve the initial set of tokens for the first key-value pair
+        uint256[] memory filteredTokens = metadataIndex[_keyValueHash(_keys[0], _values[0])];
 
-        for (uint256 tokenId = 0; tokenId < nextTokenId; tokenId++) {
-            bool matchesAll = true;
+        // Iteratively refine the list based on additional key-value pairs
+        for (uint256 i = 1; i < _keys.length; i++) {
+            uint256[] memory tokensForPair = metadataIndex[_keyValueHash(_keys[i], _values[i])];
+            filteredTokens = _intersectArrays(filteredTokens, tokensForPair);
+        }
 
-            // Check if the token has all specified key-value pairs
-            for (uint256 i = 0; i < _keys.length; i++) {
-                string memory key = _keys[i];
-                string memory value = _values[i];
-                
-                KeyValue memory keyValue = metadata[_tokenIdKeyHash(tokenId, key)];
-                
-                // If key does not exist or value does not match, mark as unmatched
-                if (!keyValue.exists || !keyValue.key.equal(key) || !keyValue.value.equal(value)){
-                    matchesAll = false;
+        // Return the details of the filtered tokens
+        return _getTokenDetails(filteredTokens);
+    }
+
+    function _intersectArrays(uint256[] memory arr1, uint256[] memory arr2)
+        internal
+        pure
+        returns (uint256[] memory)
+    {
+        // Use a memory mapping to track common elements
+        uint256 maxLength = arr1.length > arr2.length ? arr2.length : arr1.length;
+        uint256[] memory tempResult = new uint256[](maxLength);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < arr1.length; i++) {
+            for (uint256 j = 0; j < arr2.length; j++) {
+                if (arr1[i] == arr2[j]) {
+                    tempResult[index++] = arr1[i];
                     break;
                 }
             }
-
-            // If token has all matching key-value pairs, add it to the result
-            if (matchesAll) {
-                matchingTokenIds[matchCount++] = tokenId;
-            }
         }
 
-        // Resize the array to match count and return token details
-        return _getTokenDetails(_resizeArray(matchingTokenIds, matchCount));
+        // Resize the array to match the actual number of common elements
+        return _resizeArray(tempResult, index);
     }
 
     // mutable calls
@@ -172,6 +169,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
             metadataKeys[_tokenId].push(_key);
 
         metadata[_tokenIdKeyHash(_tokenId, _key)] = data;
+        _updateIndex(_tokenId, _key, _newValue);
     }
 
     function _setMetadata(uint256 _tokenId, string[] memory _keys, string[] memory _values) internal {
@@ -221,6 +219,25 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     function _tokenIdKeyHash(uint256 _tokenId, string memory _key) internal pure returns(bytes32) {
         return keccak256(abi.encodePacked(_tokenId, _key));
     }
+
+    function _keyValueHash(string memory _value, string memory _key) internal pure returns(bytes32) {
+        return keccak256(abi.encodePacked(_value, _key));
+    }
+
+    function _updateIndex(uint256 tokenId, string memory key, string memory value) internal {
+        uint256[] storage tokens = metadataIndex[_keyValueHash(key, value)];
+
+        // Check if tokenId already exists in the index
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i] == tokenId) {
+                return; // Token already indexed, no need to re-add
+            }
+        }
+
+        // Add tokenId to the index
+        tokens.push(tokenId);
+    }
+
 
     // The following functions are overrides required by Solidity.
     function tokenURI(uint256 tokenId)
