@@ -10,8 +10,8 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     using Strings for string;
 
     uint256 private nextTokenId;
-    mapping(uint256 => mapping(string => KeyValue)) internal metadataByKey;
-    mapping(uint256 => KeyValue[]) internal metadata;
+    mapping(uint256 => mapping(string => KeyValue)) internal metadata;
+    mapping(uint256 => string[]) internal metadataKeys;
     mapping(uint256 => bool) internal isFrozen;
     mapping(string => KeyValue) internal collectionMetadataByKey;
     KeyValue[] internal collectionMetadata;
@@ -45,11 +45,18 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
 
     // view calls
     function getMetadata(uint256 _tokenId) public view returns(KeyValue[] memory) {
-        return metadata[_tokenId];
+        KeyValue[] memory data = new KeyValue[](metadataKeys[_tokenId].length);
+
+        for (uint i = 0; i < metadataKeys[_tokenId].length; i++) {
+            string memory key = metadataKeys[_tokenId][i];
+            data[i] = getMetadata(_tokenId, key);
+        }
+
+        return data;
     }
 
     function getMetadata(uint256 _tokenId, string memory _key) public view returns(KeyValue memory) {
-        return metadataByKey[_tokenId][_key];
+        return metadata[_tokenId][_key];
     }
 
     function getCollectionMetadata() external view returns(KeyValue[] memory) {
@@ -71,14 +78,15 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     function filterTokens(string memory _key, string memory _value) external view returns(TokenDetails[] memory) {
         uint256 _tokenIndex;
         uint256[] memory _tokensIds = new uint256[](nextTokenId);
-        for (uint i = 0; i < nextTokenId; i++) {
-            KeyValue[] memory _metadata = metadata[i];
 
-            for (uint j = 0; j < _metadata.length; j++) {
-                KeyValue memory _keyValue = _metadata[j];
+        for (uint _tokenId = 0; _tokenId < nextTokenId; _tokenId++) {
+            string[] memory _metadataKeys = metadataKeys[_tokenId];
 
-                if (_keyValue.key.equal(_key) && _keyValue.value.equal(_value)) {
-                    _tokensIds[_tokenIndex++] = i;
+            for (uint j = 0; j < _metadataKeys.length; j++) {
+                KeyValue memory _metadata = getMetadata(_tokenId, _metadataKeys[j]);
+
+                if (_metadata.key.equal(_key) && _metadata.value.equal(_value)) {
+                    _tokensIds[_tokenIndex++] = _tokenId;
                 }
             }
         }
@@ -100,7 +108,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
                 string memory key = _keys[i];
                 string memory value = _values[i];
                 
-                KeyValue memory keyValue = metadataByKey[tokenId][key];
+                KeyValue memory keyValue = metadata[tokenId][key];
                 
                 // If key does not exist or value does not match, mark as unmatched
                 if (!keyValue.exists || !keyValue.key.equal(key) || !keyValue.value.equal(value)){
@@ -160,10 +168,10 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     function _setMetadata(uint256 _tokenId, string memory _key, string memory _newValue) internal {
         KeyValue memory data = KeyValue(_key, _newValue, true);
 
-        if (!metadataByKey[_tokenId][_key].exists)
-            metadata[_tokenId].push(data);
+        if (!metadata[_tokenId][_key].exists)
+            metadataKeys[_tokenId].push(_key);
 
-        metadataByKey[_tokenId][_key] = data;
+        metadata[_tokenId][_key] = data;
     }
 
     function _setMetadata(uint256 _tokenId, string[] memory _keys, string[] memory _values) internal {
