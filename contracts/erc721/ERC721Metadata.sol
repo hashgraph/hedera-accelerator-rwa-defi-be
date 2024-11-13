@@ -10,7 +10,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     using Strings for string;
 
     uint256 private nextTokenId;
-    mapping(uint256 => mapping(string => KeyValue)) internal metadata;
+    mapping(bytes32 => KeyValue) internal metadata;
     mapping(uint256 => string[]) internal metadataKeys;
     mapping(uint256 => bool) internal isFrozen;
     mapping(string => KeyValue) internal collectionMetadata;
@@ -56,7 +56,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     }
 
     function getMetadata(uint256 _tokenId, string memory _key) public view returns(KeyValue memory) {
-        return metadata[_tokenId][_key];
+        return metadata[_tokenIdKeyHash(_tokenId,_key)];
     }
 
     function getCollectionMetadata() external view returns(KeyValue[] memory) {
@@ -108,7 +108,7 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
                 string memory key = _keys[i];
                 string memory value = _values[i];
                 
-                KeyValue memory keyValue = metadata[tokenId][key];
+                KeyValue memory keyValue = metadata[_tokenIdKeyHash(tokenId, key)];
                 
                 // If key does not exist or value does not match, mark as unmatched
                 if (!keyValue.exists || !keyValue.key.equal(key) || !keyValue.value.equal(value)){
@@ -168,10 +168,10 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     function _setMetadata(uint256 _tokenId, string memory _key, string memory _newValue) internal {
         KeyValue memory data = KeyValue(_key, _newValue, true);
 
-        if (!metadata[_tokenId][_key].exists)
+        if (!metadata[_tokenIdKeyHash(_tokenId, _key)].exists)
             metadataKeys[_tokenId].push(_key);
 
-        metadata[_tokenId][_key] = data;
+        metadata[_tokenIdKeyHash(_tokenId, _key)] = data;
     }
 
     function _setMetadata(uint256 _tokenId, string[] memory _keys, string[] memory _values) internal {
@@ -216,6 +216,10 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
             resizedArray[i] = array[i];
         }
         return resizedArray;
+    }
+
+    function _tokenIdKeyHash(uint256 _tokenId, string memory _key) internal pure returns(bytes32) {
+        return keccak256(abi.encodePacked(_tokenId, _key));
     }
 
     // The following functions are overrides required by Solidity.
