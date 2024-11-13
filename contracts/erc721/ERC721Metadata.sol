@@ -13,8 +13,8 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     mapping(uint256 => mapping(string => KeyValue)) internal metadata;
     mapping(uint256 => string[]) internal metadataKeys;
     mapping(uint256 => bool) internal isFrozen;
-    mapping(string => KeyValue) internal collectionMetadataByKey;
-    KeyValue[] internal collectionMetadata;
+    mapping(string => KeyValue) internal collectionMetadata;
+    string[] internal collectionMetadataKeys;
 
     struct KeyValue {
         string key;
@@ -60,18 +60,18 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
     }
 
     function getCollectionMetadata() external view returns(KeyValue[] memory) {
-        KeyValue[] memory data = new KeyValue[](collectionMetadata.length);
+        KeyValue[] memory data = new KeyValue[](collectionMetadataKeys.length);
 
-        for (uint i = 0; i < collectionMetadata.length; i++) {
-            KeyValue memory keyvalue = collectionMetadata[i];
-            data[i] = (collectionMetadataByKey[keyvalue.key]);
+        for (uint i = 0; i < collectionMetadataKeys.length; i++) {
+            string memory key = collectionMetadataKeys[i];
+            data[i] = (collectionMetadata[key]);
         }
 
         return data;
     }
 
     function getCollectionMetadata(string memory _key) external view returns(KeyValue memory) {
-        return collectionMetadataByKey[_key];
+        return collectionMetadata[_key];
     }
 
 
@@ -189,10 +189,10 @@ contract ERC721Metadata is ERC721, ERC721URIStorage, Ownable {
         for (uint i = 0; i < _keys.length; i++) {       
              KeyValue memory data = KeyValue(_keys[i], _values[i], true);
 
-            if (!collectionMetadataByKey[_keys[i]].exists)
-                collectionMetadata.push(data);
+            if (!collectionMetadata[_keys[i]].exists)
+                collectionMetadataKeys.push(_keys[i]);
 
-            collectionMetadataByKey[_keys[i]] = data;
+            collectionMetadata[_keys[i]] = data;
         }
     }
 
