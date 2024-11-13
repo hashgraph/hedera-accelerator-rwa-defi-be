@@ -171,8 +171,7 @@ async function deployVault(contracts: Record<string, any>): Promise<Record<strin
     feeConfig,
     deployer.address,
     deployer.address,
-    "0x330C40b17607572cf113973b8748fD1aEd742943",
-    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("12", 18) }
+    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("16", 18) }
   );
   console.log("Hash ", hederaVault.deploymentTransaction()?.hash);
   await hederaVault.waitForDeployment();
@@ -268,6 +267,32 @@ async function deployAsyncVault(contracts: Record<string, any>): Promise<Record<
   };
 }
 
+// Deploy Token balancer
+async function deployTokenBalancer(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const [deployer] = await ethers.getSigners();
+
+  // Set Pyth Utils lib address
+  const TokenBalancer = await ethers.getContractFactory("TokenBalancer", {
+    libraries: {
+      PythUtils: "0x503187175Da79a0E62605D6CEC4e845E9ACC7C94"
+    }
+  });
+
+  const tokenBalancer = await TokenBalancer.deploy(
+    "0x330C40b17607572cf113973b8748fD1aEd742943",
+    "0xACE99ADFd95015dDB33ef19DCE44fee613DB82C2",
+    "0x0000000000000000000000000000000000068cda"
+  );
+  await tokenBalancer.waitForDeployment();
+
+  return {
+    ...contracts,
+    balancer: {
+      TokenBalancer: tokenBalancer.target
+    }
+  };
+}
+
 // deploy HTS Token Factory
 async function deployHTSTokenFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
   const [deployer] = await ethers.getSigners();
@@ -315,6 +340,7 @@ init()
   .then(deployERC3643)
   .then(deployComplianceModules)
   .then(deployVault)
+  .then(deployTokenBalancer)
   .then(deployHTSTokenFactory)
   .then(exportDeploymentVersion)
   .then(finish)

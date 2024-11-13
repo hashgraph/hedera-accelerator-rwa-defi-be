@@ -4,6 +4,10 @@ pragma solidity 0.8.24;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ERC20} from "./ERC20.sol";
+
+import {IERC4626} from "./IERC4626.sol";
 
 import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
@@ -11,58 +15,190 @@ import {PythUtils} from "@pythnetwork/pyth-sdk-solidity/PythUtils.sol";
 
 import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {ITokenBalancer} from "./interfaces/ITokenBalancer.sol";
+import {IAutoCompounder} from "./interfaces/IAutoCompounder.sol";
 
 import "../common/safe-HTS/SafeHTS.sol";
 
 /**
  * @title Token Balancer
  *
- * The contract that helps to maintain reward token balances.
+ * The contract that helps to maintain A/V (Vault Share/AutoCompaunder) token balances.
  */
-contract TokenBalancer is ITokenBalancer, AccessControl {
+contract TokenBalancer is ITokenBalancer {
+    using SafeERC20 for IERC20;
     using PythUtils for int64;
+    using Bits for uint256;
 
     // Max tokens amount to rebalance
     uint8 constant MAX_TOKENS_AMOUNT = 10;
 
-    // Saucer Swap
-    IUniswapV2Router02 public saucerSwap;
+    // Uniswap V2 Router
+    IUniswapV2Router02 public uniswapV2Router;
 
     // Oracle
     IPyth public pyth;
 
+    // USDC address
+    address public usdc;
+
     // Token address => Token info
-    mapping(address token => TokenInfo) public tokens;
+    mapping(address token => TokenInfo) public tokenInfo;
+
+    // A/V token addresses
+    address[] public tokens;
+
+    // Underlying tokens refer to A/V tokens
+    address[] public underlyingTokens;
+
+    // Token balances
+    mapping(address token => uint256 balance) public balances;
+
+    struct TradeAmount {
+        address token;
+        uint256 amountToTrade;
+    }
+
+    struct TokenValuePayload {
+        address token;
+        uint256 value;
+        uint256 balance;
+        uint256 price;
+        uint256 targetPercentage;
+    }
 
     /**
      * @dev Initializes contract with passed parameters.
      *
      * @param _pyth The address of the Pyth oracle.
-     * @param _saucerSwap The address of Saucer swap contract.
-     * @param _tokens The tokens to rebalance.
-     * @param _allocationPercentage The target allocation percentage.
-     * @param _priceIds The price IDs in terms of Pyth oracle.
+     * @param _uniswapV2Router The address of the Uniswap Router contract.
+     * @param _usdc The address of the USDC token.
      */
-    constructor(
-        address _pyth,
-        address _saucerSwap,
-        address[] memory _tokens,
-        uint256[] memory _allocationPercentage,
-        bytes32[] memory _priceIds
-    ) {
+    constructor(address _pyth, address _uniswapV2Router, address _usdc) {
         require(_pyth != address(0), "TokenBalancer: Invalid Pyth address");
-        require(_saucerSwap != address(0), "TokenBalancer: Invalid Saucer Swap address");
-        require(_tokens.length != 0 && _tokens.length <= MAX_TOKENS_AMOUNT, "TokenBalancer: Invalid amount of tokens");
-        require(_allocationPercentage.length > 0, "TokenBalancer: Allocation percentage not configured");
-        require(_priceIds.length > 0, "TokenBalancer: No price ids");
+        require(_uniswapV2Router != address(0), "TokenBalancer: Invalid Uniswap Router address");
+        require(_usdc != address(0), "TokenBalancer: Invalid USDC token address");
 
-        saucerSwap = IUniswapV2Router02(_saucerSwap);
+        uniswapV2Router = IUniswapV2Router02(_uniswapV2Router);
         pyth = IPyth(_pyth);
+        usdc = _usdc;
 
-        uint256 tokensSize = _tokens.length;
-        for (uint256 i = 0; i < tokensSize; i++) {
-            addTrackingToken(_tokens[i], _priceIds[i], _allocationPercentage[i]);
+        SafeHTS.safeAssociateToken(_usdc, address(this));
+    }
+
+    /**
+     * @dev Calculates token value in USD.
+     *
+     * @param _aToken The A/V token address.
+     */
+    function getTokenValueInUSDC(address _aToken) public view returns (TokenValuePayload memory) {
+        TokenInfo storage aTokenInfo = tokenInfo[_aToken];
+
+        require(aTokenInfo.aToken != address(0), "TokenBalancer: The token doesn't exist");
+
+        if (aTokenInfo.isAutoCompaunder) {
+            uint256 aTokenBalance = IERC20(_aToken).balanceOf(address(this));
+            uint256 exchangeRate = IAutoCompounder(_aToken).getExchangeRate();
+            uint256 usdPrice = _getPrice(aTokenInfo.token, aTokenInfo.priceId);
+
+            uint256 currentValue = (aTokenBalance * exchangeRate * usdPrice) / 1e18;
+
+            return TokenValuePayload(_aToken, currentValue, aTokenBalance, usdPrice, aTokenInfo.targetPercentage);
+        } else {
+            uint256 vTokenBalance = IERC20(_aToken).balanceOf(address(this));
+            uint256 usdPrice = _getPrice(aTokenInfo.token, aTokenInfo.priceId);
+
+            return
+                TokenValuePayload(
+                    _aToken,
+                    vTokenBalance * usdPrice,
+                    vTokenBalance,
+                    usdPrice,
+                    aTokenInfo.targetPercentage
+                );
         }
+    }
+
+    /**
+     * @dev Calculates target amount needed to add to each token.
+     */
+    function _calculateAmountsToTrade() public view returns (TradeAmount[] memory amounts, uint256 totalValue) {
+        uint256 tokensLength = tokens.length;
+        for (uint256 i = 0; i < tokensLength; i++) {
+            TokenValuePayload memory valuePayload = getTokenValueInUSDC(tokens[i]); // get current value of each A/V token
+
+            totalValue += valuePayload.value; // calculate total value on the contract
+
+            uint256 targetValue = (totalValue * valuePayload.targetPercentage) / 10000; // calculate target value for each A/V token
+            uint256 targetQuantity = targetValue / valuePayload.price; // calculate target quantity to add to reach target value
+
+            amounts[i] = TradeAmount(valuePayload.token, targetQuantity - valuePayload.balance); // return amount to swap for each A/V token
+        }
+    }
+
+    /**
+     * @dev Makes a set of swaps to reach the target allocation of each token.
+     */
+    function rebalance() public {
+        (TradeAmount[] memory amounts, uint256 totalValue) = _calculateAmountsToTrade();
+
+        for (uint256 i = 0; i < amounts.length; i++) {
+            TokenInfo storage aTokenInfo = tokenInfo[amounts[i].token];
+
+            // withdraw calculated amounts of the underlying tokens and burn A/V tokens equivalent
+            if (aTokenInfo.isAutoCompaunder) {
+                IAutoCompounder(amounts[i].token).withdraw(amounts[i].amountToTrade, address(this), address(this));
+            } else {
+                IERC4626(amounts[i].token).withdraw(amounts[i].amountToTrade, address(this), address(this));
+            }
+
+            // Decrease A/V token balance by withdrawn amount
+            balances[amounts[i].token] -= amounts[i].amountToTrade;
+        }
+
+        for (uint256 i = 0; i < underlyingTokens.length; i++) {
+            _swapTokensForTokens(balances[underlyingTokens[i]], underlyingTokens[i], usdc); // Swap whole underlying tokens balance for USDC
+
+            _swapTokensForTokens(balances[address(usdc)], usdc, underlyingTokens[i]); // Swap USDC for underlying tokens
+        }
+    }
+
+    /**
+     * @dev Performs the swap of Token to Token using Uniswap Router.
+     *
+     * @param amount The A token amount to swap.
+     * @param tokenA The A token address.
+     * @param tokenB The B token address.
+     * @return The swap amount.
+     */
+    function _swapTokensForTokens(uint256 amount, address tokenA, address tokenB) internal returns (uint256) {
+        address[] memory path = new address[](2);
+        (path[0], path[1]) = (tokenA, tokenB);
+
+        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(
+            amount,
+            0, // accept any amount of output token
+            path,
+            address(this),
+            block.timestamp
+        );
+        return amounts[1];
+    }
+
+    /**
+     * @dev Deposit underlying token to external Vault/AutoCompaunder.
+     *
+     * @param token The token address.
+     * @param amount The amount to deposit.
+     */
+    function deposit(address token, uint256 amount) external {
+        require(tokenInfo[token].priceId.length != 0, "TokenBalancer: Invalid token to deposit");
+        require(amount != 0, "TokenBalancer: Invalid amount");
+
+        balances[token] += amount;
+
+        IERC4626(token).deposit(amount, msg.sender);
+
+        emit Deposit(token, msg.sender, amount);
     }
 
     /**
@@ -77,7 +213,7 @@ contract TokenBalancer is ITokenBalancer, AccessControl {
     }
 
     /**
-     * @dev Updates price.
+     * @dev Updates oracle price.
      *
      * @param pythPriceUpdate The pyth price update.
      */
@@ -87,128 +223,31 @@ contract TokenBalancer is ITokenBalancer, AccessControl {
     }
 
     /**
-     * @dev Initiates rebalance process.
+     * @dev Adds A/V token to the balancer system.
      *
-     * @param _rewardTokens The reward tokens to rebalance.
+     * @param aToken The A/V token address.
+     * @param priceId The underlying token oracle price ID.
+     * @param percentage The allocation percentage.
+     * @param isAutoCompaunder The bool flag true if the token is autocompaunder.
      */
-    function rebalance(address[] calldata _rewardTokens) external {
-        uint256 rewardTokensSize = _rewardTokens.length;
-        uint256[] memory prices = new uint256[](rewardTokensSize);
-        for (uint256 i = 0; i < rewardTokensSize; i++) {
-            TokenInfo storage token = tokens[_rewardTokens[i]];
-            prices[i] = token.price;
-        }
-
-        uint256[] memory swapAmounts = _rebalance(prices, _rewardTokens, rewardTokensSize);
-
-        _swapExtraRewardSupplyToTransitionToken(_rewardTokens, rewardTokensSize);
-
-        uint256 swapsCount = swapAmounts.length;
-        for (uint256 i = 0; i < swapsCount; i++) {
-            saucerSwap.swapExactETHForTokens(
-                swapAmounts[i],
-                tokens[_rewardTokens[i]].path,
-                address(this),
-                block.timestamp
-            );
-        }
-    }
-
-    /**
-     * @dev Swaps extra reward balance to WHBAR token for future rebalance.
-     *
-     * @param _rewardTokens The reward tokens array.
-     * @param rewardTokensSize The reward tokens size.
-     */
-    function _swapExtraRewardSupplyToTransitionToken(
-        address[] calldata _rewardTokens,
-        uint256 rewardTokensSize
-    ) public {
-        uint256 tokenBalance;
-        uint256 totalValue;
-        uint256 targetValue;
-        uint256 targetQuantity;
-
-        for (uint256 i = 0; i < rewardTokensSize; i++) {
-            TokenInfo storage token = tokens[_rewardTokens[i]];
-
-            tokenBalance = IERC20(_rewardTokens[i]).balanceOf(msg.sender);
-            totalValue = tokenBalance * token.price;
-            targetValue = (totalValue * tokens[_rewardTokens[i]].targetPercentage) / 10000;
-            targetQuantity = targetValue / token.price;
-
-            if (tokenBalance > targetQuantity) {
-                uint256 excessQuantity = tokenBalance - targetQuantity;
-
-                // Approve token transfer to SaucerSwap
-                IERC20(_rewardTokens[i]).approve(address(saucerSwap), excessQuantity);
-
-                // Perform the swap
-                saucerSwap.swapExactTokensForETH(
-                    excessQuantity,
-                    0, // Accept any amount of ETH
-                    token.path,
-                    address(this),
-                    block.timestamp
-                );
-            }
-        }
-    }
-
-    /**
-     * @dev Calculates amount of swap for every passed token.
-     *
-     * @param _tokenPrices The token prices array.
-     * @param _rewardTokens The reward tokens array.
-     * @param rewardTokensSize The cashed size of reward tokens to save gas.
-     */
-    function _rebalance(
-        uint256[] memory _tokenPrices,
-        address[] calldata _rewardTokens,
-        uint256 rewardTokensSize
-    ) public view returns (uint256[] memory) {
-        uint256 totalValue;
-        uint256[] memory tokenBalances = new uint256[](rewardTokensSize);
-
-        // Calculate total value in the contract
-        for (uint256 i = 0; i < rewardTokensSize; i++) {
-            tokenBalances[i] = IERC20(_rewardTokens[i]).balanceOf(msg.sender);
-            totalValue += tokenBalances[i] * _tokenPrices[i];
-        }
-
-        // Array to store the amounts to swap
-        uint256[] memory swapAmounts = new uint256[](rewardTokensSize);
-
-        // Calculate target values and swap amounts
-        for (uint256 i = 0; i < rewardTokensSize; i++) {
-            uint256 targetValue = (totalValue * tokens[_rewardTokens[i]].targetPercentage) / 10000;
-            uint256 targetQuantity = targetValue / _tokenPrices[i];
-
-            swapAmounts[i] = targetQuantity - tokenBalances[i];
-        }
-
-        return swapAmounts;
-    }
-
-    /**
-     * @dev Add token to the system.
-     *
-     * @param token The token address.
-     * @param priceId The price ID in terms of Pyth oracle.
-     * @param percentage The target allocation percentage.
-     */
-    function addTrackingToken(address token, bytes32 priceId, uint256 percentage) public {
-        require(token != address(0), "TokenBalancer: Invalid token address");
+    function addTrackingToken(address aToken, bytes32 priceId, uint256 percentage, bool isAutoCompaunder) public {
+        require(aToken != address(0), "TokenBalancer: Invalid token address");
         require(priceId.length != 0, "TokenBalancer: Invalid price ID");
-        require(percentage < 10000, "TokenBalancer: Percentage exceeds 100%");
-        require(tokens[token].priceId == 0, "TokenBalancer: Token already exists");
+        require(percentage < 10000 && percentage > 0, "TokenBalancer: Invalid allocation percentage");
+        require(tokenInfo[aToken].priceId == 0, "TokenBalancer: Token already exists");
+        require(tokens.length <= MAX_TOKENS_AMOUNT, "TokenBalancer: Max amount of tokens reached");
 
-        address[] memory _path = new address[](2);
-        (_path[0], _path[1]) = (saucerSwap.WHBAR(), token);
+        address underlying = IERC4626(aToken).asset();
 
-        tokens[token] = TokenInfo(priceId, _getPrice(token, priceId), percentage, _path);
+        tokenInfo[aToken] = TokenInfo(aToken, underlying, priceId, percentage, isAutoCompaunder);
 
-        emit TokenAdded(token, priceId, percentage);
+        tokens.push(aToken);
+
+        // Associate underlying token and A/V
+        SafeHTS.safeAssociateToken(aToken, address(this));
+        SafeHTS.safeAssociateToken(underlying, address(this));
+
+        emit TokenAdded(aToken, priceId, percentage);
     }
 
     /**
@@ -218,11 +257,24 @@ contract TokenBalancer is ITokenBalancer, AccessControl {
      * @param percentage The allocation percentage.
      */
     function setAllocationPercentage(address token, uint256 percentage) external {
-        require(token != address(0), "Invalid token address");
-        require(percentage < 10000, "Percentage exceeds 100%");
+        require(percentage < 10000 && percentage != 0, "TokenBalancer: Invalid percentage");
+        require(tokenInfo[token].targetPercentage != 0, "TokenBalancer: Token doesn't exist");
 
-        tokens[token].targetPercentage = percentage;
+        tokenInfo[token].targetPercentage = percentage;
 
         emit TargetAllocationPercentageChanged(token, percentage);
+    }
+}
+
+library Bits {
+    uint256 internal constant ONE = uint256(1);
+
+    /**
+     * @dev Sets the bit at the given 'index' in 'self' to '1'.
+     *
+     * @return Returns the modified value.
+     */
+    function setBit(uint256 self, uint8 index) internal pure returns (uint256) {
+        return self | (ONE << index);
     }
 }

@@ -31,7 +31,7 @@ abstract contract IERC4626 is ERC20 {
     event Withdraw(address indexed sender, address indexed receiver, uint256 assets, uint256 shares);
 
     error ZeroShares(uint256 numberOfShares);
-    
+
     error MaxRewardTokensAmount();
 
     /*///////////////////////////////////////////////////////////////
@@ -79,6 +79,8 @@ abstract contract IERC4626 is ERC20 {
     /*///////////////////////////////////////////////////////////////
                             View Functions
     //////////////////////////////////////////////////////////////*/
+
+    function asset() public view virtual returns (address);
 
     /**
      * @dev Returns amount of assets on the contract balance.

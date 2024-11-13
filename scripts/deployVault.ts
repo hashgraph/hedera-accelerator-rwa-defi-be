@@ -6,6 +6,8 @@ import { BytesLike, ZeroAddress } from "ethers";
 
 dotenv.config();
 
+const usdcAddress = "0x0000000000000000000000000000000000068cda";
+
 const mockPyth = "0x330C40b17607572cf113973b8748fD1aEd742943";
 const deployedSaucerSwap = "0xACE99ADFd95015dDB33ef19DCE44fee613DB82C2";
 const rw1Token = "0x000000000000000000000000000000000044b66c";
@@ -29,14 +31,14 @@ async function main() {
     operatorPrKey
   );
 
-  const stakingToken = await createFungibleToken(
-    "ERC4626 on Hedera",
-    "HERC4626",
-    process.env.ACCOUNT_ID,
-    operatorPrKey.publicKey,
-    client,
-    operatorPrKey
-  );
+  // const stakingToken = await createFungibleToken(
+  //   "ERC4626 on Hedera",
+  //   "HERC4626",
+  //   process.env.ACCOUNT_ID,
+  //   operatorPrKey.publicKey,
+  //   client,
+  //   operatorPrKey
+  // );
 
   // const rewardToken = await createFungibleToken(
   //   "Reward Token 1",
@@ -103,7 +105,7 @@ async function main() {
   // await pythUtils.waitForDeployment();
 
   // console.log("PythUtils deployed to:", await pythUtils.getAddress());
-  
+
   // const VaultFactory = await ethers.getContractFactory("VaultFactory");
   // const vaultFactory = await VaultFactory.deploy();
   // console.log("Hash ", vaultFactory.deploymentTransaction()?.hash);
@@ -141,24 +143,32 @@ async function main() {
 
   // console.log("AsyncVault deployed with address: ", await asyncVault.getAddress());
 
-  // const TokenBalancer = await ethers.getContractFactory("TokenBalancer");
-  // const tokenBalancer = await TokenBalancer.deploy(
-  //   mockPyth,
-  //   deployedSaucerSwap,
-  //   [
-  //     ""
-  //   ],
-  //   [
+  const TokenBalancer = await ethers.getContractFactory("TokenBalancer", {
+    libraries: {
+      PythUtils: "0x503187175Da79a0E62605D6CEC4e845E9ACC7C94"
+    }
+  });
+  const tokenBalancer = await TokenBalancer.deploy(
+    mockPyth,
+    deployedSaucerSwap,
+    usdcAddress
+    // [
+    //   "0x00000000000000000000000000000000004d0b03",
+    //   "0x00000000000000000000000000000000004d0b04"
+    // ],
+    // [
+    //   5000,
+    //   5000
+    // ],
+    // [
+    //   "0x1111111111111111111111111111111111111111111111111111111111111111",
+    //   "0x2222222222222222222222222222222222222222222222222222222222222222"
+    // ]
+  );
+  console.log("Hash ", tokenBalancer.deploymentTransaction()?.hash);
+  await tokenBalancer.waitForDeployment();
 
-  //   ],
-  //   [
-  //     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-  //   ]
-  // );
-  // console.log("Hash ", tokenBalancer.deploymentTransaction()?.hash);
-  // await tokenBalancer.waitForDeployment();
-
-  // console.log("Token Balancer deployed with address: ", await tokenBalancer.getAddress());
+  console.log("Token Balancer deployed with address: ", await tokenBalancer.getAddress());
 }
 
 main().catch((error) => {

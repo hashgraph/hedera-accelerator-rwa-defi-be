@@ -43,16 +43,17 @@ const mockPyth = "0x330C40b17607572cf113973b8748fD1aEd742943";
 
 //     console.log("work");
 
-//     // const priceFeedData = await pyth.createPriceFeedUpdateData(
-//     //     id,
-//     //     price,
-//     //     conf,
-//     //     expo,
-//     //     emaPrice,
-//     //     emaConf,
-//     //     publishTime,
-//     //     prevPublishTime
-//     // );
+// const priceFeedData = await pyth.createPriceFeedUpdateData(
+//     id,
+//     price,
+//     conf,
+//     expo,
+//     emaPrice,
+//     emaConf,
+//     publishTime,
+//     prevPublishTime
+// );
+
 
 //     // await pyth.updatePriceFeeds(priceFeedData);
 
@@ -84,42 +85,55 @@ async function main() {
         "uint64",                    // emaPrice.publishTime
         "uint64"                     // prevPublishTime
     ];
+    // const values = [
+    //     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",  // id
+    //     1500000000,    // price.price
+    //     100000000,     // price.conf
+    //     -8,            // price.expo
+    //     1633045600,    // price.publishTime
+    //     1495000000,    // emaPrice.price
+    //     95000000,      // emaPrice.conf
+    //     -8,            // emaPrice.expo
+    //     1633045600,    // emaPrice.publishTime
+    //     1633041600     // prevPublishTime
+    // ];
+
     const values = [
-        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",  // id
-        1500000000,    // price.price
-        100000000,     // price.conf
-        -8,            // price.expo
-        1633045600,    // price.publishTime
-        1495000000,    // emaPrice.price
-        95000000,      // emaPrice.conf
+        "0x2222222222222222222222222222222222222222222222222222222222222222",  // id
+        1500000,    // price.price
+        2000,     // price.conf
+        -5,            // price.expo
+        1698675600,    // price.publishTime
+        1480000,    // emaPrice.price
+        1800,      // emaPrice.conf
         -8,            // emaPrice.expo
-        1633045600,    // emaPrice.publishTime
-        1633041600     // prevPublishTime
+        1698675600,    // emaPrice.publishTime
+        1698672000     // prevPublishTime
     ];
     const priceFeed = ethers.AbiCoder.defaultAbiCoder().encode(types, values);
 
     // Query the contract to check changes in state variable
-    const contractQueryTx1 = new ContractCallQuery()
-        .setContractId("0.0.4999394")
-        .setGas(100000)
-        .setFunction(
-            "queryPriceFeed",
-            new ContractFunctionParameters()
-                .addBytes32(
-                    ethers.getBytes("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
-                )
-        )
-    const contractQuerySubmit1 = await contractQueryTx1.execute(client);
+    // const contractQueryTx1 = new ContractCallQuery()
+    //     .setContractId("0.0.4999394")
+    //     .setGas(100000)
+    //     .setFunction(
+    //         "queryPriceFeed",
+    //         new ContractFunctionParameters()
+    //             .addBytes32(
+    //                 ethers.getBytes("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+    //             )
+    //     );
 
-    console.log(contractQuerySubmit1);
+    // const contractQuerySubmit1 = await contractQueryTx1.execute(client);
 
-    // const pyth = await ethers.getContractAt("MockPyth", mockPyth,);
+    // console.log(contractQuerySubmit1);
 
-    // const pyth = new ethers.Contract(mockPyth, abi);
+    const pyth = await ethers.getContractAt(abi, mockPyth);
 
-    // console.log(await pyth.queryPriceFeed("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"));
+    const ar = [priceFeed]
+    const tx = await pyth.updatePriceFeeds(ar);
 
-    // console.log(await createPriceFeedData(id, 1500000000, 100000000, -8, 1495000000, 95000000, 1633045600, 1633041600, client));
+    console.log(tx.hash);
 }
 
 main().catch((error) => {
