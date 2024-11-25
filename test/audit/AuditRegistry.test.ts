@@ -1,7 +1,6 @@
 import { expect, ethers } from '../setup';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-
+import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 
 async function deployFixture() {
   const [owner, auditor1, auditor2] = await ethers.getSigners();
@@ -28,8 +27,8 @@ describe('AuditRegistry', () => {
     it('should deploy contracts successfully', async () => {
       const { erc721Metadata, auditRegistry } = await loadFixture(deployFixture);
 
-      expect(erc721Metadata.getAddress()).to.be.a('string');
-      expect(auditRegistry.getAddress()).to.be.a('string');
+      expect(await erc721Metadata.getAddress()).to.be.a('string');
+      expect(await auditRegistry.getAddress()).to.be.a('string');
     });
   });
 
@@ -47,14 +46,16 @@ describe('AuditRegistry', () => {
 
     it('should not allow non-admin to add an auditor', async () => {
       const { auditRegistry, auditor1, auditor2 } = await loadFixture(deployFixture);
-
+    
       const DEFAULT_ADMIN_ROLE = await auditRegistry.DEFAULT_ADMIN_ROLE();
-
+    
       await expect(
         auditRegistry.connect(auditor1).addAuditor(await auditor2.getAddress())
-      ).to.be.revertedWith(`AccessControl: account ${await auditor1.getAddress()} is missing role ${DEFAULT_ADMIN_ROLE}`);
+      ).to.be.revertedWithCustomError(auditRegistry, 'AccessControlUnauthorizedAccount').withArgs(
+        await auditor1.getAddress(),
+        DEFAULT_ADMIN_ROLE
+      );
     });
-  });
 
   describe('Basic Audit Record', () => {
     it('should allow an authorized auditor to add an audit record', async () => {
@@ -82,5 +83,6 @@ describe('AuditRegistry', () => {
       expect(auditRecord.ipfsHash).to.equal('ipfs://audit1');
       expect(auditRecord.revoked).to.be.false;
     });
+  });
   });
 });
