@@ -21,7 +21,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "hardhat",
+  defaultNetwork: "testnet",
   networks: {
     mainnet: {
       chainId: 295, // hedera mainnet chainId
