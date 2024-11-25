@@ -6,18 +6,18 @@ import "../erc721/ERC721Metadata.sol";
 
 /**
  * @title AuditRegistry
- * @author Hashgraph
+ * @author
  * @notice This contract manages audit records for building NFTs.
  */
 contract AuditRegistry is AccessControl {
     bytes32 public constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
 
     struct AuditRecord {
-        uint256 buildingId;      // ID of the building NFT
-        address auditor;         // Address of the auditor
-        string ipfsHash;         // IPFS hash of the audit document
-        uint256 timestamp;       // Timestamp when the audit was added
-        bool revoked;            // Status of the audit record
+        uint256 buildingId;   // ID of the building NFT
+        address auditor;      // Address of the auditor
+        string ipfsHash;      // IPFS hash of the audit document
+        uint256 timestamp;    // Timestamp when the audit was added
+        bool revoked;         // Status of the audit record
     }
 
     mapping(uint256 => AuditRecord) public auditRecords;
@@ -51,7 +51,7 @@ contract AuditRegistry is AccessControl {
     constructor(address _buildingNFTAddress) {
         require(_buildingNFTAddress != address(0), "Invalid NFT contract address");
         buildingNFT = ERC721Metadata(_buildingNFTAddress);
-        grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Use internal function to assign admin role
     }
 
     modifier buildingExists(uint256 _buildingId) {
