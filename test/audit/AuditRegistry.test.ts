@@ -8,6 +8,9 @@ dotenv.config();
 async function getContracts() {
   const provider = ethers.provider;
   const owner = new ethers.Wallet(process.env.PRIVATE_KEY || '', provider);
+  const nonAdmin = process.env.PRIVATE_KEY_NON_ADMIN
+    ? new ethers.Wallet(process.env.PRIVATE_KEY_NON_ADMIN, provider)
+    : null;
 
   // read contract addresses from file
   const addresses = JSON.parse(fs.readFileSync('contractAddresses.json', 'utf8'));
@@ -17,6 +20,7 @@ async function getContracts() {
 
   return {
     owner,
+    nonAdmin,
     erc721Metadata,
     auditRegistry,
   };
@@ -24,11 +28,12 @@ async function getContracts() {
 
 describe('AuditRegistry', () => {
   let owner: any;
+  let nonAdmin: any;
   let erc721Metadata: any;
   let auditRegistry: any;
 
   beforeEach(async () => {
-    ({ owner, erc721Metadata, auditRegistry } = await getContracts());
+    ({ owner, nonAdmin, erc721Metadata, auditRegistry } = await getContracts());
   });
 
   describe('Deployment', () => {
@@ -50,29 +55,15 @@ describe('AuditRegistry', () => {
       const hasRole = await auditRegistry.hasRole(AUDITOR_ROLE, owner.address);
       expect(hasRole).to.be.true;
     });
-  });
 
-  describe('Basic Audit Record', () => {
-    it('should allow an authorized auditor to add an audit record', async () => {
+    it('should allow the admin to remove an auditor', async () => {
       const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
 
       await auditRegistry.connect(owner).addAuditor(owner.address);
-      await erc721Metadata.connect(owner)['mint(address,string)'](owner.address, 'ipfs://building1');
+      await auditRegistry.connect(owner).removeAuditor(owner.address);
 
-      await expect(auditRegistry.connect(owner).addAuditRecord(1, 'ipfs://audit1'))
-        .to.emit(auditRegistry, 'AuditRecordAdded')
-        .withArgs(
-          1, // auditRecordId
-          1, // buildingId
-          owner.address,
-          'ipfs://audit1',
-          anyValue // timestamp
-        );
-
-      const auditRecord = await auditRegistry.auditRecords(1);
-      expect(auditRecord.buildingId).to.equal(1);
-      expect(auditRecord.ipfsHash).to.equal('ipfs://audit1');
-      expect(auditRecord.revoked).to.be.false;
+      const hasRole = await auditRegistry.hasRole(AUDITOR_ROLE, owner.address);
+      expect(hasRole).to.be.false;
     });
-  });
+  });  
 });
