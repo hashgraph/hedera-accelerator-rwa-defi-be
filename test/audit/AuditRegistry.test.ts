@@ -1,31 +1,22 @@
 import { expect, ethers } from '../setup';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import * as dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
-async function deployContracts() {
+async function getContracts() {
   const provider = ethers.provider;
-
   const owner = new ethers.Wallet(process.env.PRIVATE_KEY || '', provider);
 
-  const auditor1 = owner;
-  const auditor2 = owner;
+  // read contract addresses from file
+  const addresses = JSON.parse(fs.readFileSync('contractAddresses.json', 'utf8'));
 
-  const ERC721Metadata = await ethers.getContractFactory('ERC721Metadata', owner);
-  const erc721Metadata = await ERC721Metadata.deploy('BuildingNFT', 'BLD');
-  await erc721Metadata.waitForDeployment();
-
-  const erc721Address = await erc721Metadata.getAddress();
-
-  const AuditRegistry = await ethers.getContractFactory('AuditRegistry', owner);
-  const auditRegistry = await AuditRegistry.deploy(erc721Address);
-  await auditRegistry.waitForDeployment();
+  const erc721Metadata = await ethers.getContractAt('ERC721Metadata', addresses.ERC721Metadata, owner);
+  const auditRegistry = await ethers.getContractAt('AuditRegistry', addresses.AuditRegistry, owner);
 
   return {
     owner,
-    auditor1,
-    auditor2,
     erc721Metadata,
     auditRegistry,
   };
@@ -33,13 +24,11 @@ async function deployContracts() {
 
 describe('AuditRegistry', () => {
   let owner: any;
-  let auditor1: any;
-  let auditor2: any;
   let erc721Metadata: any;
   let auditRegistry: any;
 
   beforeEach(async () => {
-    ({ owner, auditor1, auditor2, erc721Metadata, auditRegistry } = await deployContracts());
+    ({ owner, erc721Metadata, auditRegistry } = await getContracts());
   });
 
   describe('Deployment', () => {
@@ -56,9 +45,9 @@ describe('AuditRegistry', () => {
     it('should allow the admin to add an auditor', async () => {
       const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
 
-      await auditRegistry.connect(owner).addAuditor(auditor1.address);
+      await auditRegistry.connect(owner).addAuditor(owner.address);
 
-      const hasRole = await auditRegistry.hasRole(AUDITOR_ROLE, auditor1.address);
+      const hasRole = await auditRegistry.hasRole(AUDITOR_ROLE, owner.address);
       expect(hasRole).to.be.true;
     });
   });
@@ -85,6 +74,5 @@ describe('AuditRegistry', () => {
       expect(auditRecord.ipfsHash).to.equal('ipfs://audit1');
       expect(auditRecord.revoked).to.be.false;
     });
-
   });
 });
