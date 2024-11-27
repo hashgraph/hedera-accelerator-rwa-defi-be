@@ -33,13 +33,14 @@ contract BuildingFactory is Ownable  {
         emit NewNFTCollection(address(nft));
     }
 
-    function newBuilding() external payable {
-        Building building = new Building();
+    function newBuilding(bytes32 _salt) external payable {
+        Building building = (new Building){salt: _salt}();
         
-        building.initialize{ value : msg.value}(
+        building.initialize{ value : msg.value }(
             usdc, 
             uniswapRouter, 
-            uniswapFactory
+            uniswapFactory,
+            address(nft)
         );
 
         nft.mint(address(building), ""); // tokenURI should be sent here?        

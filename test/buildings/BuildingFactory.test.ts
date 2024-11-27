@@ -68,15 +68,18 @@ async function getDeployeBuilding(buildingFactory: BuildingFactory) {
 describe('BuildingFactory', () => {
   describe('.newBuilding()', () => {
     describe('when there is ', () => {
-      it.only('should do it', async () => {
+      it('should do it', async () => {
         const { buildingFactory, usdc } = await deployFixture();
 
         const usdcAmount = ethers.parseUnits('1', 6);
         const tokenAmount = ethers.parseUnits('100', 6);
 
+        // create a unique salt to create2 new building
+        // (factoryAddress)-usdc-(tokenSymbol)
+        const salt = ethers.id(`${await buildingFactory.getAddress()}-usdc-bild`);
 
         console.log('- new building');
-        const tx = await buildingFactory.newBuilding({ value: ethers.parseEther('10'), gasLimit: 800000 });
+        const tx = await buildingFactory.newBuilding(salt, { value: ethers.parseEther('10'), gasLimit: 800000 });
         await tx.wait();
         console.log('- new building created', tx.hash);
 

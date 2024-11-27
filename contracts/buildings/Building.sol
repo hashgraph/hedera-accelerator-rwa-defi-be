@@ -9,6 +9,8 @@ import "../common/safe-HTS/SafeHTS.sol";
 import "./interface/UniswapInterface.sol";
 import "./BuildingLiquidityPool.sol";
 import "./library/BuildingToken.sol";
+import "./library/CallContract.sol";
+import "../audit/AuditRegistry.sol";
 
 contract Building is IERC721Receiver, Initializable, OwnableUpgradeable, BuildingLiquidityPool  {    
     // Addresses for the supporting contracts
@@ -23,19 +25,24 @@ contract Building is IERC721Receiver, Initializable, OwnableUpgradeable, Buildin
     function initialize (
         address _usdc, 
         address _uniswapRouter, 
-        address _uniswapFactory
+        address _uniswapFactory,
+        address _buildingNftAddress
     ) external payable initializer {
         __Ownable_init(_msgSender());
         usdc = _usdc;
         uniswapRouter = _uniswapRouter;
         uniswapFactory = _uniswapFactory;
         token = BuildingToken.createHTSToken("BuildingToken", "BILD", 6, address(this));
+        auditRegistry = address(new AuditRegistry(_buildingNftAddress));
     }
 
     function addLiquidity(uint256 usdcAmount, uint256 tokenAmount) external payable onlyOwner {        
         _addLiquidityToPool(usdc, token, usdcAmount, tokenAmount);        
     }
 
+    function callContract(address callableContract, bytes memory data) external onlyOwner returns(bytes memory) {
+        return CallContract.call(callableContract, data);
+    }
 
     function onERC721Received(
         address /*operator*/,
