@@ -1,30 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../common/safe-HTS/SafeHTS.sol";
-import "./interface/UniswapInterface.sol";
+import {SafeHTS} from "../../common/safe-HTS/SafeHTS.sol";
+import {UniswapV2Factory, UniswapV2Pair, UniswapV2Router02} from "../interface/UniswapInterface.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract BuildingLiquidityPool is Initializable {
-    address internal uniswapRouter;
-    address internal uniswapFactory;
-    address internal pair;
-    address internal lpToken;
+abstract contract BuildingLiquidityPool is Initializable {
+    address public uniswapRouter;
+    address public uniswapFactory;
+    address public pair;
+    address public lpToken;
+    address public usdc;
 
-    function initialize ( 
-        address _uniswapRouter, 
-        address _uniswapFactory
-    ) public initializer {
+    function __Liquidity_init (address _usdc, address _uniswapRouter, address _uniswapFactory) internal onlyInitializing {
         uniswapRouter = _uniswapRouter;
         uniswapFactory = _uniswapFactory;
-    }
-
-    function getPair() public view returns (address) {
-        return pair;
-    }
-
-    function getLpToken() public view returns (address) {
-        return lpToken;
+        usdc = _usdc;
     }
 
     function _addLiquidityToPool(

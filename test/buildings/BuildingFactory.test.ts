@@ -1,4 +1,4 @@
-import { Contract, LogDescription } from 'ethers';
+import { LogDescription } from 'ethers';
 import { expect, ethers } from '../setup';
 import { BuildingFactory } from '../../typechain-types';
 
@@ -11,15 +11,28 @@ async function deployFixture() {
 
   const usdc = await ethers.getContractAt('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20', usdcAddress);
 
+  // create the NFT separately because ERC721Metadata is too large
+  // must transfer ownership to BuildingFactory
+  console.log(' - deploying Building NFT Collection');
+  const nftCollectionFactory = await ethers.getContractFactory('ERC721Metadata', owner);
+  const nftCollection = await nftCollectionFactory.deploy("Building NFT", "BILDNFT",);
+  await nftCollection.waitForDeployment();
+  const nftCollectionAddress = await nftCollection.getAddress();
+
   // // Deploy implementations
   console.log(' - deploying BuildingFactory')
   const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
   const buildingFactory = await buildingFactoryFactory.deploy();
   await buildingFactory.waitForDeployment();
+  // const buildingFactory = await ethers.getContractAt('BuildingFactory', "0x5979e42f408E771dE80704F05DD9cabCed6A10B9");
+  const buildingFactoryAddress = await buildingFactory.getAddress()
+  console.log(' - BuildingFactory address', buildingFactoryAddress);
+
+  console.log(' - transfer NFT ownership to BuildingFactory');
+  await nftCollection.transferOwnership(buildingFactoryAddress);
   
-  // const buildingFactory = await ethers.getContractAt('BuildingFactory', "0xfdcd04627aF5767d93642A88d1373Be2a2b0e330");
-  console.log(' - BuildingFactory address', await buildingFactory.getAddress());
-  const tx = await buildingFactory.initialize("Building NFT", "BILDNFT", usdcAddress, uniswapRouterAddress, uniswapFactoryAddress);
+  console.log(' - Initializing BuildingFactory');
+  const tx = await buildingFactory.initialize(nftCollectionAddress, usdcAddress, uniswapRouterAddress, uniswapFactoryAddress);
   await tx.wait();
 
   return {
@@ -31,27 +44,9 @@ async function deployFixture() {
 }
 
 // get ERC721Metadata NFT collection deployed on contract deployment
-async function getDeployedNftCollection(buildingFactory: BuildingFactory) {
-   // Decode the event using queryFilter
-   const logs = await buildingFactory.queryFilter(
-    buildingFactory.filters.NewNFTCollection(),
-    -1
-  );
-
-  // Ensure one event was emitted
-  expect(logs.length).to.equal(1);
-
-  // Decode the log using the contract's interface
-  const event = logs[0]; // Get the first log
-  const decodedEvent = buildingFactory.interface.parseLog(event) as LogDescription;
-  const nftCollectionAddress = decodedEvent.args[0]; // Assuming the address is the first argument
-  return await ethers.getContractAt('ERC721Metadata', nftCollectionAddress);
-}
-
-// get ERC721Metadata NFT collection deployed on contract deployment
-async function getDeployeBuilding(buildingFactory: BuildingFactory) {
+async function getDeployeBuilding(buildingFactory: BuildingFactory, blockNumber: number) {
   // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters.NewBuilding(), -1);
+  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewBuilding(address)'], blockNumber, blockNumber);
 
   // Ensure one event was emitted
   expect(logs.length).to.equal(1);
@@ -83,8 +78,9 @@ describe('BuildingFactory', () => {
         await tx.wait();
         console.log('- new building created', tx.hash);
 
-        const newBuilding = await getDeployeBuilding(buildingFactory)
+        const newBuilding = await getDeployeBuilding(buildingFactory, Number(tx.blockNumber));
         const newBuildingAddress = await newBuilding.getAddress();
+        console.log(' - newBuildingAddress',  newBuildingAddress)
 
         console.log('- approving usdc to buildingFactory');
         const txapprove = await usdc.approve(buildingFactory.getAddress(), usdcAmount);
@@ -101,10 +97,8 @@ describe('BuildingFactory', () => {
         const building = await ethers.getContractAt('Building', newBuildingAddress);
         const _usdc = await building.usdc();
         const _token = await building.token();
-        const pair = await building.getPair();
-        const lpToken = await building.getLpToken();
 
-        console.log({ pair, _usdc, _token, lpToken, newBuildingAddress })
+        console.log({ _usdc, _token, newBuildingAddress })
 
         // // should emit NewBuilding event
         // await expect(tx).to.emit(buildingFactory, 'NewBuilding');

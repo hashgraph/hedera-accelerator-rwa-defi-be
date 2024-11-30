@@ -1,49 +1,46 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../erc721/ERC721Metadata.sol";
-import "./Building.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Building} from "./Building.sol";
+import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
 
-contract BuildingFactory is Ownable  {
-    ERC721Metadata private nft;
+contract BuildingFactory is OwnableUpgradeable  {
+    address private nft;
     address private usdc;
     address private uniswapRouter;
     address private uniswapFactory;
     address private router;
 
     event NewBuilding(address addr);
-    event NewNFTCollection(address addr);
-
-    constructor() Ownable(_msgSender()) {}
 
     function initialize(
-        string memory _name, 
-        string memory _symbol, 
+        address _nft,
         address _usdc, 
         address _uniswapRouter,
         address _uniswapFactory
-    ) external {
-        nft = new ERC721Metadata(_name, _symbol);
+    ) external initializer {
+        __Ownable_init(_msgSender());
+        nft = _nft;
         usdc = _usdc;
         uniswapRouter = _uniswapRouter;
         uniswapFactory = _uniswapFactory;
         router = _uniswapRouter;
-        emit NewNFTCollection(address(nft));
     }
 
     function newBuilding(bytes32 _salt) external payable {
         Building building = (new Building){salt: _salt}();
         
         building.initialize{ value : msg.value }(
+            _salt,
             usdc, 
             uniswapRouter, 
             uniswapFactory,
-            address(nft)
+            nft
         );
 
-        nft.mint(address(building), ""); // tokenURI should be sent here?        
+        IERC721Metadata(nft).mint(address(building), ""); // tokenURI should be sent here?        
         emit NewBuilding(address(building));
     }
 
