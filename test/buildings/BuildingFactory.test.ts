@@ -6,10 +6,16 @@ async function deployFixture() {
   const [owner, notOwner] = await ethers.getSigners();
   
   const usdcAddress = "0x0000000000000000000000000000000000001549";
-  const uniswapRouterAddress = "0x0000000000000000000000000000000000004b40";
-  const uniswapFactoryAddress = "0x00000000000000000000000000000000000026e7";
+  const uniswapRouterAddress = "0x00000000000000000000000000000000004fa0fa"; // HeliSwap
+  const uniswapFactoryAddress = "0x00000000000000000000000000000000004fa0f8"; // HeliSwap
 
   const usdc = await ethers.getContractAt('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20', usdcAddress);
+  // const token = await ethers.getContractAt('ERC20Mock', tokenAddress);
+  const token = await ethers.deployContract('ERC20Mock', ["Buildings R US", "BRUS", 18]);
+  await token.waitForDeployment();
+  const tokenAddress = await token.getAddress();
+
+  console.log(" - tokenAddress", tokenAddress);
 
   // create the NFT separately because ERC721Metadata is too large
   // must transfer ownership to BuildingFactory
@@ -24,7 +30,7 @@ async function deployFixture() {
   const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
   const buildingFactory = await buildingFactoryFactory.deploy();
   await buildingFactory.waitForDeployment();
-  // const buildingFactory = await ethers.getContractAt('BuildingFactory', "0x5979e42f408E771dE80704F05DD9cabCed6A10B9");
+  // const buildingFactory = await ethers.getContractAt('BuildingFactory', "0x3aae32Ae1d9F24b3C814F6977ff948251A7620a2");
   const buildingFactoryAddress = await buildingFactory.getAddress()
   console.log(' - BuildingFactory address', buildingFactoryAddress);
 
@@ -32,14 +38,17 @@ async function deployFixture() {
   await nftCollection.transferOwnership(buildingFactoryAddress);
   
   console.log(' - Initializing BuildingFactory');
-  const tx = await buildingFactory.initialize(nftCollectionAddress, usdcAddress, uniswapRouterAddress, uniswapFactoryAddress);
+  const tx = await buildingFactory.initialize(nftCollectionAddress, uniswapRouterAddress, uniswapFactoryAddress);
   await tx.wait();
 
   return {
     owner,
     notOwner,
     buildingFactory,
-    usdc
+    usdc,
+    usdcAddress,
+    token,
+    tokenAddress
   }
 }
 
@@ -64,10 +73,10 @@ describe('BuildingFactory', () => {
   describe('.newBuilding()', () => {
     describe('when there is ', () => {
       it('should do it', async () => {
-        const { buildingFactory, usdc } = await deployFixture();
+        const { owner, buildingFactory, usdc, usdcAddress, token, tokenAddress } = await deployFixture();
 
         const usdcAmount = ethers.parseUnits('1', 6);
-        const tokenAmount = ethers.parseUnits('100', 6);
+        const tokenAmount = ethers.parseUnits('100', 18);
 
         // create a unique salt to create2 new building
         // (factoryAddress)-usdc-(tokenSymbol)
@@ -80,6 +89,7 @@ describe('BuildingFactory', () => {
 
         const newBuilding = await getDeployeBuilding(buildingFactory, Number(tx.blockNumber));
         const newBuildingAddress = await newBuilding.getAddress();
+        // const newBuildingAddress = "0x0e86579E8447f06829a0BCC3057042666Acc4E82";
         console.log(' - newBuildingAddress',  newBuildingAddress)
 
         console.log('- approving usdc to buildingFactory');
@@ -87,18 +97,31 @@ describe('BuildingFactory', () => {
         await txapprove.wait();
         console.log('- usdc to buildingFactory approved');
 
+        console.log('- minting token');
+        const txmint = await token.mint(owner.address, tokenAmount);
+        await txmint.wait();
+        console.log('- token minted');
+
+        console.log('- approving token to buildingFactory');
+        const txapprove2 = await token.approve(buildingFactory.getAddress(), tokenAmount);
+        await txapprove2.wait();
+        console.log('- token to buildingFactory approved');
+
         console.log('- add liquidity to Building');
-        const tx2 = await buildingFactory.addLiquidityToBuilding(newBuildingAddress, usdcAmount, tokenAmount, { value: ethers.parseEther('20'), gasLimit: 8000000 });
+        const tx2 = await buildingFactory.addLiquidityToBuilding(
+          newBuildingAddress, 
+          tokenAddress,
+          tokenAmount, 
+          usdcAddress, 
+          usdcAmount, 
+          { value: ethers.parseEther('20'), gasLimit: 8000000 }
+        );
         await tx2.wait();
         console.log('- liquidity added', tx2.hash);
 
         // const buildingAddress =  await buildingFactory.building();
 
-        const building = await ethers.getContractAt('Building', newBuildingAddress);
-        const _usdc = await building.usdc();
-        const _token = await building.token();
-
-        console.log({ _usdc, _token, newBuildingAddress })
+        console.log({ newBuildingAddress })
 
         // // should emit NewBuilding event
         // await expect(tx).to.emit(buildingFactory, 'NewBuilding');

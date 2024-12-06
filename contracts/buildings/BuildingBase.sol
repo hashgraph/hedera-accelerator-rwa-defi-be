@@ -8,15 +8,12 @@ import {CallContract} from "./library/CallContract.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 abstract contract BuildingBase is IERC721Receiver, Initializable, OwnableUpgradeable {
-    // Addresses for the supporting contracts
-    address public token;
 
     function __Building_init () internal onlyInitializing {
         __Ownable_init(_msgSender());
-        token = BuildingToken.createHTSToken("BuildingsToken", "BILD", 6, address(this));
     }
 
-    function callContract(address callableContract, bytes memory data) external onlyOwner returns(bytes memory) {
+    function callContract(address callableContract, bytes memory data) external payable onlyOwner returns(bytes memory) {
         return CallContract.call(callableContract, data);
     }
 

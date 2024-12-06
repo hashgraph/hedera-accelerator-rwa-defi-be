@@ -9,18 +9,22 @@ contract Building is BuildingBase, BuildingLiquidityPool, BuildingAudit {
 
     function initialize (
         bytes32 _salt,
-        address _usdc, 
         address _uniswapRouter, 
         address _uniswapFactory,
         address _nftAddress
     ) external payable initializer {
         __Ownable_init(_msgSender());
         __Building_init();
-        __Liquidity_init(_usdc, _uniswapRouter, _uniswapFactory);
+        __Liquidity_init(_uniswapRouter, _uniswapFactory);
         __Audit_init(_salt, _nftAddress);
     }
 
-    function addLiquidity(uint256 usdcAmount, uint256 tokenAmount) external payable onlyOwner {        
-        _addLiquidityToPool(usdc, token, usdcAmount, tokenAmount);        
+    function addLiquidity(
+        address tokenA, 
+        uint256 tokenAAmount, 
+        address tokenB, 
+        uint256 tokenBAmount
+    ) external payable onlyOwner {        
+        _addLiquidityToPool(tokenA, tokenB, tokenAAmount, tokenBAmount);        
     }
 }
