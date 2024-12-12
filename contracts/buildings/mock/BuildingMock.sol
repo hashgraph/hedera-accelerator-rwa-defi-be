@@ -19,7 +19,7 @@ contract BuildingMock is Building {
         address _uniswapRouter, 
         address _uniswapFactory,
         address _nftAddress
-    ) public override payable {
+    ) public override {
        super.initialize(_salt, _uniswapRouter, _uniswapFactory, _nftAddress);
     }
 

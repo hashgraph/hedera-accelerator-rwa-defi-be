@@ -17,7 +17,7 @@ contract BuildingFactoryMock is BuildingFactory {
        super.initialize(_nft, _uniswapRouter, _uniswapFactory);
     }
 
-    function newBuilding(bytes32 _salt, string memory tokenURI) public override payable onlyOwner {
+    function newBuilding(bytes32 _salt, string memory tokenURI) public override onlyOwner {
         super.newBuilding(_salt, tokenURI);
     }
 }

@@ -112,7 +112,7 @@ describe('BuildingFactory', () => {
 
       const salt = ethers.id(`BUILDING_ONE`);
       const tokenURI = "ipfs://building-nft-uri";
-      const tx = await buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 });
+      const tx = await buildingFactory.newBuilding(salt, tokenURI);
       await tx.wait();
       const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
 
@@ -138,9 +138,9 @@ describe('BuildingFactory', () => {
 
       const salt = ethers.id(`BUILDING_ONE`);
       const tokenURI = "ipfs://building-nft-uri";
-      await buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 });
+      await buildingFactory.newBuilding(salt, tokenURI);
 
-      await expect(buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 }))
+      await expect(buildingFactory.newBuilding(salt, tokenURI))
         .to.be.revertedWith('BuildingFactory: Building alreadyExists');
     });
 

@@ -7,6 +7,10 @@ import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
 import {Token} from '../erc3643/token/Token.sol';
 
+/**
+ * @title BuildingFactory
+ * @author Hashgraph 
+ */
 contract BuildingFactory is OwnableUpgradeable  {
     address private nft;
     address private uniswapRouter;
@@ -18,12 +22,18 @@ contract BuildingFactory is OwnableUpgradeable  {
     event NewBuilding(address addr);
 
     struct BuildingInfo {
-        address addr;
-        uint256 nftId;
-        string tokenURI;
-        bytes32 salt;
+        address addr; // building address
+        uint256 nftId; // NFT token ID attributed to the building
+        string tokenURI; // NFT metadatada location
+        bytes32 salt; // proxy identifier
     }
 
+    /**
+     * initialize used for upgradable contract
+     * @param _nft NFT collection address
+     * @param _uniswapRouter unsiswap router address
+     * @param _uniswapFactory unsiswap factory address
+     */
     function initialize(
         address _nft,
         address _uniswapRouter,
@@ -35,12 +45,17 @@ contract BuildingFactory is OwnableUpgradeable  {
         uniswapFactory = _uniswapFactory;
     }
 
-    function newBuilding(bytes32 _salt, string memory tokenURI) public virtual payable onlyOwner {
+    /**
+     * newBuilding Creates new building with create2, mints NFT and store it.
+     * @param _salt bytes32 identifier for upgradeable proxy contracts with create2
+     * @param tokenURI metadata location
+     */
+    function newBuilding(bytes32 _salt, string memory tokenURI) public virtual onlyOwner {
         require(buildingSalts[_salt] == address(0), "BuildingFactory: Building alreadyExists");
 
         Building building = (new Building){salt: _salt}();
 
-        building.initialize{ value : msg.value }(
+        building.initialize(
             _salt,
             uniswapRouter, 
             uniswapFactory,
