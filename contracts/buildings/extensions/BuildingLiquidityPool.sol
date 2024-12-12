@@ -21,15 +21,15 @@ abstract contract BuildingLiquidityPool is Initializable {
         address _tokenB, 
         uint256 _tokenAAmount, 
         uint256 _tokenBAmount
-    ) internal returns(uint amountA, uint amountB, uint liquidity) {
-        address pair = IUniswapV2Factory(uniswapFactory).getPair(_tokenA, _tokenB);
+    ) internal returns(uint amountA, uint amountB, uint liquidity, address pair) {
+        pair = IUniswapV2Factory(uniswapFactory).getPair(_tokenA, _tokenB);
         
         if (pair == address(0)){
             pair = IUniswapV2Factory(uniswapFactory).createPair(_tokenA, _tokenB);
         }
 
-        _approveToken(_tokenA, _tokenAAmount, address(uniswapRouter));
-        _approveToken(_tokenB, _tokenBAmount, address(uniswapRouter));
+        IERC20(_tokenA).approve(address(uniswapRouter), _tokenAAmount);
+        IERC20(_tokenB).approve(address(uniswapRouter), _tokenBAmount);
         
         (
             amountA, // The actual amounts of tokenA that were added to the pool.
@@ -45,13 +45,5 @@ abstract contract BuildingLiquidityPool is Initializable {
             address(this), // The address that will receive the liquidity pool (LP) tokens
             block.timestamp + 300 // A timestamp (in seconds) after which the transaction will revert if it hasn't been executed.  prevents front-running 
         );
-    }
-
-    function _approveToken(address _token, uint256 _tokenAmount, address _spender) internal {
-        if (SafeHTS.safeIsToken(_token)) {
-            SafeHTS.safeApprove(_token, _spender, _tokenAmount);
-        } else {
-            IERC20(_token).approve(_spender, _tokenAmount);
-        }
     }
 }

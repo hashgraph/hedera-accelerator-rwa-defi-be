@@ -11,23 +11,33 @@ contract BuildingFactory is OwnableUpgradeable  {
     address private nft;
     address private uniswapRouter;
     address private uniswapFactory;
-    address private router;
+
+    mapping(bytes32 => address) public buildingSalts;
+    BuildingInfo[] public buildingsList;
 
     event NewBuilding(address addr);
+
+    struct BuildingInfo {
+        address addr;
+        uint256 nftId;
+        string tokenURI;
+        bytes32 salt;
+    }
 
     function initialize(
         address _nft,
         address _uniswapRouter,
         address _uniswapFactory
-    ) external initializer {
+    ) public virtual initializer {
         __Ownable_init(_msgSender());
         nft = _nft;
         uniswapRouter = _uniswapRouter;
         uniswapFactory = _uniswapFactory;
-        router = _uniswapRouter;
     }
 
-    function newBuilding(bytes32 _salt) external payable {
+    function newBuilding(bytes32 _salt, string memory tokenURI) public virtual payable onlyOwner {
+        require(buildingSalts[_salt] == address(0), "BuildingFactory: Building alreadyExists");
+
         Building building = (new Building){salt: _salt}();
 
         building.initialize{ value : msg.value }(
@@ -37,19 +47,17 @@ contract BuildingFactory is OwnableUpgradeable  {
             nft
         );
 
-        IERC721Metadata(nft).mint(address(building), ""); // tokenURI should be sent here?        
-        emit NewBuilding(address(building));
-    }
+        uint256 tokenId = IERC721Metadata(nft).mint(address(building), tokenURI);
 
-    function addLiquidityToBuilding(
-        address _building, 
-        address _tokenA,
-        uint256 _tokenAAmount, 
-        address _tokenB, 
-        uint256 _tokenBAmount
-    ) external payable {
-        IERC20(_tokenA).transferFrom(_msgSender(), address(_building), _tokenAAmount);
-        IERC20(_tokenB).transferFrom(_msgSender(), address(_building), _tokenBAmount);
-        Building(_building).addLiquidity{ value : msg.value}(_tokenA, _tokenAAmount, _tokenB, _tokenBAmount);
+        buildingsList.push(BuildingInfo(
+            address(building),
+            tokenId,
+            tokenURI,
+            _salt
+        ));
+
+        buildingSalts[_salt] = address(building);
+
+        emit NewBuilding(address(building));
     }
 }

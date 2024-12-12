@@ -5,12 +5,12 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import "../../audit/AuditRegistry.sol";
 
 abstract contract BuildingAudit is Initializable {
-    AuditRegistry private registry;
+    AuditRegistry public auditRegistry;
 
     event NewAuditRegistry(address addr);
 
     function __Audit_init(bytes32 _salt, address _nftAddress) internal onlyInitializing {
-        registry = _newAuditRegistry(_salt, _nftAddress);
+        auditRegistry = _newAuditRegistry(_salt, _nftAddress);
     }
 
     function _newAuditRegistry(bytes32 _salt, address _nftAddress) internal returns (AuditRegistry _registry){

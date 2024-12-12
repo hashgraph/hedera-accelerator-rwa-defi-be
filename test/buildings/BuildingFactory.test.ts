@@ -1,59 +1,71 @@
-import { LogDescription } from 'ethers';
-import { expect, ethers } from '../setup';
-import { BuildingFactory } from '../../typechain-types';
+import { Contract, LogDescription, } from 'ethers';
+import { expect, ethers, upgrades } from '../setup';
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 
 async function deployFixture() {
   const [owner, notOwner] = await ethers.getSigners();
-  
-  const usdcAddress = "0x0000000000000000000000000000000000001549";
-  const uniswapRouterAddress = "0x00000000000000000000000000000000004fa0fa"; // HeliSwap
-  const uniswapFactoryAddress = "0x00000000000000000000000000000000004fa0f8"; // HeliSwap
 
-  const usdc = await ethers.getContractAt('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20', usdcAddress);
-  // const token = await ethers.getContractAt('ERC20Mock', tokenAddress);
-  const token = await ethers.deployContract('ERC20Mock', ["Buildings R US", "BRUS", 18]);
-  await token.waitForDeployment();
-  const tokenAddress = await token.getAddress();
+  const uniswapRouter = await ethers.deployContract('UniswapRouterMock', []);
+  const uniswapRouterAddress = await uniswapRouter.getAddress();
+  const uniswapFactory = await ethers.deployContract('UniswapFactoryMock', []);
+  const uniswapFactoryAddress = await uniswapFactory.getAddress();
 
-  console.log(" - tokenAddress", tokenAddress);
+  const tokenA = await ethers.deployContract('ERC20Mock', ["Token A", "TKA", 18]);
+  const tokenB = await ethers.deployContract('ERC20Mock', ["Token B", "TkB", 6]); // USDC
+
+  await tokenA.waitForDeployment();
+  await tokenB.waitForDeployment();
+  const tokenAAddress = await tokenA.getAddress();
+  const tokenBAddress = await tokenB.getAddress();
 
   // create the NFT separately because ERC721Metadata is too large
   // must transfer ownership to BuildingFactory
-  console.log(' - deploying Building NFT Collection');
   const nftCollectionFactory = await ethers.getContractFactory('ERC721Metadata', owner);
   const nftCollection = await nftCollectionFactory.deploy("Building NFT", "BILDNFT",);
   await nftCollection.waitForDeployment();
   const nftCollectionAddress = await nftCollection.getAddress();
 
-  // // Deploy implementations
-  console.log(' - deploying BuildingFactory')
-  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
-  const buildingFactory = await buildingFactoryFactory.deploy();
-  await buildingFactory.waitForDeployment();
-  // const buildingFactory = await ethers.getContractAt('BuildingFactory', "0x3aae32Ae1d9F24b3C814F6977ff948251A7620a2");
-  const buildingFactoryAddress = await buildingFactory.getAddress()
-  console.log(' - BuildingFactory address', buildingFactoryAddress);
+  // Deploy implementations
 
-  console.log(' - transfer NFT ownership to BuildingFactory');
+  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
+  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
+
+  const buildingFactory = await upgrades.deployBeaconProxy(
+    await buildingFactoryBeacon.getAddress(),
+    buildingFactoryFactory,
+    [
+      nftCollectionAddress, 
+      uniswapRouterAddress, 
+      uniswapFactoryAddress
+    ],
+    { 
+      initializer: 'initialize'
+    }
+  );
+
+  await buildingFactory.waitForDeployment();
+  const buildingFactoryAddress = await buildingFactory.getAddress()
+
   await nftCollection.transferOwnership(buildingFactoryAddress);
-  
-  console.log(' - Initializing BuildingFactory');
-  const tx = await buildingFactory.initialize(nftCollectionAddress, uniswapRouterAddress, uniswapFactoryAddress);
-  await tx.wait();
 
   return {
     owner,
     notOwner,
     buildingFactory,
-    usdc,
-    usdcAddress,
-    token,
-    tokenAddress
+    buildingFactoryBeacon,
+    tokenA,
+    tokenAAddress,
+    tokenB,
+    tokenBAddress,
+    nftCollection,
+    nftCollectionAddress,
+    uniswapRouterAddress,
+    uniswapFactoryAddress,
   }
 }
 
 // get ERC721Metadata NFT collection deployed on contract deployment
-async function getDeployeBuilding(buildingFactory: BuildingFactory, blockNumber: number) {
+async function getDeployeBuilding(buildingFactory: Contract, blockNumber: number) {
   // Decode the event using queryFilter
   const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewBuilding(address)'], blockNumber, blockNumber);
 
@@ -70,70 +82,67 @@ async function getDeployeBuilding(buildingFactory: BuildingFactory, blockNumber:
 }
 
 describe('BuildingFactory', () => {
-  describe('.newBuilding()', () => {
-    describe('when there is ', () => {
-      it('should do it', async () => {
-        const { owner, buildingFactory, usdc, usdcAddress, token, tokenAddress } = await deployFixture();
+  describe('upgrade', () => {
+    it('should be uprgradable', async () => {
+      const { 
+        buildingFactory,
+        buildingFactoryBeacon
+       } = await loadFixture(deployFixture);
 
-        const usdcAmount = ethers.parseUnits('1', 6);
-        const tokenAmount = ethers.parseUnits('100', 18);
+      const previousBuildingFactoryAddress = await buildingFactory.getAddress();
+      const v2contractFactory = await ethers.getContractFactory('BuildingFactoryMock');
+      await upgrades.upgradeBeacon(await buildingFactoryBeacon.getAddress(), v2contractFactory);
 
-        // create a unique salt to create2 new building
-        // (factoryAddress)-usdc-(tokenSymbol)
-        const salt = ethers.id(`${await buildingFactory.getAddress()}-usdc-bild`);
+      const upgradedBuildinFactory = await ethers.getContractAt('BuildingFactoryMock', previousBuildingFactoryAddress);
 
-        console.log('- new building');
-        const tx = await buildingFactory.newBuilding(salt, { value: ethers.parseEther('10'), gasLimit: 800000 });
-        await tx.wait();
-        console.log('- new building created', tx.hash);
-
-        const newBuilding = await getDeployeBuilding(buildingFactory, Number(tx.blockNumber));
-        const newBuildingAddress = await newBuilding.getAddress();
-        // const newBuildingAddress = "0x0e86579E8447f06829a0BCC3057042666Acc4E82";
-        console.log(' - newBuildingAddress',  newBuildingAddress)
-
-        console.log('- approving usdc to buildingFactory');
-        const txapprove = await usdc.approve(buildingFactory.getAddress(), usdcAmount);
-        await txapprove.wait();
-        console.log('- usdc to buildingFactory approved');
-
-        console.log('- minting token');
-        const txmint = await token.mint(owner.address, tokenAmount);
-        await txmint.wait();
-        console.log('- token minted');
-
-        console.log('- approving token to buildingFactory');
-        const txapprove2 = await token.approve(buildingFactory.getAddress(), tokenAmount);
-        await txapprove2.wait();
-        console.log('- token to buildingFactory approved');
-
-        console.log('- add liquidity to Building');
-        const tx2 = await buildingFactory.addLiquidityToBuilding(
-          newBuildingAddress, 
-          tokenAddress,
-          tokenAmount, 
-          usdcAddress, 
-          usdcAmount, 
-          { value: ethers.parseEther('20'), gasLimit: 8000000 }
-        );
-        await tx2.wait();
-        console.log('- liquidity added', tx2.hash);
-
-        // const buildingAddress =  await buildingFactory.building();
-
-        console.log({ newBuildingAddress })
-
-        // // should emit NewBuilding event
-        // await expect(tx).to.emit(buildingFactory, 'NewBuilding');
-        
-        // const newBuilding = await getDeployeBuilding(buildingFactory)
-        // const newBuildingAddress = await newBuilding.getAddress();
-        
-        // expect(newBuildingAddress).to.be.properAddress; // Verify it's a valid address
-        // expect(await nftCollection.ownerOf(0)).to.be.equal(newBuildingAddress);// Very it is the owner of new minted NFT
-        // expect(await usdc.balanceOf(newBuildingAddress)).to.be.equal(1000n);
-        
-      });
+      expect(await upgradedBuildinFactory.getAddress()).to.be.hexEqual(previousBuildingFactoryAddress);
+      expect(await upgradedBuildinFactory.version()).to.be.equal('2.0');
     });
+  });
+
+
+  describe('.newBuilding()', () => {    
+    it('should create a building', async () => {
+      const { 
+        buildingFactory, 
+        uniswapFactoryAddress, 
+        uniswapRouterAddress, 
+        nftCollection, 
+      } = await loadFixture(deployFixture);
+
+      const salt = ethers.id(`BUILDING_ONE`);
+      const tokenURI = "ipfs://building-nft-uri";
+      const tx = await buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 });
+      await tx.wait();
+      const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+
+      expect(await building.getAddress()).to.be.properAddress;
+      expect(await nftCollection.ownerOf(0)).to.be.equal(await building.getAddress());
+      expect(await nftCollection.tokenURI(0)).to.be.equal(tokenURI);
+      expect(await building.uniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
+      expect(await building.uniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
+
+      const firstBuilding = await buildingFactory.buildingsList(0);
+
+      expect(firstBuilding.addr).to.be.hexEqual(await building.getAddress());
+      expect(firstBuilding.nftId).to.be.equal(0n);
+      expect(firstBuilding.salt).to.be.equal(salt);
+      expect(firstBuilding.tokenURI).to.be.equal(tokenURI);
+
+    });
+
+    it('should revert if building already created', async () => {
+      const { 
+        buildingFactory, 
+      } = await loadFixture(deployFixture);
+
+      const salt = ethers.id(`BUILDING_ONE`);
+      const tokenURI = "ipfs://building-nft-uri";
+      await buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 });
+
+      await expect(buildingFactory.newBuilding(salt, tokenURI, { value: ethers.parseEther('10'), gasLimit: 8000000 }))
+        .to.be.revertedWith('BuildingFactory: Building alreadyExists');
+    });
+
   });
 });

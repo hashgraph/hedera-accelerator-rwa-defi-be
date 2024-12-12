@@ -220,8 +220,8 @@ contract ERC721Metadata is IERC721Metadata, ERC721, ERC721URIStorage, Ownable {
      * @param _uri string token URI
      * @notice only the contract owner can call this function
      */
-    function mint(address _to, string memory _uri) external onlyOwner {
-       _mint(_to, _uri);
+    function mint(address _to, string memory _uri) external onlyOwner returns (uint256 tokenId) {
+      tokenId = _mint(_to, _uri);
     }
 
     /**
@@ -235,8 +235,9 @@ contract ERC721Metadata is IERC721Metadata, ERC721, ERC721URIStorage, Ownable {
     function mint(address _to, string memory _uri, string[] memory _keys, string[] memory _values) 
         external 
         onlyOwner 
+        returns (uint256 tokenId)
     {
-       uint256 tokenId = _mint(_to, _uri);
+       tokenId = _mint(_to, _uri);
        _setMetadata(tokenId, _keys, _values);
     }
 
