@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
@@ -15,8 +16,8 @@ contract BuildingFactory is OwnableUpgradeable  {
     address private nft;
     address private uniswapRouter;
     address private uniswapFactory;
+    address private buildingBeacon;
 
-    mapping(bytes32 => address) public buildingSalts;
     BuildingInfo[] public buildingsList;
 
     event NewBuilding(address addr);
@@ -25,7 +26,6 @@ contract BuildingFactory is OwnableUpgradeable  {
         address addr; // building address
         uint256 nftId; // NFT token ID attributed to the building
         string tokenURI; // NFT metadatada location
-        bytes32 salt; // proxy identifier
     }
 
     /**
@@ -37,42 +37,34 @@ contract BuildingFactory is OwnableUpgradeable  {
     function initialize(
         address _nft,
         address _uniswapRouter,
-        address _uniswapFactory
+        address _uniswapFactory,
+        address _buildingBeacon
     ) public virtual initializer {
         __Ownable_init(_msgSender());
         nft = _nft;
         uniswapRouter = _uniswapRouter;
         uniswapFactory = _uniswapFactory;
+        buildingBeacon = _buildingBeacon;
     }
 
     /**
      * newBuilding Creates new building with create2, mints NFT and store it.
-     * @param _salt bytes32 identifier for upgradeable proxy contracts with create2
      * @param tokenURI metadata location
      */
-    function newBuilding(bytes32 _salt, string memory tokenURI) public virtual onlyOwner {
-        require(buildingSalts[_salt] == address(0), "BuildingFactory: Building alreadyExists");
-
-        Building building = (new Building){salt: _salt}();
-
-        building.initialize(
-            _salt,
-            uniswapRouter, 
-            uniswapFactory,
-            nft
+    function newBuilding(string memory tokenURI) public virtual onlyOwner {
+        BeaconProxy buildingProxy = new BeaconProxy(
+            buildingBeacon,
+            abi.encodeWithSelector(Building.initialize.selector, uniswapRouter, uniswapFactory, nft)
         );
 
-        uint256 tokenId = IERC721Metadata(nft).mint(address(building), tokenURI);
+        uint256 tokenId = IERC721Metadata(nft).mint(address(buildingProxy), tokenURI);
 
         buildingsList.push(BuildingInfo(
-            address(building),
+            address(buildingProxy),
             tokenId,
-            tokenURI,
-            _salt
+            tokenURI
         ));
 
-        buildingSalts[_salt] = address(building);
-
-        emit NewBuilding(address(building));
+        emit NewBuilding(address(buildingProxy));
     }
 }

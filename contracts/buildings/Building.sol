@@ -7,16 +7,18 @@ import {BuildingAudit} from "./extensions/BuildingAudit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Building is BuildingBase, BuildingLiquidityPool, BuildingAudit {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * Contract initializer
-     * @param _salt proxy identifier
      * @param _uniswapRouter uniswap router address
      * @param _uniswapFactory uniswap factory address
      * @param _nftAddress NFT collection address
      */
     function initialize (
-        bytes32 _salt,
         address _uniswapRouter, 
         address _uniswapFactory,
         address _nftAddress
@@ -24,7 +26,7 @@ contract Building is BuildingBase, BuildingLiquidityPool, BuildingAudit {
         __Ownable_init(_msgSender());
         __Building_init();
         __Liquidity_init(_uniswapRouter, _uniswapFactory);
-        __Audit_init(_salt, _nftAddress);
+        __Audit_init(_nftAddress);
     }
 
     /**

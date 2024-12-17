@@ -12,12 +12,13 @@ contract BuildingFactoryMock is BuildingFactory {
     function initialize(
         address _nft,
         address _uniswapRouter,
-        address _uniswapFactory
+        address _uniswapFactory,
+        address _beacon
     ) public override initializer {
-       super.initialize(_nft, _uniswapRouter, _uniswapFactory);
+       super.initialize(_nft, _uniswapRouter, _uniswapFactory, _beacon);
     }
 
-    function newBuilding(bytes32 _salt, string memory tokenURI) public override onlyOwner {
-        super.newBuilding(_salt, tokenURI);
+    function newBuilding(string memory tokenURI) public override onlyOwner {
+        super.newBuilding(tokenURI);
     }
 }

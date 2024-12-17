@@ -24,7 +24,6 @@ async function deployFixture() {
   await nftCollection.waitForDeployment();
   const nftCollectionAddress = await nftCollection.getAddress();
 
-  const salt = ethers.id('SALT');
   const buildingFactory = await ethers.getContractFactory('Building');
   const buildingBeacon = await upgrades.deployBeacon(
     buildingFactory, 
@@ -34,7 +33,6 @@ async function deployFixture() {
     await buildingBeacon.getAddress(), 
     buildingFactory,
     [
-      salt, 
       uniswapRouterAddress, 
       uniswapFactoryAddress, 
       nftCollectionAddress
@@ -90,9 +88,9 @@ describe('Building', () => {
         building,
        } = await loadFixture(deployFixture);
 
-      expect(await building.uniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
-      expect(await building.uniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
-      expect(await building.auditRegistry()).to.be.properAddress;
+      expect(await building.getUniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
+      expect(await building.getUniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
+      expect(await building.getAuditRegistry()).to.be.properAddress;
       expect(await building.owner()).to.be.hexEqual(owner.address);
       
     });
@@ -110,12 +108,10 @@ describe('Building', () => {
         tokenBAddress,
        } = await loadFixture(deployFixture);
 
-      const salt = ethers.id('LIQUIDITY');
       const buildingFactory = await ethers.getContractFactory('BuildingMock');
       const building = await upgrades.deployProxy(
         buildingFactory, 
         [
-          salt, 
           uniswapRouterAddress, 
           uniswapFactoryAddress, 
           nftCollectionAddress

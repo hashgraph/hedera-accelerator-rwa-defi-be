@@ -25,8 +25,16 @@ async function deployFixture() {
   await nftCollection.waitForDeployment();
   const nftCollectionAddress = await nftCollection.getAddress();
 
-  // Deploy implementations
+  // Beacon Upgradable Patter for Building
+  const buildingImplementation = await ethers.deployContract('Building');
+  const buildingImplementationAddress = await buildingImplementation.getAddress();
 
+  const buildingBeaconFactory = await ethers.getContractFactory('BuildingBeacon');
+  const buildingBeacon = await buildingBeaconFactory.deploy(buildingImplementationAddress)
+  await buildingBeacon.waitForDeployment();
+  const buildingBeaconAddress = await buildingBeacon.getAddress();
+
+  // Deploy BuildingFactory
   const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
   const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
 
@@ -36,7 +44,8 @@ async function deployFixture() {
     [
       nftCollectionAddress, 
       uniswapRouterAddress, 
-      uniswapFactoryAddress
+      uniswapFactoryAddress,
+      buildingBeaconAddress
     ],
     { 
       initializer: 'initialize'
@@ -110,38 +119,23 @@ describe('BuildingFactory', () => {
         nftCollection, 
       } = await loadFixture(deployFixture);
 
-      const salt = ethers.id(`BUILDING_ONE`);
       const tokenURI = "ipfs://building-nft-uri";
-      const tx = await buildingFactory.newBuilding(salt, tokenURI);
+      const tx = await buildingFactory.newBuilding(tokenURI);
       await tx.wait();
       const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
 
       expect(await building.getAddress()).to.be.properAddress;
       expect(await nftCollection.ownerOf(0)).to.be.equal(await building.getAddress());
       expect(await nftCollection.tokenURI(0)).to.be.equal(tokenURI);
-      expect(await building.uniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
-      expect(await building.uniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
+      expect(await building.getUniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
+      expect(await building.getUniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
 
       const firstBuilding = await buildingFactory.buildingsList(0);
 
       expect(firstBuilding.addr).to.be.hexEqual(await building.getAddress());
       expect(firstBuilding.nftId).to.be.equal(0n);
-      expect(firstBuilding.salt).to.be.equal(salt);
       expect(firstBuilding.tokenURI).to.be.equal(tokenURI);
 
-    });
-
-    it('should revert if building already created', async () => {
-      const { 
-        buildingFactory, 
-      } = await loadFixture(deployFixture);
-
-      const salt = ethers.id(`BUILDING_ONE`);
-      const tokenURI = "ipfs://building-nft-uri";
-      await buildingFactory.newBuilding(salt, tokenURI);
-
-      await expect(buildingFactory.newBuilding(salt, tokenURI))
-        .to.be.revertedWith('BuildingFactory: Building alreadyExists');
     });
 
   });

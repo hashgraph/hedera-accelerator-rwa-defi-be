@@ -8,19 +8,17 @@ contract BuildingMock is Building {
     uint public amountB;
     uint public liquidity;
     address public pair;
-    bool public isUpgraded;
 
     function version() public pure returns (string memory) {
         return '2.0';
     }
 
     function initialize (
-        bytes32 _salt,
         address _uniswapRouter, 
         address _uniswapFactory,
         address _nftAddress
     ) public override {
-       super.initialize(_salt, _uniswapRouter, _uniswapFactory, _nftAddress);
+       super.initialize(_uniswapRouter, _uniswapFactory, _nftAddress);
     }
 
     function addLiquidity(
