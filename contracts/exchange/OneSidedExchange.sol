@@ -5,7 +5,7 @@ pragma abicoder v2;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {SafeTransferLib} from "../erc4626/SafeTransferLib.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 struct Price {
     uint256 price;
@@ -18,7 +18,7 @@ struct PriceThreshold {
     uint256 interval;
 }
 
-using SafeTransferLib for ERC20;
+using SafeERC20 for ERC20;
 
 /**
  * @title One Sided Exchange
@@ -48,6 +48,8 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
 
     constructor() Ownable(msg.sender) {}
 
+    /// @dev Modifier that do check on zero address
+    /// @param token Token EVM address
     modifier isValidAddress(address token) {
         if (token == address(0)) {
             revert InvalidAddress("No zero address is allowed");
@@ -56,6 +58,9 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         _;
     }
 
+    /// @dev Method that publicaly exposed for tokens withdrawal from exchange
+    /// @param token Token EVM address
+    /// @param amount Amount of tokens to withdraw
     function withdraw(address token, uint256 amount) public nonReentrant onlyOwner isValidAddress(token) {
         if (amount == 0) {
             revert InvalidAmount("Invalid amount", amount);
@@ -68,6 +73,9 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         _withdraw(token, amount);
     }
 
+    /// @dev Method that publicaly exposed for deposit tokens into exchnage
+    /// @param token Token EVM address
+    /// @param amount Amount of tokens to deposit
     function deposit(address token, uint256 amount) public nonReentrant onlyOwner isValidAddress(token) {
         if (amount == 0) {
             revert InvalidAmount("Invalid amount", amount);
@@ -76,6 +84,10 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         _deposit(msg.sender, token, amount);
     }
 
+    /// @dev Method that publicaly exposed for a swap between tokenA and tokenB
+    /// @param tokenA First token EVM address
+    /// @param tokenB Second token EVM address
+    /// @param amount Amount of tokens to swap using tokens rate
     function swap(address tokenA, address tokenB, uint256 amount) public nonReentrant {
         _swap(msg.sender, tokenA, tokenB, amount);
     }
@@ -83,7 +95,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     function _deposit(address signer, address token, uint256 amount) internal {
         /// @notice Owner should give allowance for a contract to transfer n tokens amount.
         uint256 _amount = amount * (10 ** ERC20(token).decimals());
-        ERC20(token).transferFrom(signer, address(this), _amount);
+        ERC20(token).safeTransferFrom(signer, address(this), _amount);
 
         emit Deposit(token, amount);
     }
@@ -99,7 +111,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         (uint256 tokenAAmount, uint256 tokenBAmount) = _checkIfExchangeAllowedForPair(tokenA, tokenB, amount, trader);
 
         /// @notice Owner should give allowance for a contract to transfer n tokens amount.
-        ERC20(tokenA).transferFrom(trader, address(this), tokenAAmount);
+        ERC20(tokenA).safeTransferFrom(trader, address(this), tokenAAmount);
         ERC20(tokenB).transfer(trader, tokenBAmount);
 
         _sellAmounts[tokenA] += tokenAAmount;
@@ -142,6 +154,10 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         return (tokenASellAmount, tokenBBuyAmount);
     }
 
+    /// @dev Method that publicaly exposed for a token amounts returns estimation
+    /// @param tokenA First token EVM address
+    /// @param tokenB Second token EVM address
+    /// @param amount Amount of tokens to estimate swap using tokens rate
     function estimateTokenReturns(
         address tokenA,
         address tokenB,
@@ -169,6 +185,11 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         }
     }
 
+    /// Set threshold for sell/buy token amounts considering interval
+    /// @param token Token EVM address
+    /// @param maxSellAmount Tokens max sell amount
+    /// @param maxBuyAmount Tokens max buy amount
+    /// @param interval Timestamp in seconds that indicates end time
     function setThreshold(
         address token,
         uint256 maxSellAmount,
@@ -184,10 +205,18 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         );
     }
 
+    /// Set buy price for a token considering interval
+    /// @param token Token EVM address
+    /// @param amount Price of the token
+    /// @param interval Timestamp in seconds that indicates end time
     function setBuyPrice(address token, uint256 amount, uint256 interval) public onlyOwner isValidAddress(token) {
         _buyPrices[token] = Price(amount, interval);
     }
 
+    /// Set sell price for a token considering interval
+    /// @param token Token EVM address
+    /// @param amount Price of the token
+    /// @param interval Timestamp in seconds that indicates end time
     function setSellPrice(address token, uint256 amount, uint256 interval) public onlyOwner isValidAddress(token) {
         _sellPrices[token] = Price(amount, interval);
     }

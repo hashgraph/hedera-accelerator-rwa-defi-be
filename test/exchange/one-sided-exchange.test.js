@@ -58,6 +58,8 @@ describe("OneSidedExchange", async () => {
         expect(exchangeABalanceAfter).to.be.equal(12n);
         expect(swapperBBalanceBefore).to.be.equal(100n);
         expect(swapperBBalanceAfter).to.be.equal(98n);
+
+        await oneSidedExchangeInstance.withdraw(tokenAAddress, 2n);
     });
 
     it("Should fail on swap tokenA and tokenB", async () => {
@@ -67,8 +69,8 @@ describe("OneSidedExchange", async () => {
         const tokenBAddress = await tokenBInstance.getAddress();
         const tokenBDecimals = await tokenBInstance.decimals();
 
-        // Set days threshold to 2.
-        const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+        // Set days threshold to 2 days.
+        const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
         // Set token swap amount to 2.
         const tokenASwapAmount = 2n;
         // Set token A max sell amount to 16 and max buy amount 10.
@@ -76,10 +78,10 @@ describe("OneSidedExchange", async () => {
         const tokenABuyAmount = 10n;
 
         // Set sell price for token A to 6.
-        await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfter);
+        await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfterInSeconds);
         // Set buy price for token B to 4.
-        await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfter);
-        await oneSidedExchangeInstance.setThreshold(tokenAAddress, tokenASellAmount, tokenABuyAmount, twoDaysAfter);
+        await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfterInSeconds);
+        await oneSidedExchangeInstance.setThreshold(tokenAAddress, tokenASellAmount, tokenABuyAmount, twoDaysAfterInSeconds);
         await tokenAInstance.approve(exchangeAddress, (100n * (10n ** tokenADecimals)));
         await tokenBInstance.approve(exchangeAddress, (100n * (10n ** tokenBDecimals)));
 
@@ -104,6 +106,26 @@ describe("OneSidedExchange", async () => {
             const parsedMessage = err.message?.split("InvalidAmount")[1];
 
             expect(parsedMessage).to.be.includes("Max sell amount of tokens exceeded");
+        }
+    });
+
+    it("Should fail on zero address provided", async () => {
+        try {
+            const tokenASellAmount = 16n;
+            const tokenABuyAmount = 10n;
+            // Set days threshold to 2 days.
+            const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+
+            await oneSidedExchangeInstance.setThreshold(
+                "0x0000000000000000000000000000000000000000",
+                tokenASellAmount,
+                tokenABuyAmount,
+                twoDaysAfterInSeconds,
+            );
+        } catch (err) {
+            const parsedMessage = err.message?.split("InvalidAddress")[1];
+
+            expect(parsedMessage).to.be.includes("No zero address is allowed");
         }
     });
 })
