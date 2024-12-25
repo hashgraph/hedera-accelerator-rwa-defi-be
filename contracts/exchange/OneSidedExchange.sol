@@ -27,8 +27,23 @@ using SafeERC20 for ERC20;
  at desired prices.
  */
 contract OneSidedExchange is ReentrancyGuard, Ownable {
+    /**
+     * @dev Emitted when `amount` of tokens are deposited to contract.
+     *
+     * Emits a {Deposit} event.
+     */
     event Deposit(address token, uint256 amount);
+    /**
+     * @dev Emitted when `amount` of tokens are withdrawed from contract.
+     *
+     * Emits a {Withdraw} event.
+     */
     event Withdraw(address token, uint256 amount);
+    /**
+     * @dev Emitted when `tokenAAmount` tokens are swapped to (`tokenBAmount`) at the admin desired rate.
+     *
+     * Emits a {SwapSuccess} event.
+     */
     event SwapSuccess(
         address indexed trader,
         address tokenA,
@@ -36,14 +51,20 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         uint256 tokenAAmount,
         uint256 tokenBAmount
     );
+
     error InvalidAmount(string message, uint256 amount);
     error NoPriceExists(string message);
     error InvalidAddress(string message);
 
+    /// @dev List of buy prices for particular token in interval.
     mapping(address => Price) internal _buyPrices;
+    /// @dev List of sell prices for particular token in interval.
     mapping(address => Price) internal _sellPrices;
+    /// @dev List of price thresholds for particular token in interval.
     mapping(address => PriceThreshold) internal _thresholds;
+    /// @dev List of total bought amounts for particular token.
     mapping(address => uint256) internal _buyAmounts;
+    /// @dev List of total selled amounts for particular token.
     mapping(address => uint256) internal _sellAmounts;
 
     constructor() Ownable(msg.sender) {}
@@ -88,7 +109,11 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     /// @param tokenA First token EVM address
     /// @param tokenB Second token EVM address
     /// @param amount Amount of tokens to swap using tokens rate
-    function swap(address tokenA, address tokenB, uint256 amount) public nonReentrant {
+    function swap(
+        address tokenA,
+        address tokenB,
+        uint256 amount
+    ) public nonReentrant isValidAddress(tokenA) isValidAddress(tokenB) {
         _swap(msg.sender, tokenA, tokenB, amount);
     }
 
@@ -101,8 +126,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     }
 
     function _withdraw(address token, uint256 amount) internal {
-        uint256 _amount = amount * (10 ** ERC20(token).decimals());
-        ERC20(token).transfer(owner(), _amount);
+        ERC20(token).safeTransfer(owner(), amount);
 
         emit Withdraw(token, amount);
     }
@@ -112,7 +136,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
 
         /// @notice Owner should give allowance for a contract to transfer n tokens amount.
         ERC20(tokenA).safeTransferFrom(trader, address(this), tokenAAmount);
-        ERC20(tokenB).transfer(trader, tokenBAmount);
+        ERC20(tokenB).safeTransfer(trader, tokenBAmount);
 
         _sellAmounts[tokenA] += tokenAAmount;
         _buyAmounts[tokenB] += tokenBAmount;

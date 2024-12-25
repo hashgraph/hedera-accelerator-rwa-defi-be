@@ -109,7 +109,7 @@ describe("OneSidedExchange", async () => {
         }
     });
 
-    it("Should fail on zero address provided", async () => {
+    it("Should fail on zero address provided on setThreshold()", async () => {
         try {
             const tokenASellAmount = 16n;
             const tokenABuyAmount = 10n;
@@ -121,6 +121,24 @@ describe("OneSidedExchange", async () => {
                 tokenASellAmount,
                 tokenABuyAmount,
                 twoDaysAfterInSeconds,
+            );
+        } catch (err) {
+            const parsedMessage = err.message?.split("InvalidAddress")[1];
+
+            expect(parsedMessage).to.be.includes("No zero address is allowed");
+        }
+    });
+
+    it("Should fail on zero address provided on swap()", async () => {
+        try {
+            const tokenAAddress = await tokenAInstance.getAddress();
+            const tokenBAddress = await tokenBInstance.getAddress();
+            const tokenASwapAmount = 2n;
+
+            await oneSidedExchangeInstance.swap(
+                "0x0000000000000000000000000000000000000000",
+                tokenBAddress,
+                tokenASwapAmount,
             );
         } catch (err) {
             const parsedMessage = err.message?.split("InvalidAddress")[1];

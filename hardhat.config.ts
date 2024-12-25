@@ -42,7 +42,7 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY || ""],
     },
     hardhat: {
-      blockGasLimit: 199999999999,
+      blockGasLimit: 9999999999999,
       gas: 30000000,
       allowUnlimitedContractSize: true,
       // forking: {
