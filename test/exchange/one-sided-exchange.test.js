@@ -29,37 +29,33 @@ describe("OneSidedExchange", async () => {
         const tokenBDecimals = await tokenBInstance.decimals();
         // Set days threshold to 2.
         const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-        // Set token swap amount to 2.
-        const tokenASwapAmount = 2n;
+        // Set token swap amount to 0.5.
+        const tokenASwapAmount = (10n ** (tokenADecimals / 2n));
 
         // Set sell price for token A to 6.
         await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfter);
         // Set buy price for token B to 4.
         await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfter);
-        // Approve exchange to use n amount of tokens.
-        await tokenAInstance.approve(exchangeAddress, (100n * (10n ** tokenADecimals)));
-        await tokenBInstance.approve(exchangeAddress, (100n * (10n ** tokenBDecimals)));
+        // Approve exchange to use 5 amount of tokens.
+        await tokenAInstance.approve(exchangeAddress, (5n * (10n ** tokenADecimals)));
+        await tokenBInstance.approve(exchangeAddress, (5n * (10n ** tokenBDecimals)));
 
         const [_, buyAmount] = (await oneSidedExchangeInstance.estimateTokenReturns(tokenAAddress, tokenBAddress, tokenASwapAmount));
         const exchangeTokenABalanceBeforeSwap = await tokenAInstance.balanceOf(exchangeAddress);
         const swapperTokenBBalanceBeforeSwap = await tokenBInstance.balanceOf(owner);
 
-        await oneSidedExchangeInstance.deposit(tokenBAddress, (buyAmount / (10n ** tokenBDecimals)) + 2n);
+        await oneSidedExchangeInstance.deposit(tokenBAddress, buyAmount + (10n ** tokenADecimals));
         await oneSidedExchangeInstance.swap(tokenAAddress, tokenBAddress, tokenASwapAmount);
 
         const exchangeTokenABalanceAfterSwap = await tokenAInstance.balanceOf(exchangeAddress);
         const swapperTokenBBalanceAfterSwap = await tokenBInstance.balanceOf(owner);
-        const exchangeABalanceBefore = exchangeTokenABalanceBeforeSwap / (10n ** tokenADecimals);
-        const exchangeABalanceAfter = exchangeTokenABalanceAfterSwap / (10n ** tokenADecimals);
-        const swapperBBalanceBefore = swapperTokenBBalanceBeforeSwap / (10n ** tokenBDecimals);
-        const swapperBBalanceAfter = swapperTokenBBalanceAfterSwap / (10n ** tokenBDecimals);
 
-        expect(exchangeABalanceBefore).to.be.equal(0n);
-        expect(exchangeABalanceAfter).to.be.equal(12n);
-        expect(swapperBBalanceBefore).to.be.equal(100n);
-        expect(swapperBBalanceAfter).to.be.equal(98n);
+        expect(exchangeTokenABalanceBeforeSwap).to.be.equal(0n);
+        expect(exchangeTokenABalanceAfterSwap).to.be.equal(6000000000n);
+        expect(swapperTokenBBalanceBeforeSwap).to.be.equal(100000000000000000000n);
+        expect(swapperTokenBBalanceAfterSwap).to.be.equal(99000000000000000000n);
 
-        await oneSidedExchangeInstance.withdraw(tokenAAddress, 2n);
+        await oneSidedExchangeInstance.withdraw(tokenAAddress, (10n ** (tokenADecimals / 2n)));
     });
 
     it("Should fail on swap tokenA and tokenB", async () => {
@@ -73,35 +69,19 @@ describe("OneSidedExchange", async () => {
         const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
         // Set token swap amount to 2.
         const tokenASwapAmount = 2n;
-        // Set token A max sell amount to 16 and max buy amount 10.
-        const tokenASellAmount = 16n;
-        const tokenABuyAmount = 10n;
 
         // Set sell price for token A to 6.
         await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfterInSeconds);
         // Set buy price for token B to 4.
         await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfterInSeconds);
-        await oneSidedExchangeInstance.setThreshold(tokenAAddress, tokenASellAmount, tokenABuyAmount, twoDaysAfterInSeconds);
-        await tokenAInstance.approve(exchangeAddress, (100n * (10n ** tokenADecimals)));
-        await tokenBInstance.approve(exchangeAddress, (100n * (10n ** tokenBDecimals)));
-
-        const exchangeTokenABalanceBeforeSwap = await tokenAInstance.balanceOf(exchangeAddress);
-        const swapperTokenBBalanceBeforeSwap = await tokenBInstance.balanceOf(owner);
+        // Set token A max sell amount to 16 and max buy amount 10.
+        await oneSidedExchangeInstance.setThreshold(tokenAAddress, 16n, 10n, twoDaysAfterInSeconds);
+        // Approve exchange to use 5 amount of tokens.
+        await tokenAInstance.approve(exchangeAddress, (5n * (10n ** tokenADecimals)));
+        await tokenBInstance.approve(exchangeAddress, (5n * (10n ** tokenBDecimals)));
 
         try {
             await oneSidedExchangeInstance.swap(tokenAAddress, tokenBAddress, tokenASwapAmount);
-
-            const exchangeTokenABalanceAfterSwap = await tokenAInstance.balanceOf(exchangeAddress);
-            const swapperTokenBBalanceAfterSwap = await tokenBInstance.balanceOf(owner);
-            const exchangeABalanceBefore = exchangeTokenABalanceBeforeSwap / (10n ** tokenADecimals);
-            const exchangeABalanceAfter = exchangeTokenABalanceAfterSwap / (10n ** tokenADecimals);
-            const swapperBBalanceBefore = swapperTokenBBalanceBeforeSwap / (10n ** tokenBDecimals);
-            const swapperBBalanceAfter = swapperTokenBBalanceAfterSwap / (10n ** tokenBDecimals);
-
-            expect(exchangeABalanceBefore).to.be.equal(0n);
-            expect(exchangeABalanceAfter).to.be.equal(12n);
-            expect(swapperBBalanceBefore).to.be.equal(100n);
-            expect(swapperBBalanceAfter).to.be.equal(98n);
         } catch (err) {
             const parsedMessage = err.message?.split("InvalidAmount")[1];
 

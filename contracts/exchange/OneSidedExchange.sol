@@ -119,8 +119,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
 
     function _deposit(address signer, address token, uint256 amount) internal {
         /// @notice Owner should give allowance for a contract to transfer n tokens amount.
-        uint256 _amount = amount * (10 ** ERC20(token).decimals());
-        ERC20(token).safeTransferFrom(signer, address(this), _amount);
+        ERC20(token).safeTransferFrom(signer, address(this), amount);
 
         emit Deposit(token, amount);
     }
@@ -154,8 +153,8 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         PriceThreshold memory tokenBThreshold = _thresholds[tokenB];
 
         (uint256 tokenASellAmount, uint256 tokenBBuyAmount) = estimateTokenReturns(tokenA, tokenB, amount);
-        uint256 balanceOfAToken = ERC20(tokenA).balanceOf(trader) * (10 ** ERC20(tokenA).decimals());
-        uint256 balanceOfBToken = ERC20(tokenB).balanceOf(address(this)) * (10 ** ERC20(tokenB).decimals());
+        uint256 balanceOfAToken = ERC20(tokenA).balanceOf(trader);
+        uint256 balanceOfBToken = ERC20(tokenB).balanceOf(address(this));
 
         if (tokenASellAmount > balanceOfAToken) {
             revert InvalidAmount("No enough tokens to sell", tokenASellAmount);
@@ -193,20 +192,24 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
             revert NoPriceExists("Sell or buy price for pair is not valid");
         }
 
-        uint256 tokenADecimals = 10 ** ERC20(tokenA).decimals();
-        uint256 tokenBDecimals = 10 ** ERC20(tokenB).decimals();
+        uint256 tokenASellAmount = amount * _sellPrices[tokenA].price;
+        uint256 tokenBBuyAmount = ((tokenASellAmount * _sellPrices[tokenA].price) / _buyPrices[tokenB].price);
+        uint256 tokenADecimals = ERC20(tokenA).decimals();
+        uint256 tokenBDecimals = ERC20(tokenB).decimals();
 
         if (tokenADecimals != tokenBDecimals) {
-            uint256 tokenASellAmount = amount * _sellPrices[tokenA].price;
-            uint256 tokenBBuyAmount = ((tokenASellAmount * _sellPrices[tokenA].price) / _buyPrices[tokenB].price);
+            if (tokenBDecimals > tokenADecimals) {
+                uint256 range = tokenBDecimals - tokenADecimals;
 
-            return (tokenASellAmount * tokenADecimals, tokenBBuyAmount * tokenBDecimals);
-        } else {
-            uint256 tokenASellAmount = (amount * tokenADecimals) * _sellPrices[tokenA].price;
-            uint256 tokenBBuyAmount = ((tokenASellAmount * _sellPrices[tokenA].price) / _buyPrices[tokenB].price);
+                return (tokenASellAmount, tokenBBuyAmount * (10 ** range));
+            } else {
+                uint256 range = tokenADecimals - tokenBDecimals;
 
-            return (tokenASellAmount, tokenBBuyAmount);
+                return (tokenASellAmount, tokenBBuyAmount / (10 ** range));
+            }
         }
+
+        return (tokenASellAmount, tokenBBuyAmount);
     }
 
     /// Set threshold for sell/buy token amounts considering interval
