@@ -111,7 +111,6 @@ describe("OneSidedExchange", async () => {
 
     it("Should fail on zero address provided on swap()", async () => {
         try {
-            const tokenAAddress = await tokenAInstance.getAddress();
             const tokenBAddress = await tokenBInstance.getAddress();
             const tokenASwapAmount = 2n;
 
@@ -124,6 +123,24 @@ describe("OneSidedExchange", async () => {
             const parsedMessage = err.message?.split("InvalidAddress")[1];
 
             expect(parsedMessage).to.be.includes("No zero address is allowed");
+        }
+    });
+
+    it("Should fail on zero amount provided on setThreshold()", async () => {
+        // Set days threshold to 2 days.
+        const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+
+        try {
+            await oneSidedExchangeInstance.setThreshold(
+                "0x0000000000000000000000000000000000004567",
+                0n,
+                0n,
+                twoDaysAfterInSeconds
+            );
+        } catch (err) {
+            const parsedMessage = err.message?.split("InvalidAmount")[1];
+
+            expect(parsedMessage).to.be.includes("Zero amount is not allowed");
         }
     });
 })

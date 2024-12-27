@@ -79,14 +79,23 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         _;
     }
 
+    /// @dev Modifier that do check on valid amount
+    /// @param amount Tokens amount
+    modifier isValidAmount(uint256 amount) {
+        if (amount == 0) {
+            revert InvalidAmount("Zero amount is not allowed", amount);
+        }
+
+        _;
+    }
+
     /// @dev Method that publicaly exposed for tokens withdrawal from exchange
     /// @param token Token EVM address
     /// @param amount Amount of tokens to withdraw
-    function withdraw(address token, uint256 amount) public nonReentrant onlyOwner isValidAddress(token) {
-        if (amount == 0) {
-            revert InvalidAmount("Invalid amount", amount);
-        }
-
+    function withdraw(
+        address token,
+        uint256 amount
+    ) public nonReentrant onlyOwner isValidAddress(token) isValidAmount(amount) {
         if (ERC20(token).balanceOf(address(this)) < amount) {
             revert InvalidAmount("Not enought tokens balance to withdraw", amount);
         }
@@ -97,7 +106,10 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     /// @dev Method that publicaly exposed for deposit tokens into exchnage
     /// @param token Token EVM address
     /// @param amount Amount of tokens to deposit
-    function deposit(address token, uint256 amount) public nonReentrant onlyOwner isValidAddress(token) {
+    function deposit(
+        address token,
+        uint256 amount
+    ) public nonReentrant onlyOwner isValidAddress(token) isValidAmount(amount) {
         if (amount == 0) {
             revert InvalidAmount("Invalid amount", amount);
         }
@@ -113,7 +125,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         address tokenA,
         address tokenB,
         uint256 amount
-    ) public nonReentrant isValidAddress(tokenA) isValidAddress(tokenB) {
+    ) public nonReentrant isValidAddress(tokenA) isValidAddress(tokenB) isValidAmount(amount) {
         _swap(msg.sender, tokenA, tokenB, amount);
     }
 
@@ -185,7 +197,14 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         address tokenA,
         address tokenB,
         uint256 amount
-    ) public view isValidAddress(tokenA) isValidAddress(tokenB) returns (uint256 tokenAAmount, uint256 tokenBAmount) {
+    )
+        public
+        view
+        isValidAddress(tokenA)
+        isValidAddress(tokenB)
+        isValidAmount(amount)
+        returns (uint256 tokenAAmount, uint256 tokenBAmount)
+    {
         if (_buyPrices[tokenB].interval == 0 || _sellPrices[tokenA].interval == 0) {
             revert NoPriceExists("Sell or buy price for pair not found");
         } else if (_buyPrices[tokenB].interval > block.timestamp || _sellPrices[tokenA].interval > block.timestamp) {
@@ -222,7 +241,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         uint256 maxSellAmount,
         uint256 maxBuyAmount,
         uint256 interval
-    ) public onlyOwner isValidAddress(token) {
+    ) public onlyOwner isValidAddress(token) isValidAmount(maxSellAmount) isValidAmount(maxBuyAmount) {
         uint256 _decimals = ERC20(token).decimals();
 
         _thresholds[token] = PriceThreshold(
@@ -236,7 +255,11 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     /// @param token Token EVM address
     /// @param amount Price of the token
     /// @param interval Timestamp in seconds that indicates end time
-    function setBuyPrice(address token, uint256 amount, uint256 interval) public onlyOwner isValidAddress(token) {
+    function setBuyPrice(
+        address token,
+        uint256 amount,
+        uint256 interval
+    ) public onlyOwner isValidAddress(token) isValidAmount(amount) {
         _buyPrices[token] = Price(amount, interval);
     }
 
@@ -244,7 +267,11 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     /// @param token Token EVM address
     /// @param amount Price of the token
     /// @param interval Timestamp in seconds that indicates end time
-    function setSellPrice(address token, uint256 amount, uint256 interval) public onlyOwner isValidAddress(token) {
+    function setSellPrice(
+        address token,
+        uint256 amount,
+        uint256 interval
+    ) public onlyOwner isValidAddress(token) isValidAmount(amount) {
         _sellPrices[token] = Price(amount, interval);
     }
 }
