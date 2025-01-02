@@ -94,3 +94,5 @@ node_modules
 # ide
 .vscode
 .idea
+
+./contractAddresses.json

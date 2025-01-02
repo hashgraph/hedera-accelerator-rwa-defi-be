@@ -31,7 +31,7 @@ abstract contract IERC4626 is ERC20 {
     event Withdraw(address indexed sender, address indexed receiver, uint256 assets, uint256 shares);
 
     error ZeroShares(uint256 numberOfShares);
-    
+
     error MaxRewardTokensAmount();
 
     /*///////////////////////////////////////////////////////////////
@@ -76,9 +76,36 @@ abstract contract IERC4626 is ERC20 {
      */
     function redeem(uint256 shares, address receiver, address from) public virtual returns (uint256 amount);
 
+    /**
+     * @dev Claims all pending reward tokens for the caller.
+     *
+     * @param _startPosition The starting index in the reward token list from which to begin claiming rewards.
+     * @return The index of the start position after the last claimed reward and the total number of reward tokens.
+     */
+    function claimAllReward(uint256 _startPosition) external payable virtual returns (uint256, uint256);
+
     /*///////////////////////////////////////////////////////////////
                             View Functions
     //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Returns rewards for a user with fee considering.
+     *
+     * @param _user The user address.
+     * @param _rewardToken The reward address.
+     * @return unclaimedAmount The calculated rewards.
+     */
+    function getUserReward(address _user, address _rewardToken) external view virtual returns (uint256);
+
+    /**
+     * @dev Returns Asset token address.
+     */
+    function asset() public view virtual returns (address);
+
+    /**
+     * @dev Returns Share token address.
+     */
+    function share() public view virtual returns (address);
 
     /**
      * @dev Returns amount of assets on the contract balance.

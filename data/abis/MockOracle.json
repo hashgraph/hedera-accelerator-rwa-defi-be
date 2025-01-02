@@ -1,0 +1,702 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockOracle",
+  "sourceName": "contracts/erc4626/mocks/MockOracle.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "publishTime",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "int64",
+          "name": "price",
+          "type": "int64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "conf",
+          "type": "uint64"
+        }
+      ],
+      "name": "PriceFeedUpdate",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getEmaPrice",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "age",
+          "type": "uint256"
+        }
+      ],
+      "name": "getEmaPriceNoOlderThan",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getEmaPriceUnsafe",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getPrice",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "age",
+          "type": "uint256"
+        }
+      ],
+      "name": "getPriceNoOlderThan",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getPriceUnsafe",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "int64",
+              "name": "price",
+              "type": "int64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "conf",
+              "type": "uint64"
+            },
+            {
+              "internalType": "int32",
+              "name": "expo",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "publishTime",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct PythStructs.Price",
+          "name": "price",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "updateData",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "getUpdateFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "feeAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getValidTimePeriod",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "validTimePeriod",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "updateData",
+          "type": "bytes[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "priceIds",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minPublishTime",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "maxPublishTime",
+          "type": "uint64"
+        }
+      ],
+      "name": "parsePriceFeedUpdates",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "id",
+              "type": "bytes32"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "int64",
+                  "name": "price",
+                  "type": "int64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "conf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "int32",
+                  "name": "expo",
+                  "type": "int32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "publishTime",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct PythStructs.Price",
+              "name": "price",
+              "type": "tuple"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "int64",
+                  "name": "price",
+                  "type": "int64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "conf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "int32",
+                  "name": "expo",
+                  "type": "int32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "publishTime",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct PythStructs.Price",
+              "name": "emaPrice",
+              "type": "tuple"
+            }
+          ],
+          "internalType": "struct PythStructs.PriceFeed[]",
+          "name": "priceFeeds",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "updateData",
+          "type": "bytes[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "priceIds",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minPublishTime",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "maxPublishTime",
+          "type": "uint64"
+        }
+      ],
+      "name": "parsePriceFeedUpdatesUnique",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "id",
+              "type": "bytes32"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "int64",
+                  "name": "price",
+                  "type": "int64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "conf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "int32",
+                  "name": "expo",
+                  "type": "int32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "publishTime",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct PythStructs.Price",
+              "name": "price",
+              "type": "tuple"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "int64",
+                  "name": "price",
+                  "type": "int64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "conf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "int32",
+                  "name": "expo",
+                  "type": "int32"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "publishTime",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct PythStructs.Price",
+              "name": "emaPrice",
+              "type": "tuple"
+            }
+          ],
+          "internalType": "struct PythStructs.PriceFeed[]",
+          "name": "priceFeeds",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "prices",
+      "outputs": [
+        {
+          "internalType": "int64",
+          "name": "price",
+          "type": "int64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "conf",
+          "type": "uint64"
+        },
+        {
+          "internalType": "int32",
+          "name": "expo",
+          "type": "int32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "publishTime",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "id",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "int64",
+          "name": "price",
+          "type": "int64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "conf",
+          "type": "uint64"
+        },
+        {
+          "internalType": "int32",
+          "name": "expo",
+          "type": "int32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "publishTime",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "updateData",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "updatePriceFeeds",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "updateData",
+          "type": "bytes[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "priceIds",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint64[]",
+          "name": "publishTimes",
+          "type": "uint64[]"
+        }
+      ],
+      "name": "updatePriceFeedsIfNecessary",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561001057600080fd5b50338061003757604051631e4fbdf760e01b81526000600482015260240160405180910390fd5b61004081610046565b50610096565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b61094e806100a56000396000f3fe6080604052600436106100de5760003560e01c8063a4ae35e011610085578063a4ae35e014610245578063accca7f914610190578063b5dcc911146100e3578063b9256d28146102a2578063d47eed45146102b8578063e18910a3146102e9578063ef9e5e28146102fe578063f2fde38b14610310578063fe02dfd61461033057600080fd5b806331d98b3f146100e35780634716e9c51461019057806360846bc6146101b7578063711a2e2814610245578063715018a6146102655780638da5cb5b1461027c5780639474f45b146100e357806396834ad3146100e3575b600080fd5b3480156100ef57600080fd5b5061017a6100fe366004610592565b6040805160808101825260008082526020820181905291810182905260608101919091525060009081526001602081815260409283902083516080810185528154600781900b82526001600160401b03600160401b82041693820193909352600160801b90920460030b93820193909352910154606082015290565b60405161018791906105e0565b60405180910390f35b6101aa61019e366004610655565b60609695505050505050565b60405161018791906106e4565b3480156101c357600080fd5b5061020e6101d2366004610592565b60016020819052600091825260409091208054910154600782900b916001600160401b03600160401b82041691600160801b90910460030b9084565b604051610187949392919060079490940b84526001600160401b0392909216602084015260030b6040830152606082015260800190565b34801561025157600080fd5b5061017a610260366004610752565b6103de565b34801561027157600080fd5b5061027a6104c3565b005b34801561028857600080fd5b506000546001600160a01b03166040516101879190610774565b61027a6102b0366004610788565b505050505050565b3480156102c457600080fd5b506102db6102d3366004610821565b600092915050565b604051908152602001610187565b3480156102f557600080fd5b50610e106102db565b61027a61030c366004610821565b5050565b34801561031c57600080fd5b5061027a61032b366004610862565b6104d7565b34801561033c57600080fd5b5061027a61034b366004610892565b6040805160808101825260079590950b85526001600160401b03938416602080870191825260039490940b86830190815260608701938452600097885260019485905291909620945185549651915163ffffffff16600160801b0263ffffffff60801b19928616600160401b026001600160801b0319909816919095161795909517949094169190911782559151910155565b60408051608081018252600080825260208201819052918101829052606081019190915260008381526001602081905260409091200154829061042190426108f7565b11156104675760405162461bcd60e51b815260206004820152601060248201526f141c9a58d9481a5cc81d1bdbc81bdb1960821b60448201526064015b60405180910390fd5b5060008281526001602081815260409283902083516080810185528154600781900b82526001600160401b03600160401b82041693820193909352600160801b90920460030b9382019390935291015460608201525b92915050565b6104cb610515565b6104d56000610542565b565b6104df610515565b6001600160a01b038116610509576000604051631e4fbdf760e01b815260040161045e9190610774565b61051281610542565b50565b6000546001600160a01b031633146104d5573360405163118cdaa760e01b815260040161045e9190610774565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156105a457600080fd5b5035919050565b805160070b82526001600160401b036020820151166020830152604081015160030b6040830152606081015160608301525050565b608081016104bd82846105ab565b60008083601f84011261060057600080fd5b5081356001600160401b0381111561061757600080fd5b6020830191508360208260051b850101111561063257600080fd5b9250929050565b80356001600160401b038116811461065057600080fd5b919050565b6000806000806000806080878903121561066e57600080fd5b86356001600160401b038082111561068557600080fd5b6106918a838b016105ee565b909850965060208901359150808211156106aa57600080fd5b506106b789828a016105ee565b90955093506106ca905060408801610639565b91506106d860608801610639565b90509295509295509295565b602080825282518282018190526000919060409081850190868401855b82811015610745578151805185528681015161071f888701826105ab565b5085015161073060a08601826105ab565b50610120939093019290850190600101610701565b5091979650505050505050565b6000806040838503121561076557600080fd5b50508035926020909101359150565b6001600160a01b0391909116815260200190565b600080600080600080606087890312156107a157600080fd5b86356001600160401b03808211156107b857600080fd5b6107c48a838b016105ee565b909850965060208901359150808211156107dd57600080fd5b6107e98a838b016105ee565b9096509450604089013591508082111561080257600080fd5b5061080f89828a016105ee565b979a9699509497509295939492505050565b6000806020838503121561083457600080fd5b82356001600160401b0381111561084a57600080fd5b610856858286016105ee565b90969095509350505050565b60006020828403121561087457600080fd5b81356001600160a01b038116811461088b57600080fd5b9392505050565b600080600080600060a086880312156108aa57600080fd5b8535945060208601358060070b81146108c257600080fd5b93506108d060408701610639565b925060608601358060030b81146108e657600080fd5b949793965091946080013592915050565b818103818111156104bd57634e487b7160e01b600052601160045260246000fdfea26469706673582212209bab31be2106d21a255668b970cd2a869e53c87c23df562bb2eff8794e24d6cd64736f6c63430008180033",
+  "deployedBytecode": "0x6080604052600436106100de5760003560e01c8063a4ae35e011610085578063a4ae35e014610245578063accca7f914610190578063b5dcc911146100e3578063b9256d28146102a2578063d47eed45146102b8578063e18910a3146102e9578063ef9e5e28146102fe578063f2fde38b14610310578063fe02dfd61461033057600080fd5b806331d98b3f146100e35780634716e9c51461019057806360846bc6146101b7578063711a2e2814610245578063715018a6146102655780638da5cb5b1461027c5780639474f45b146100e357806396834ad3146100e3575b600080fd5b3480156100ef57600080fd5b5061017a6100fe366004610592565b6040805160808101825260008082526020820181905291810182905260608101919091525060009081526001602081815260409283902083516080810185528154600781900b82526001600160401b03600160401b82041693820193909352600160801b90920460030b93820193909352910154606082015290565b60405161018791906105e0565b60405180910390f35b6101aa61019e366004610655565b60609695505050505050565b60405161018791906106e4565b3480156101c357600080fd5b5061020e6101d2366004610592565b60016020819052600091825260409091208054910154600782900b916001600160401b03600160401b82041691600160801b90910460030b9084565b604051610187949392919060079490940b84526001600160401b0392909216602084015260030b6040830152606082015260800190565b34801561025157600080fd5b5061017a610260366004610752565b6103de565b34801561027157600080fd5b5061027a6104c3565b005b34801561028857600080fd5b506000546001600160a01b03166040516101879190610774565b61027a6102b0366004610788565b505050505050565b3480156102c457600080fd5b506102db6102d3366004610821565b600092915050565b604051908152602001610187565b3480156102f557600080fd5b50610e106102db565b61027a61030c366004610821565b5050565b34801561031c57600080fd5b5061027a61032b366004610862565b6104d7565b34801561033c57600080fd5b5061027a61034b366004610892565b6040805160808101825260079590950b85526001600160401b03938416602080870191825260039490940b86830190815260608701938452600097885260019485905291909620945185549651915163ffffffff16600160801b0263ffffffff60801b19928616600160401b026001600160801b0319909816919095161795909517949094169190911782559151910155565b60408051608081018252600080825260208201819052918101829052606081019190915260008381526001602081905260409091200154829061042190426108f7565b11156104675760405162461bcd60e51b815260206004820152601060248201526f141c9a58d9481a5cc81d1bdbc81bdb1960821b60448201526064015b60405180910390fd5b5060008281526001602081815260409283902083516080810185528154600781900b82526001600160401b03600160401b82041693820193909352600160801b90920460030b9382019390935291015460608201525b92915050565b6104cb610515565b6104d56000610542565b565b6104df610515565b6001600160a01b038116610509576000604051631e4fbdf760e01b815260040161045e9190610774565b61051281610542565b50565b6000546001600160a01b031633146104d5573360405163118cdaa760e01b815260040161045e9190610774565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000602082840312156105a457600080fd5b5035919050565b805160070b82526001600160401b036020820151166020830152604081015160030b6040830152606081015160608301525050565b608081016104bd82846105ab565b60008083601f84011261060057600080fd5b5081356001600160401b0381111561061757600080fd5b6020830191508360208260051b850101111561063257600080fd5b9250929050565b80356001600160401b038116811461065057600080fd5b919050565b6000806000806000806080878903121561066e57600080fd5b86356001600160401b038082111561068557600080fd5b6106918a838b016105ee565b909850965060208901359150808211156106aa57600080fd5b506106b789828a016105ee565b90955093506106ca905060408801610639565b91506106d860608801610639565b90509295509295509295565b602080825282518282018190526000919060409081850190868401855b82811015610745578151805185528681015161071f888701826105ab565b5085015161073060a08601826105ab565b50610120939093019290850190600101610701565b5091979650505050505050565b6000806040838503121561076557600080fd5b50508035926020909101359150565b6001600160a01b0391909116815260200190565b600080600080600080606087890312156107a157600080fd5b86356001600160401b03808211156107b857600080fd5b6107c48a838b016105ee565b909850965060208901359150808211156107dd57600080fd5b6107e98a838b016105ee565b9096509450604089013591508082111561080257600080fd5b5061080f89828a016105ee565b979a9699509497509295939492505050565b6000806020838503121561083457600080fd5b82356001600160401b0381111561084a57600080fd5b610856858286016105ee565b90969095509350505050565b60006020828403121561087457600080fd5b81356001600160a01b038116811461088b57600080fd5b9392505050565b600080600080600060a086880312156108aa57600080fd5b8535945060208601358060070b81146108c257600080fd5b93506108d060408701610639565b925060608601358060030b81146108e657600080fd5b949793965091946080013592915050565b818103818111156104bd57634e487b7160e01b600052601160045260246000fdfea26469706673582212209bab31be2106d21a255668b970cd2a869e53c87c23df562bb2eff8794e24d6cd64736f6c63430008180033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

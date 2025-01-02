@@ -1,14 +1,13 @@
 import { ethers, expect } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
-import { log } from "console";
+import { ZeroAddress } from "ethers";
 import hre from "hardhat";
 
 // constants
 const rewardTokenAddress = "0x0000000000000000000000000000000000423252";
-const deployedFactory = "0x88f598B617BF4cB1430488EF43a6777cfb589904";
+const deployedFactory = "0xabAF69016bE44d738680fe2298941e278dC8C55a";
 
-const salt = "testSall";
-const feePercentage = 1000;
+const salt = "testSalt";
 // Tests
 describe("VaultFactory", function () {
     async function deployFixture() {
@@ -48,20 +47,20 @@ describe("VaultFactory", function () {
                 shareTokenName: "TST",
                 shareTokenSymbol: "TST",
                 vaultRewardController: owner.address,
-                feeConfigController: owner.address,
+                feeConfigController: owner.address
             }
 
             const feeConfig = {
-                receiver: owner.address,
-                token: rewardTokenAddress,
-                feePercentage: feePercentage
+                receiver: ZeroAddress,
+                token: ZeroAddress,
+                feePercentage: 0
             }
 
             const tx = await vaultFactory.deployVault(
                 salt,
                 vaultDetails,
                 feeConfig,
-                { from: owner.address, gasLimit: 3000000, value: ethers.parseUnits("13", 18) }
+                { from: owner.address, gasLimit: 3000000, value: ethers.parseUnits("23", 18) }
             );
 
             console.log(tx.hash);

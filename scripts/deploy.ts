@@ -3,6 +3,13 @@ import { writeFile } from 'fs/promises';
 import { createFungibleToken } from "../scripts/utils";
 import { Client, AccountId, PrivateKey } from "@hashgraph/sdk";
 
+import {
+  usdcAddress,
+  uniswapRouterAddress,
+  pythOracleAddress,
+  pythUtilsAddress
+} from "../constants";
+
 // Initial function for logs and configs
 async function init(): Promise<Record<string, any>> {
   console.log(" - Deploying contracts...");
@@ -102,6 +109,9 @@ async function deployComplianceModules(contracts: Record<string, any>): Promise<
   const requiresNFTModule = await ethers.deployContract('RequiresNFTModule', deployer);
   const countryAllowModule = await ethers.deployContract('CountryAllowModule', deployer);
   const maxOwnershipByCountryModule = await ethers.deployContract('MaxOwnershipByCountryModule', deployer);
+  const maxTenPercentOwnershipModule = await ethers.deployContract('MaxTenPercentOwnershipModule', deployer);
+  const onlyUsaModule = await ethers.deployContract('OnlyUsaModule', deployer);
+  const transferLimitOneHundredModule = await ethers.deployContract('TransferLimitOneHundredModule', deployer);
 
   return {
     ...contracts,
@@ -109,6 +119,9 @@ async function deployComplianceModules(contracts: Record<string, any>): Promise<
       RequiresNFTModule: await requiresNFTModule.getAddress(),
       CountryAllowModule: await countryAllowModule.getAddress(),
       MaxOwnershipByCountryModule: await maxOwnershipByCountryModule.getAddress(),
+      MaxTenPercentOwnershipModule: await maxTenPercentOwnershipModule.getAddress(),
+      OnlyUsaModule: await onlyUsaModule.getAddress(),
+      TransferLimitOneHundredModule: await transferLimitOneHundredModule.getAddress(),
     }
   }
 }
@@ -165,7 +178,7 @@ async function deployVault(contracts: Record<string, any>): Promise<Record<strin
     feeConfig,
     deployer.address,
     deployer.address,
-    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("12", 18) }
+    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("16", 18) }
   );
   console.log("Hash ", hederaVault.deploymentTransaction()?.hash);
   await hederaVault.waitForDeployment();
@@ -187,6 +200,141 @@ async function deployVault(contracts: Record<string, any>): Promise<Record<strin
       StakingToken: stakingTokenAddress,
       Share: await hederaVault.share(),
       RewardToken: "0x" + rewardToken!.toSolidityAddress()
+    }
+  };
+}
+
+// Deploy Async Vault contracts
+async function deployAsyncVault(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const [deployer] = await ethers.getSigners();
+  const network = await ethers.provider.getNetwork();
+
+  console.log("Deploying Async Vault with account:", deployer.address, "at:", network.name);
+
+  let client = Client.forTestnet();
+
+  const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || '');
+  const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || '');
+
+  client.setOperator(
+    operatorAccountId,
+    operatorPrKey
+  );
+
+  const stakingToken = await createFungibleToken(
+    "ERC7540 on Hedera",
+    "HERC7540",
+    process.env.ACCOUNT_ID,
+    operatorPrKey.publicKey,
+    client,
+    operatorPrKey
+  );
+
+  const stakingTokenAddress = "0x" + stakingToken!.toSolidityAddress();
+
+  const rewardToken = await createFungibleToken(
+    "Reward Token 1",
+    "RT1",
+    process.env.ACCOUNT_ID,
+    operatorPrKey.publicKey,
+    client,
+    operatorPrKey
+  );
+
+  const feeConfig = {
+    receiver: "0x091b4a7ea614a3bd536f9b62ad5641829a1b174f",
+    token: "0x" + rewardToken!.toSolidityAddress(),
+    minAmount: 0,
+    feePercentage: 1000,
+  };
+
+  const AsyncVault = await ethers.getContractFactory("AsyncVault");
+  const asyncVault = await AsyncVault.deploy(
+    stakingTokenAddress,
+    "TST",
+    "TST",
+    feeConfig,
+    deployer.address,
+    deployer.address,
+    { from: deployer.address, gasLimit: 3000000, value: ethers.parseUnits("20", 18) }
+  );
+  console.log("Hash ", asyncVault.deploymentTransaction()?.hash);
+  await asyncVault.waitForDeployment();
+
+  console.log("Vault deployed with address: ", await asyncVault.getAddress());
+
+  return {
+    ...contracts,
+    asyncVault: {
+      Vault: asyncVault.target,
+      StakingToken: stakingTokenAddress,
+      Share: await asyncVault.share(),
+      RewardToken: "0x" + rewardToken!.toSolidityAddress()
+    }
+  };
+}
+
+// Deploy Token balancer
+async function deployTokenBalancer(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const [deployer] = await ethers.getSigners();
+
+  // Set Pyth Utils lib address
+  const TokenBalancer = await ethers.getContractFactory("TokenBalancer", {
+    libraries: {
+      PythUtils: pythUtilsAddress
+    }
+  });
+
+  const tokenBalancer = await TokenBalancer.deploy(
+    pythOracleAddress,
+    uniswapRouterAddress,
+    usdcAddress
+  );
+  await tokenBalancer.waitForDeployment();
+
+  return {
+    ...contracts,
+    balancer: {
+      TokenBalancer: tokenBalancer.target
+    }
+  };
+}
+
+// Deploy AutoCompounder
+async function deployAutoCompounder(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const [deployer] = await ethers.getSigners();
+
+  const AutoCompounder = await ethers.getContractFactory("AutoCompounder");
+
+  const autoCompounder = await AutoCompounder.deploy(
+    uniswapRouterAddress,
+    "0x0000000000000000000000000000000000423255",
+    usdcAddress,
+    "AToken",
+    "AToken"
+  );
+  await autoCompounder.waitForDeployment();
+
+  return {
+    ...contracts,
+    autoCompounder: {
+      AutoCompounder: autoCompounder.target
+    }
+  };
+}
+
+// Deploy AutoCompounder
+async function deployAutoCompounderFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const [deployer] = await ethers.getSigners();
+
+  const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
+  const autoCompounderFactory = await AutoCompounderFactory.deploy();
+  await autoCompounderFactory.waitForDeployment();
+
+  return {
+    ...contracts,
+    autoCompounder: {
+      AutoCompounderFactory: autoCompounderFactory.target
     }
   };
 }
@@ -238,6 +386,9 @@ init()
   .then(deployERC3643)
   .then(deployComplianceModules)
   .then(deployVault)
+  .then(deployTokenBalancer)
+  .then(deployAutoCompounder)
+  .then(deployAutoCompounderFactory)
   .then(deployHTSTokenFactory)
   .then(exportDeploymentVersion)
   .then(finish)

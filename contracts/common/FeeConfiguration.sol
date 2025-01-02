@@ -5,6 +5,8 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import "../common/safe-HTS/SafeHTS.sol";
 
 /**
@@ -13,6 +15,7 @@ import "../common/safe-HTS/SafeHTS.sol";
  * The contract that helps to consider fee during any Vault token operation.
  */
 abstract contract FeeConfiguration is AccessControl {
+    using SafeERC20 for IERC20;
     /**
      * @notice FeeConfigUpdated event.
      * @dev Emitted when admin changes fee configuration.
@@ -70,12 +73,14 @@ abstract contract FeeConfiguration is AccessControl {
      *
      * @param _amount The amount of the claim.
      */
-    function _deductFee(uint256 _amount) internal {
+    function _deductFee(uint256 _amount) internal returns (uint256) {
         address _token = feeConfig.token;
         uint256 fee = _calculateFee(_amount, feeConfig.feePercentage);
 
-        require(IERC20(_token).balanceOf(msg.sender) >= fee, "FC: Insufficient token balance");
-        SafeHTS.safeTransferToken(_token, msg.sender, feeConfig.receiver, int64(uint64(fee)));
+        require(IERC20(_token).balanceOf(address(this)) >= fee, "FC: Insufficient token balance");
+        IERC20(_token).safeTransfer(feeConfig.receiver, fee);
+
+        return _amount - fee;
     }
 
     /**

@@ -1,0 +1,239 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "UniswapFactoryMock",
+  "sourceName": "contracts/uniswap/mock/UniswapFactoryMock.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token0",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token1",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "pair",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "PairCreated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "allPairs",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "pair",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "allPairsLength",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "tokenA",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "tokenB",
+          "type": "address"
+        }
+      ],
+      "name": "createPair",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "pair",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feeTo",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feeToSetter",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "tokenA",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "tokenB",
+          "type": "address"
+        }
+      ],
+      "name": "getPair",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "pair",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pairCreateFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rentPayer",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setFeeTo",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setFeeToSetter",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPairCreateFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "setRentPayer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "setTokenCreateFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561001057600080fd5b50610255806100206000396000f3fe6080604052600436106100b25760003560e01c8063881a075a1161006f578063881a075a14610140578063a2e74af6146100e4578063a5171e40146100b7578063c9c653961461015c578063e6a4390514610172578063f1b050e914610125578063f46901ed146100e457600080fd5b8063017e7e58146100b7578063094b7415146100b757806316af9344146100e45780631e3dd18b146101045780633c32474d14610125578063574f2ba314610140575b600080fd5b3480156100c357600080fd5b5060005b6040516001600160a01b0390911681526020015b60405180910390f35b3480156100f057600080fd5b506101026100ff3660046101b1565b50565b005b34801561011057600080fd5b506100c761011f3660046101d3565b50600090565b34801561013157600080fd5b506101026100ff3660046101d3565b34801561014c57600080fd5b50604051600081526020016100db565b6100c761016a3660046101ec565b600092915050565b34801561017e57600080fd5b506100c761018d3660046101ec565b600192915050565b80356001600160a01b03811681146101ac57600080fd5b919050565b6000602082840312156101c357600080fd5b6101cc82610195565b9392505050565b6000602082840312156101e557600080fd5b5035919050565b600080604083850312156101ff57600080fd5b61020883610195565b915061021660208401610195565b9050925092905056fea2646970667358221220b844389da011ed0c8f8bf1eeb682a71d7a2fc43ff0e67be410739c74198ff4e264736f6c63430008180033",
+  "deployedBytecode": "0x6080604052600436106100b25760003560e01c8063881a075a1161006f578063881a075a14610140578063a2e74af6146100e4578063a5171e40146100b7578063c9c653961461015c578063e6a4390514610172578063f1b050e914610125578063f46901ed146100e457600080fd5b8063017e7e58146100b7578063094b7415146100b757806316af9344146100e45780631e3dd18b146101045780633c32474d14610125578063574f2ba314610140575b600080fd5b3480156100c357600080fd5b5060005b6040516001600160a01b0390911681526020015b60405180910390f35b3480156100f057600080fd5b506101026100ff3660046101b1565b50565b005b34801561011057600080fd5b506100c761011f3660046101d3565b50600090565b34801561013157600080fd5b506101026100ff3660046101d3565b34801561014c57600080fd5b50604051600081526020016100db565b6100c761016a3660046101ec565b600092915050565b34801561017e57600080fd5b506100c761018d3660046101ec565b600192915050565b80356001600160a01b03811681146101ac57600080fd5b919050565b6000602082840312156101c357600080fd5b6101cc82610195565b9392505050565b6000602082840312156101e557600080fd5b5035919050565b600080604083850312156101ff57600080fd5b61020883610195565b915061021660208401610195565b9050925092905056fea2646970667358221220b844389da011ed0c8f8bf1eeb682a71d7a2fc43ff0e67be410739c74198ff4e264736f6c63430008180033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
