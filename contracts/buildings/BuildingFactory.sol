@@ -82,7 +82,7 @@ contract BuildingFactory is OwnableUpgradeable  {
      * newBuilding Creates new building with create2, mints NFT and store it.
      * @param tokenURI metadata location
      */
-    function newBuilding(string memory tokenURI) public virtual onlyOwner {
+    function newBuilding(string memory tokenURI) public virtual {
         BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
         BeaconProxy buildingProxy = new BeaconProxy(
             $.buildingBeacon,
