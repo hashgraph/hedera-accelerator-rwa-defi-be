@@ -6,7 +6,8 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
-import {Token} from '../erc3643/token/Token.sol';
+import {IdentityGateway} from "../onchainid/gateway/Gateway.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title BuildingFactory
@@ -19,6 +20,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         address uniswapRouter;
         address uniswapFactory;
         address buildingBeacon;
+        address onchainIdGateway;
         BuildingInfo[] buildingsList;
         mapping (address => BuildingInfo) buildingDetails;
     }
@@ -27,6 +29,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         address addr; // building address
         uint256 nftId; // NFT token ID attributed to the building
         string tokenURI; // NFT metadatada location
+        address identity; // building's OnchainID identity address
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
@@ -46,12 +49,15 @@ contract BuildingFactory is OwnableUpgradeable  {
      * @param _nft NFT collection address
      * @param _uniswapRouter unsiswap router address
      * @param _uniswapFactory unsiswap factory address
+     * @param _buildingBeacon building beacon address
+     * @param _onchainIdGateway OnchainID IdentityGateway address
      */
     function initialize(
         address _nft,
         address _uniswapRouter,
         address _uniswapFactory,
-        address _buildingBeacon
+        address _buildingBeacon,
+        address _onchainIdGateway
     ) public virtual initializer {
         __Ownable_init(_msgSender());
         BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
@@ -59,6 +65,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         $.uniswapRouter = _uniswapRouter;
         $.uniswapFactory = _uniswapFactory;
         $.buildingBeacon = _buildingBeacon;
+        $.onchainIdGateway = _onchainIdGateway;
     }
 
     /**
@@ -90,11 +97,13 @@ contract BuildingFactory is OwnableUpgradeable  {
         );
 
         uint256 tokenId = IERC721Metadata($.nft).mint(address(buildingProxy), tokenURI);
+        address identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(address(buildingProxy));
 
         $.buildingDetails[address(buildingProxy)] = BuildingInfo(
             address(buildingProxy),
             tokenId,
-            tokenURI
+            tokenURI,
+            identity
         );
 
         $.buildingsList.push($.buildingDetails[address(buildingProxy)]);        
