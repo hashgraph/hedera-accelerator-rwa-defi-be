@@ -46,9 +46,9 @@ const config: HardhatUserConfig = {
       blockGasLimit: 9999999999999,
       gas: 30000000,
       allowUnlimitedContractSize: true,
-      // forking: {
-      //   url: process.env.RPC_URL || "",
-      // },
+      forking: {
+        url: process.env.RPC_URL || "",
+      },
     },
   },
   gasReporter: {
