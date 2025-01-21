@@ -23,6 +23,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         address onchainIdGateway;
         BuildingInfo[] buildingsList;
         mapping (address => BuildingInfo) buildingDetails;
+        mapping (address => bool) callableContracts;
     }
 
     struct BuildingInfo {
@@ -66,6 +67,8 @@ contract BuildingFactory is OwnableUpgradeable  {
         $.uniswapFactory = _uniswapFactory;
         $.buildingBeacon = _buildingBeacon;
         $.onchainIdGateway = _onchainIdGateway;
+        
+        $.callableContracts[_nft] = true;
     }
 
     /**
@@ -109,5 +112,19 @@ contract BuildingFactory is OwnableUpgradeable  {
         $.buildingsList.push($.buildingDetails[address(buildingProxy)]);        
 
         emit NewBuilding(address(buildingProxy));
+    }
+    
+    /**
+     * callFromBuilding inpersonate building and call external contract
+     * @param buildingAddress address of the building
+     * @param callableContract  address of the external callable contract
+     * @param data // encoded function data
+     * @notice this allows anyone to execute callable contract function as the building, until ownership/ACL of BuildingFactory is adjusted
+     */
+    function callFromBuilding(address buildingAddress, address callableContract, bytes memory data) external {
+        BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
+        require($.buildingDetails[buildingAddress].addr == buildingAddress, "BuildingFactory: Invalid building address");
+        require($.callableContracts[callableContract] == true, "BuildingFactory: Invalid callable contract");
+        Building(buildingAddress).callContract(callableContract, data);
     }
 }

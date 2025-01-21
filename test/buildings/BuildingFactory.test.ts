@@ -1,6 +1,7 @@
 import { Contract, LogDescription, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
+import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
 
 async function deployFixture() {
   const [owner, notOwner] = await ethers.getSigners();
@@ -164,5 +165,97 @@ describe('BuildingFactory', () => {
       await expect(tx).to.emit(identityFactory, 'WalletLinked').withArgs(buildingAddress, identityAddress);
     });
 
+  });
+
+  describe('.callFromBuilding()', () => {
+    describe('when INVALID building address', () => {
+      it('should revert', async () => {
+        const { buildingFactory, nftCollectionAddress } = await loadFixture(deployFixture);
+        const invalidBuildingAddress = ethers.Wallet.createRandom().address;
+        const NFT_ID = 0;
+
+        const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
+        const encodedMetadataFunctionData = ERC721MetadataIface.encodeFunctionData(
+          "setMetadata(uint256,string[],string[])", // function selector
+          [ // function parameters
+            NFT_ID, 
+            ["size"], 
+            ["8"]
+          ]
+        );
+        
+        await expect(
+          buildingFactory.callFromBuilding(invalidBuildingAddress, nftCollectionAddress, encodedMetadataFunctionData)
+        ).to.be.revertedWith('BuildingFactory: Invalid building address');
+      });
+    });
+    describe('when VAlID building address', () => {
+      describe('when contract is NOT whitelisted', () => {
+        it('should revert', async () => {
+          const { buildingFactory } = await loadFixture(deployFixture);
+          const NFT_ID = 0;
+          const invalidContractAddress = ethers.Wallet.createRandom().address;
+
+          const tokenURI = "ipfs://building-nft-uri";
+          const tx = await buildingFactory.newBuilding(tokenURI);
+          await tx.wait();
+          
+          const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+          const buildingAddress = await building.getAddress();
+  
+          const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
+          const encodedMetadataFunctionData = ERC721MetadataIface.encodeFunctionData(
+            "setMetadata(uint256,string[],string[])", // function selector
+            [ // function parameters
+              NFT_ID, 
+              ["size"], 
+              ["8"]
+            ]
+          );
+          
+          await expect(
+            buildingFactory.callFromBuilding(buildingAddress, invalidContractAddress, encodedMetadataFunctionData)
+          ).to.be.revertedWith('BuildingFactory: Invalid callable contract');
+        });
+      });
+      describe('when contract IS whitelisted', () => {
+        it('should call ERC721Metadata contract and set metadata', async () => {
+          const { buildingFactory, nftCollection, nftCollectionAddress } = await loadFixture(deployFixture);
+          const NFT_ID = 0;
+
+          const tokenURI = "ipfs://building-nft-uri";
+          const tx = await buildingFactory.newBuilding(tokenURI);
+          await tx.wait();
+          
+          const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+          const buildingAddress = await building.getAddress();
+  
+          const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
+          const encodedMetadataFunctionData = ERC721MetadataIface.encodeFunctionData(
+            "setMetadata(uint256,string[],string[])", // function selector
+            [ // function parameters
+              NFT_ID, 
+              ["size", "type", "color", "city"], 
+              ["8", "mp4", "blue", "denver"]
+            ]
+          );
+          
+          await buildingFactory.callFromBuilding(buildingAddress, nftCollectionAddress, encodedMetadataFunctionData);
+          const metadata = await nftCollection["getMetadata(uint256)"](NFT_ID);
+
+          expect(metadata[0][0]).to.be.equal('size')
+          expect(metadata[0][1]).to.be.equal('8')
+
+          expect(metadata[1][0]).to.be.equal('type')
+          expect(metadata[1][1]).to.be.equal('mp4')
+
+          expect(metadata[2][0]).to.be.equal('color')
+          expect(metadata[2][1]).to.be.equal('blue')
+
+          expect(metadata[3][0]).to.be.equal('city')
+          expect(metadata[3][1]).to.be.equal('denver')
+        });
+      });
+    });
   });
 });
