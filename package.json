@@ -1,5 +1,5 @@
 {
-  "name": "accelerator-defi-eip",
+  "name": "@hashgraph/accelerator-defi-eip",
   "version": "1.0.0",
   "description": "Smart contracts for accelerator-defi-EIP",
   "author": "Swirldlabs",
