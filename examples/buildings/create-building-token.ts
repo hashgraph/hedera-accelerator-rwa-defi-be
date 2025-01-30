@@ -5,7 +5,7 @@ async function createBuildingToken() {
   const buildingFactory = await ethers.getContractAt('BuildingFactory', Deployments.factories.BuildingFactory);
   const buildingAddress = "0x0f8CEC1b612c3827084C65dE7Bd5A6F4B47BE93d";
 
-  const tx = await buildingFactory.newERC3643Token(buildingAddress, "New Token Name", "SYMBOL", { gasLimit : 6000000 });
+  const tx = await buildingFactory.newERC3643Token(buildingAddress, "New Token Name", "SYMBOL", 18, { gasLimit : 6000000 });
   await tx.wait();
 
   const [

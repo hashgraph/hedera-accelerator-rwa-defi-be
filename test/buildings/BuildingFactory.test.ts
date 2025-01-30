@@ -307,12 +307,12 @@ describe('BuildingFactory', () => {
           buildingFactory, 
          } = await loadFixture(deployFixture);
 
-         await expect(buildingFactory.newERC3643Token(ethers.ZeroAddress, "token name", "TKN"))
+         await expect(buildingFactory.newERC3643Token(ethers.ZeroAddress, "token name", "TKN", 18))
           .to.be.revertedWith('BuildingFactory: Invalid building address');
 
           const randomWallet = ethers.Wallet.createRandom();
 
-          await expect(buildingFactory.newERC3643Token(randomWallet.address, "token name", "TKN"))
+          await expect(buildingFactory.newERC3643Token(randomWallet.address, "token name", "TKN", 18))
           .to.be.revertedWith('BuildingFactory: Invalid building address');
 
       });
@@ -330,7 +330,7 @@ describe('BuildingFactory', () => {
           const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
           const buildingAddress = await building.getAddress();
 
-         const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN");
+         const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN", 18);
          await tx2.wait();
 
          const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
@@ -352,10 +352,10 @@ describe('BuildingFactory', () => {
             const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
             const buildingAddress = await building.getAddress();
   
-           const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN");
+           const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN", 18);
            await tx2.wait();
 
-           await expect(buildingFactory.newERC3643Token(buildingAddress, "other name", "OTKN"))
+           await expect(buildingFactory.newERC3643Token(buildingAddress, "other name", "OTKN", 18))
             .to.be.revertedWith('BuildingFactory: token already created for building');
         });
       });

@@ -39,9 +39,9 @@ library BuildingToken {
         _token = SafeHTS.safeCreateFungibleToken(newToken, 0, decimals);
     }
 
-    function createERC3643Token(address trexGateway, address buildingAddress, string memory name, string memory symbol) internal returns (address) {
+    function createERC3643Token(address trexGateway, address buildingAddress, string memory name, string memory symbol, uint8 decimals) internal returns (address) {
         ITREXGateway(trexGateway).deployTREXSuite(
-            buildTokenDetails(buildingAddress, name, symbol), 
+            buildTokenDetails(buildingAddress, name, symbol, decimals), 
             buildTokenClaimDetails()
         );
 
@@ -52,14 +52,13 @@ library BuildingToken {
         return token;
     }
 
-    function buildTokenDetails(address buildingAddress, string memory name, string memory symbol) internal pure returns (ITREXFactory.TokenDetails memory)  {
+    function buildTokenDetails(address buildingAddress, string memory name, string memory symbol, uint8 decimals) internal pure returns (ITREXFactory.TokenDetails memory)  {
         address irs = address(0);
         address onchainid = address(0);
         address[] memory irsAgents = new address[](0);
         address[] memory tokenAgents = new address[](0);
         address[] memory complianceModules = new address[](0);
         bytes[] memory complianceSettings = new bytes[](0);
-        uint8 decimals = 18;
         
         return ITREXFactory.TokenDetails(
             buildingAddress,

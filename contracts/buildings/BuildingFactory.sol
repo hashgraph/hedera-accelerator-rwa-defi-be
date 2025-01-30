@@ -141,13 +141,13 @@ contract BuildingFactory is OwnableUpgradeable  {
      * @param name string name of the token
      * @param symbol string symbol of the token
      */
-    function newERC3643Token(address buildingAddress, string memory name, string memory symbol) external {
+    function newERC3643Token(address buildingAddress, string memory name, string memory symbol, uint8 decimals) external {
         BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
 
         require(buildingAddress != address(0) && $.buildingDetails[buildingAddress].addr != address(0), "BuildingFactory: Invalid building address");
         require($.buildingDetails[buildingAddress].erc3643Token == address(0), "BuildingFactory: token already created for building");
         
-        address token = BuildingToken.createERC3643Token($.trexGateway, buildingAddress, name, symbol);
+        address token = BuildingToken.createERC3643Token($.trexGateway, buildingAddress, name, symbol, decimals);
 
         $.buildingDetails[buildingAddress].erc3643Token = token;
 
