@@ -1,22 +1,22 @@
 {
   "implementations": {
-    "Token": "0xB0f1AD71bA47Cc10cD925f06E1b467A5544e9592",
-    "ClaimTopicsRegistry": "0x6396f3444dc7b0E06E5D6453bf367E9dfa7A635C",
-    "TrustedIssuersRegistry": "0x9872BAaDb06D14f998e0185138745e8593E6D3D7",
-    "IdentityRegistryStorage": "0xA0AEA5e7Caa342297c4a9309eC1Db7E9aa15a3EB",
-    "IdentityRegistry": "0xb0b0671aA04d79059BdcBAB5C59270bac5dc80A5",
-    "ModularCompliance": "0x3134520cBB0cC9d0fEA9EAE182cCc29b3b20f0C8",
-    "Identity": "0xdf72070C2bCA419215f1b4A57837396F52c0e1B8",
-    "ImplementationAuthority": "0x0EE2CDdFFcDe197319Ba2Ea8684469bbD25c2e79",
-    "HTSToken": "0xDCf36eAd241EB927E1046abcF17fE9FB31ecc646"
+    "Token": "0x913007FB64587F5FB31e8f5e4435A1B2DfBE3f6a",
+    "ClaimTopicsRegistry": "0xBEF4508F1Aa6fE4b0D304daC64Ac40b5CaE77a4C",
+    "TrustedIssuersRegistry": "0x43712E6768B689994cac6097DAfC341e36cc54c7",
+    "IdentityRegistryStorage": "0x4ed17E398b173346e8fb7aA353a05A5B477376A3",
+    "IdentityRegistry": "0xfaF1d24Fb0c8c38D025ee7b26E926955B5f81955",
+    "ModularCompliance": "0xF5564619EcF4100F204a5040140E13b727C4f42f",
+    "Identity": "0x3e56b1C2fFbE347b6727884B328805Ef7f914e8a",
+    "ImplementationAuthority": "0x0765FdfDcf78d29aEf10E77b55f417182d458E73",
+    "ERC721Metadata": "0x6D5c4fDBf7D60D09fB14300Cf1463E252990FF67"
   },
   "factories": {
-    "IdFactory": "0xCe444169a11761b361D212005334b13A9d454061",
-    "TREXImplementationAuthority": "0x94eDe092ea4480e00174C73BC615c2466743f3dA",
-    "TREXFactory": "0xf17A4C9E2B00398fB11c88060FdE39066b6269b0",
-    "TREXGateway": "0x56C433eca9E534FF5024Eaedb95C652d31B44a09",
-    "IdentityGateway": "0xcfCF11BEe5575c59e1F4a9D5a53c90A4e5e49D0C",
-    "HTSTokenFactory": "0x1Ed9b9832A84E312d1B2670A3a9b853FAd499189"
+    "IdFactory": "0x140108F2D8731F582F25849A3f195A11fE62679E",
+    "TREXImplementationAuthority": "0x7ec38283Cf983712b2692eaF34b0006C25220e68",
+    "TREXFactory": "0xDae14ffe7F67bb63457f2c718Ea2c8091518B711",
+    "TREXGateway": "0x00E73eA36A10252274e070A0B19d3f04Db423A56",
+    "IdentityGateway": "0xA18D6fbcD34c1cb9E09Df31ceb9d2fAEB64E925C",
+    "BuildingFactory": "0x47CE39E474A13D9E5a1890B212E6aBA4FFC867Dd"
   },
   "compliance": {
     "RequiresNFTModule": "0xA318d349488531882b4fCa6b412A8766F7421044",

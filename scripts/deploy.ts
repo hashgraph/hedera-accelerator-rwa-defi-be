@@ -1,7 +1,8 @@
-import { ethers } from 'hardhat';
+import { ethers, upgrades } from 'hardhat';
 import { writeFile } from 'fs/promises';
 import { createFungibleToken } from "../scripts/utils";
 import { Client, AccountId, PrivateKey } from "@hashgraph/sdk";
+import TestnetDeployments from '../data/deployments/chain-296.json';
 
 import {
   usdcAddress,
@@ -13,7 +14,9 @@ import {
 // Initial function for logs and configs
 async function init(): Promise<Record<string, any>> {
   console.log(" - Deploying contracts...");
-  return {};
+  return {
+    ...TestnetDeployments
+  };
 }
 
 // Deploy main contracts for the ERC3643 Standart (T-REX)
@@ -363,6 +366,79 @@ async function deployHTSTokenFactory(contracts: Record<string, any>): Promise<Re
   };
 }
 
+
+// deploy NFT metadata collection
+async function createERC721Metadata(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const nftCollectionFactory = await ethers.getContractFactory('ERC721Metadata');
+  const ERC721Metadata = await nftCollectionFactory.deploy("Buildings R Us", "BRUS",);
+  await ERC721Metadata.waitForDeployment();
+  const ERC721MetadataAddress = await ERC721Metadata.getAddress();
+
+
+  return {
+    ...contracts,
+    implementations: {
+      ...contracts.implementations,
+      ERC721Metadata: ERC721MetadataAddress,
+    }
+  }
+}
+
+// deploy upgradeable BuildingFactory
+async function createBuildingFactory(contracts: Record<string, any>) : Promise<Record<string, any>> {  
+  const buildingFact = await ethers.getContractFactory('Building');
+  const buildingBeacon = await upgrades.deployBeacon(buildingFact);
+  const buildingBeaconAddress = await buildingBeacon.getAddress();
+
+  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory');
+  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
+  const buildingFactoryBeaconAddress = await buildingFactoryBeacon.getAddress();
+  const identityGateway = await ethers.getContractAt('IdentityGateway', contracts.factories.IdentityGateway);
+  const identityGatewayAddress = await identityGateway.getAddress();
+
+  const uniswapRouter = await ethers.getContractAt('UniswapRouterMock', uniswapRouterAddress);
+  const uniswapFactoryAddress = await uniswapRouter.factory();
+
+  const trexGatewayAddress = contracts.factories.TREXGateway;
+  const trexGateway = await ethers.getContractAt('TREXGateway', trexGatewayAddress);
+
+  const buildingFactory = await upgrades.deployBeaconProxy(
+    buildingFactoryBeaconAddress,
+    buildingFactoryFactory,
+    [
+      contracts.implementations.ERC721Metadata, 
+      uniswapRouterAddress, 
+      uniswapFactoryAddress,
+      buildingBeaconAddress,
+      identityGatewayAddress,
+      trexGatewayAddress,
+    ],
+    { 
+      initializer: 'initialize'
+    }
+  );
+
+  await buildingFactory.waitForDeployment();
+  const buildingFactoryAddress = await buildingFactory.getAddress()
+
+  const nftCollection = await ethers.getContractAt('ERC721Metadata', contracts.implementations.ERC721Metadata);
+  await nftCollection.transferOwnership(buildingFactoryAddress);
+  await trexGateway.addDeployer(buildingFactoryAddress);
+
+  return {
+    ...contracts,
+    factories: {
+      ...contracts.factories,
+      BuildingFactory: buildingFactoryAddress
+    }
+  }
+}
+
+async function logContracts(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(contracts);
+  return contracts;
+}
+
 // creates a deployment file into data/deployments (eg: data/deployments/mainnet.json)
 async function exportDeploymentVersion(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(' - Export Deployment contract addresses...');
@@ -390,7 +466,10 @@ init()
   .then(deployAutoCompounder)
   .then(deployAutoCompounderFactory)
   .then(deployHTSTokenFactory)
+  .then(createERC721Metadata)
+  .then(createBuildingFactory)
   .then(exportDeploymentVersion)
+  .then(logContracts)
   .then(finish)
   .catch((error) => {
     console.error(error);
