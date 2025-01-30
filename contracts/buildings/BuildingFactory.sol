@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
 import {IdentityGateway} from "../onchainid/gateway/Gateway.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {BuildingToken} from "./library/BuildingToken.sol";
 
 /**
  * @title BuildingFactory
@@ -21,6 +21,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         address uniswapFactory;
         address buildingBeacon;
         address onchainIdGateway;
+        address trexGateway;
         BuildingInfo[] buildingsList;
         mapping (address => BuildingInfo) buildingDetails;
         mapping (address => bool) callableContracts;
@@ -31,6 +32,7 @@ contract BuildingFactory is OwnableUpgradeable  {
         uint256 nftId; // NFT token ID attributed to the building
         string tokenURI; // NFT metadatada location
         address identity; // building's OnchainID identity address
+        address erc3643Token; // TRex token
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
@@ -44,6 +46,7 @@ contract BuildingFactory is OwnableUpgradeable  {
 
     event NewAuditRegistry(address addr);
     event NewBuilding(address addr);
+    event NewERC3643Token(address building, address token);
 
     /**
      * initialize used for upgradable contract
@@ -58,7 +61,8 @@ contract BuildingFactory is OwnableUpgradeable  {
         address _uniswapRouter,
         address _uniswapFactory,
         address _buildingBeacon,
-        address _onchainIdGateway
+        address _onchainIdGateway,
+        address _trexGateway
     ) public virtual initializer {
         __Ownable_init(_msgSender());
         BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
@@ -67,8 +71,10 @@ contract BuildingFactory is OwnableUpgradeable  {
         $.uniswapFactory = _uniswapFactory;
         $.buildingBeacon = _buildingBeacon;
         $.onchainIdGateway = _onchainIdGateway;
+        $.trexGateway = _trexGateway;
         
         $.callableContracts[_nft] = true;
+        
     }
 
     /**
@@ -106,7 +112,8 @@ contract BuildingFactory is OwnableUpgradeable  {
             address(buildingProxy),
             tokenId,
             tokenURI,
-            identity
+            identity,
+            address(0) // ERC3643 token lazy deploy
         );
 
         $.buildingsList.push($.buildingDetails[address(buildingProxy)]);        
@@ -127,4 +134,24 @@ contract BuildingFactory is OwnableUpgradeable  {
         require($.callableContracts[callableContract] == true, "BuildingFactory: Invalid callable contract");
         Building(buildingAddress).callContract(callableContract, data);
     }
+
+    /**
+     * Create new ERC3643 token
+     * @param buildingAddress address of the building
+     * @param name string name of the token
+     * @param symbol string symbol of the token
+     */
+    function newERC3643Token(address buildingAddress, string memory name, string memory symbol) external {
+        BuildingFactoryStorage storage $ = _getBuildingFactoryStorage();
+
+        require(buildingAddress != address(0) && $.buildingDetails[buildingAddress].addr != address(0), "BuildingFactory: Invalid building address");
+        require($.buildingDetails[buildingAddress].erc3643Token == address(0), "BuildingFactory: token already created for building");
+        
+        address token = BuildingToken.createERC3643Token($.trexGateway, buildingAddress, name, symbol);
+
+        $.buildingDetails[buildingAddress].erc3643Token = token;
+
+        emit NewERC3643Token(buildingAddress, token);
+    }
+    
 }

@@ -32,9 +32,6 @@ async function deployFixture() {
   const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
   const identityGatewayAddress = await identityGateway.getAddress();
 
-  // identityGateway must be the Owner of the IdFactory
-  await identityFactory.transferOwnership(identityGatewayAddress);
-
   // Beacon Upgradable Patter for Building
   const buildingImplementation = await ethers.deployContract('Building');
   const buildingImplementationAddress = await buildingImplementation.getAddress();
@@ -48,6 +45,46 @@ async function deployFixture() {
   const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
   const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
 
+  // TREX SUITE ------------------------------------
+  const claimTopicsRegistryImplementation = await ethers.deployContract('ClaimTopicsRegistry', owner);
+  const trustedIssuersRegistryImplementation = await ethers.deployContract('TrustedIssuersRegistry', owner);
+  const identityRegistryStorageImplementation = await ethers.deployContract('IdentityRegistryStorage', owner);
+  const identityRegistryImplementation = await ethers.deployContract('IdentityRegistry', owner);
+  const modularComplianceImplementation = await ethers.deployContract('ModularCompliance', owner);
+  const tokenImplementation = await ethers.deployContract('Token', owner);
+  const trexImplementationAuthority = await ethers.deployContract('TREXImplementationAuthority',[true, ethers.ZeroAddress, ethers.ZeroAddress], owner);
+  
+  const versionStruct = {
+    major: 4,
+    minor: 0,
+    patch: 0,
+  };
+
+  const contractsStruct = {
+    tokenImplementation: await tokenImplementation.getAddress(),
+    ctrImplementation: await claimTopicsRegistryImplementation.getAddress(),
+    irImplementation: await identityRegistryImplementation.getAddress(),
+    irsImplementation: await identityRegistryStorageImplementation.getAddress(),
+    tirImplementation: await trustedIssuersRegistryImplementation.getAddress(),
+    mcImplementation: await modularComplianceImplementation.getAddress(),
+  };
+
+  await trexImplementationAuthority.connect(owner).addAndUseTREXVersion(versionStruct, contractsStruct);
+
+  const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], owner);
+  
+  await identityFactory.connect(owner).addTokenFactory(await trexFactory.getAddress());
+  const trexGateway = await ethers.deployContract('TREXGateway', [await trexFactory.getAddress(), true], owner);
+  await trexFactory.transferOwnership(await trexGateway.getAddress());
+
+  const trexGatewayAddress = await trexGateway.getAddress();
+  const trexFactoryAddress = await trexFactory.getAddress();
+
+  // ------------------------------------------------------
+
+  // identityGateway must be the Owner of the IdFactory
+  await identityFactory.transferOwnership(identityGatewayAddress);
+
   const buildingFactory = await upgrades.deployBeaconProxy(
     await buildingFactoryBeacon.getAddress(),
     buildingFactoryFactory,
@@ -57,6 +94,7 @@ async function deployFixture() {
       uniswapFactoryAddress,
       buildingBeaconAddress,
       identityGatewayAddress,
+      trexGatewayAddress,
     ],
     { 
       initializer: 'initialize'
@@ -67,6 +105,7 @@ async function deployFixture() {
   const buildingFactoryAddress = await buildingFactory.getAddress()
 
   await nftCollection.transferOwnership(buildingFactoryAddress);
+  await trexGateway.addDeployer(buildingFactoryAddress);
 
   return {
     owner,
@@ -82,12 +121,14 @@ async function deployFixture() {
     uniswapRouterAddress,
     uniswapFactoryAddress,
     identityFactory,
-    identityGateway
+    identityGateway,
+    trexFactoryAddress,
+    trexGatewayAddress
   }
 }
 
 // get ERC721Metadata NFT collection deployed on contract deployment
-async function getDeployeBuilding(buildingFactory: Contract, blockNumber: number) {
+async function getDeployedBuilding(buildingFactory: Contract, blockNumber: number) {
   // Decode the event using queryFilter
   const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewBuilding(address)'], blockNumber, blockNumber);
 
@@ -137,7 +178,7 @@ describe('BuildingFactory', () => {
       const tx = await buildingFactory.newBuilding(tokenURI);
       await tx.wait();
       
-      const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+      const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
       
       expect(await building.getAddress()).to.be.properAddress;
       expect(await nftCollection.ownerOf(0)).to.be.equal(await building.getAddress());
@@ -200,7 +241,7 @@ describe('BuildingFactory', () => {
           const tx = await buildingFactory.newBuilding(tokenURI);
           await tx.wait();
           
-          const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+          const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
           const buildingAddress = await building.getAddress();
   
           const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
@@ -227,7 +268,7 @@ describe('BuildingFactory', () => {
           const tx = await buildingFactory.newBuilding(tokenURI);
           await tx.wait();
           
-          const building  = await getDeployeBuilding(buildingFactory, tx.blockNumber as number);
+          const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
           const buildingAddress = await building.getAddress();
   
           const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
@@ -254,6 +295,68 @@ describe('BuildingFactory', () => {
 
           expect(metadata[3][0]).to.be.equal('city')
           expect(metadata[3][1]).to.be.equal('denver')
+        });
+      });
+    });
+  });
+
+  describe('.newERC3643Building()', () => {
+    describe('when building address is not valid', () => {
+      it('should revert', async () => {
+        const { 
+          buildingFactory, 
+         } = await loadFixture(deployFixture);
+
+         await expect(buildingFactory.newERC3643Token(ethers.ZeroAddress, "token name", "TKN"))
+          .to.be.revertedWith('BuildingFactory: Invalid building address');
+
+          const randomWallet = ethers.Wallet.createRandom();
+
+          await expect(buildingFactory.newERC3643Token(randomWallet.address, "token name", "TKN"))
+          .to.be.revertedWith('BuildingFactory: Invalid building address');
+
+      });
+    });
+
+    describe('when building address is valid', () => {
+      it('should create token', async () => {
+        const { 
+          buildingFactory, 
+         } = await loadFixture(deployFixture);
+
+          const tx = await buildingFactory.newBuilding("ipfs://tokenuri");
+          await tx.wait();
+          
+          const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+          const buildingAddress = await building.getAddress();
+
+         const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN");
+         await tx2.wait();
+
+         const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
+         const deployedToken = buildingDetails[4];
+
+         expect(deployedToken).to.be.properAddress; // tokenAddress;
+         expect(tx).to.emit(tx2, 'NewERC3643Token').withArgs(buildingAddress, deployedToken);
+      });
+
+      describe('when building already deployed', () => {
+        it('shoud revert', async () => {
+          const { 
+            buildingFactory, 
+           } = await loadFixture(deployFixture);
+  
+            const tx = await buildingFactory.newBuilding("ipfs://tokenuri");
+            await tx.wait();
+            
+            const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+            const buildingAddress = await building.getAddress();
+  
+           const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN");
+           await tx2.wait();
+
+           await expect(buildingFactory.newERC3643Token(buildingAddress, "other name", "OTKN"))
+            .to.be.revertedWith('BuildingFactory: token already created for building');
         });
       });
     });
