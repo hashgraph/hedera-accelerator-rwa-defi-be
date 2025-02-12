@@ -149,6 +149,8 @@ contract BuildingFactory is OwnableUpgradeable  {
         
         address token = BuildingToken.createERC3643Token($.trexGateway, buildingAddress, name, symbol, decimals);
 
+        OwnableUpgradeable(token).transferOwnership(msg.sender);
+
         $.buildingDetails[buildingAddress].erc3643Token = token;
 
         emit NewERC3643Token(buildingAddress, token);
