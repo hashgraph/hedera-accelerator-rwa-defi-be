@@ -26,7 +26,7 @@ contract Building is BuildingBase, BuildingLiquidityPool, BuildingAudit {
         __Ownable_init(_msgSender());
         __Building_init();
         __Liquidity_init(_uniswapRouter, _uniswapFactory);
-        __Audit_init(_nftAddress);
+        __Audit_init();
     }
 
     /**
