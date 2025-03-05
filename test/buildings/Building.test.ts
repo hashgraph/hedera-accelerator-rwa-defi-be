@@ -101,7 +101,6 @@ describe('Building', () => {
         owner,
         uniswapRouterAddress, 
         uniswapFactoryAddress,
-        nftCollectionAddress,
         tokenA,
         tokenAAddress,
         tokenB,
@@ -114,7 +113,7 @@ describe('Building', () => {
         [
           uniswapRouterAddress, 
           uniswapFactoryAddress, 
-          nftCollectionAddress
+          owner.address
         ], 
         { 
           initializer: 'initialize'
@@ -137,16 +136,13 @@ describe('Building', () => {
         tokenAAmount, 
         tokenBAddress, 
         tokenBAmount, 
-        {
-          value: ethers.parseEther('20'), 
-          gasLimit: 800000 
-        }
       );      
 
       expect(await building.amountA()).to.be.equal(tokenAAmount);
       expect(await building.amountB()).to.be.equal(tokenBAmount);
       expect(await building.liquidity()).to.be.equal(tokenAAmount);
       expect(await building.pair()).to.be.properAddress;
+      expect(await building.owner()).to.be.equal(owner.address);
       
     });
   });
