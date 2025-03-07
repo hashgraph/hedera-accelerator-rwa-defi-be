@@ -5,6 +5,7 @@ import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {TreasuryStorage} from "./TreasuryStorage.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {ITreasury} from "./interfaces/ITreasury.sol";
 
 /**
  * @title Treasury
@@ -12,7 +13,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
  * @notice This contract manages the Treasury
  */
 
-contract Treasury is AccessControlUpgradeable, TreasuryStorage {
+contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
     using SafeERC20 for IERC20;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -21,13 +22,15 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage {
     }
     
     bytes32 constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+    bytes32 constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
 
     function initialize(
         address _usdcAddress,
         uint256 _reserveAmount,
         uint256 _nPercentage,   
         address _vault,
-        address _initialOwner // change to initialOwner, bc governance is created after treasury
+        address _initialOwner, // change to initialOwner, bc governance is created after treasury
+        address _buildingFactory
     ) public initializer {
         require(_usdcAddress != address(0), "Invalid USDC address");
         require(_initialOwner != address(0), "Invalid governance address");
@@ -40,9 +43,23 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage {
         $.nPercentage = _nPercentage;
         $.mPercentage = 10000 - _nPercentage; // N + M = 100% (in basis points)
         $.vault = _vault;
+        $.businessAddress = _initialOwner;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        _grantRole(FACTORY_ROLE, _buildingFactory);
         _grantRole(GOVERNANCE_ROLE, _initialOwner);
+    }
+
+    // return usdc address
+    function usdc() public view returns (address) {
+        TreasuryData storage $ = _getTreasuryStorage();
+        return $.usdc;
+    }
+
+    // return vault
+    function vault() public view returns (address) {
+        TreasuryData storage $ = _getTreasuryStorage();
+        return $.vault;
     }
 
     // deposit USDC into treasury
@@ -81,6 +98,18 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage {
 
         $.reserveAmount = newReserveAmount;
         _forwardExcessFunds();
+    }
+
+    // grant governance role
+    function grantGovernanceRole(address governance) external onlyRole(FACTORY_ROLE) {
+        require(governance != address(0), "Invalid governance address");
+        _grantRole(GOVERNANCE_ROLE, governance);
+    }
+    
+    // grant factory role
+    function grantFactoryRole(address factory) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(factory != address(0), "Invalid factory address");
+        _grantRole(FACTORY_ROLE, factory);
     }
 
     function _distributeFunds(uint256 amount) internal {

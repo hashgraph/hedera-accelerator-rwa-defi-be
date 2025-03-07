@@ -402,6 +402,26 @@ async function createBuildingFactory(contracts: Record<string, any>) : Promise<R
   const trexGatewayAddress = contracts.factories.TREXGateway;
   const trexGateway = await ethers.getContractAt('TREXGateway', trexGatewayAddress);
 
+  // Beacon Upgradable Pattern for Treasury
+  const treasuryImplementation = await ethers.deployContract('Treasury');
+  const treasuryImplementationAddress = await treasuryImplementation.getAddress();
+  const treasuryBeaconFactory = await ethers.getContractFactory('TreasuryBeacon');
+  const treasuryBeacon = await treasuryBeaconFactory.deploy(treasuryImplementationAddress)
+  await treasuryBeacon.waitForDeployment();
+  const treasuryBeaconAddress = await treasuryBeacon.getAddress();
+
+  // Beacon Upgradable Pattern for Treasury
+  const governanceImplementation = await ethers.deployContract('BuildingGovernance');
+  const governanceImplementationAddress = await governanceImplementation.getAddress();
+  const governanceBeaconFactory = await ethers.getContractFactory('BuildingGovernanceBeacon');
+  const governanceBeacon = await governanceBeaconFactory.deploy(governanceImplementationAddress)
+  await governanceBeacon.waitForDeployment();
+  const governanceBeaconAddress = await governanceBeacon.getAddress();
+
+  // deploy new ERC20 to be used as USDC for demo/phase1 porpose
+  const usdcMock = await ethers.deployContract('ERC20Mock', ["USDC", "USDC", 6]);
+  const usdcMockAddress = await usdcMock.getAddress();
+
   const buildingFactory = await upgrades.deployBeaconProxy(
     buildingFactoryBeaconAddress,
     buildingFactoryFactory,
@@ -409,9 +429,13 @@ async function createBuildingFactory(contracts: Record<string, any>) : Promise<R
       contracts.implementations.ERC721Metadata, 
       uniswapRouterAddress, 
       uniswapFactoryAddress,
-      buildingBeaconAddress,
       identityGatewayAddress,
       trexGatewayAddress,
+      usdcMockAddress,
+      buildingBeaconAddress,
+      contracts.vault.VaultFactory,
+      treasuryBeaconAddress,
+      governanceBeaconAddress
     ],
     { 
       initializer: 'initialize'

@@ -1,19 +1,32 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// Compatible with OpenZeppelin Contracts ^5.0.0
+pragma solidity ^0.8.22;
 
+import {GovernorUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/GovernorUpgradeable.sol";
+import {GovernorCountingSimpleUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorCountingSimpleUpgradeable.sol";
+import {GovernorVotesUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesUpgradeable.sol";
+import {GovernorVotesQuorumFractionUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
-import {BuildingGovernor} from "./BuildingGovernor.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BuildingGovernanceStorage} from "./BuildingGovernanceStorage.sol";
 
-contract BuildingGovernance is BuildingGovernor, BuildingGovernanceStorage {
+contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCountingSimpleUpgradeable, GovernorVotesUpgradeable, GovernorVotesQuorumFractionUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BuildingGovernanceStorage {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address token, string memory name, address initialOwner, address treasury) public initializer {
-        __BuildingGovernor_init(IVotes(token), name, initialOwner);
-        
+    function initialize(IVotes _token, string memory name, address initialOwner, address treasury) public initializer {
+        __Governor_init(name);
+        __GovernorCountingSimple_init();
+        __GovernorVotes_init(_token);
+        __GovernorVotesQuorumFraction_init(1);
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
+
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         $.treasury = treasury;
     }
@@ -60,4 +73,36 @@ contract BuildingGovernance is BuildingGovernor, BuildingGovernanceStorage {
         
         emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
     }
+
+    function votingDelay() public pure override returns (uint256) {
+        return 0; // 0 minutes
+    }
+
+    function votingPeriod() public pure override returns (uint256) {
+        return 150; // 30 minutes
+    }
+
+     // Override clock() to return block.number
+    function clock() public view override(GovernorUpgradeable, GovernorVotesUpgradeable) returns (uint48) {
+        return SafeCast.toUint48(block.number);
+    }
+    
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyOwner
+    {}
+
+    // The following functions are overrides required by Solidity.
+
+    function quorum(uint256 blockNumber)
+        public
+        view
+        override(GovernorUpgradeable, GovernorVotesQuorumFractionUpgradeable)
+        returns (uint256)
+    {
+        return super.quorum(blockNumber);
+    }
 }
+

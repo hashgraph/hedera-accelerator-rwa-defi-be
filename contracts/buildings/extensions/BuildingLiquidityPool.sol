@@ -55,10 +55,6 @@ abstract contract BuildingLiquidityPool is Initializable, HederaTokenService {
         
         if (pair == address(0)){
             pair = IUniswapV2Factory($.uniswapFactory).createPair(_tokenA, _tokenB);
-
-            // try to associate tokens to pair
-            associateToken(pair, _tokenA); 
-            associateToken(pair, _tokenB); 
         }
 
         IERC20(_tokenA).approve(address($.uniswapRouter), _tokenAAmount);

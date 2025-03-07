@@ -15,6 +15,7 @@ import {Treasury} from "../treasury/Treasury.sol";
 import {BuildingGovernance} from "./governance/BuildingGovernance.sol";
 import {IVaultFactory} from "../erc4626/factory/interfaces/IVaultFactory.sol";
 import {FeeConfiguration} from "../common/FeeConfiguration.sol";
+import {ITreasury} from "../treasury/interfaces/ITreasury.sol";
 
 /**
  * @title BuildingFactory
@@ -183,6 +184,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address governance = _deployGovernance(token, name, treasury, msg.sender); 
 
         $.buildingDetails[building].governance = governance;
+
+        ITreasury(treasury).grantGovernanceRole(governance);
+        
         emit NewGovernance(governance, building, msg.sender);
     }
 
@@ -228,7 +232,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
 
         BeaconProxy treasuryProxy = new BeaconProxy(
             $.treasuryBeacon,
-            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, vault, initialOwner)
+            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, vault, initialOwner, address(this))
         );
 
         return address(treasuryProxy);
