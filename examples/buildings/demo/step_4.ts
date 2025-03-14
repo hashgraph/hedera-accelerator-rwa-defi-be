@@ -25,11 +25,11 @@ async function fundTreasury(treasuryAddress: string, usdcAddress: string, amount
 }
 
 async function run () {
-  const treasuryAddress = "0xBc1Ef9A1c872D531255e654D3F62Ef602456bAcA";
+  const treasuryAddress = "GOVERNANCE_ADDRESS";
   const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
   
   const usdc = await treasury.usdc();
-  const amount = ethers.parseUnits('1', 6) // mint 1 usdc
+  const amount = ethers.parseUnits('20000', 6) // mint 1 usdc
 
   await mintUsdc(usdc, amount);
   await fundTreasury(treasuryAddress, usdc, amount);  // send 1 dolar to treasury;

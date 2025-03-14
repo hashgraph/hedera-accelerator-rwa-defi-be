@@ -91,8 +91,8 @@ async function createTreasury(building: string, token: string): Promise<string> 
     Deployments.factories.BuildingFactory
   );
 
-  const reserve = 3000; // 30%
-  const npercentage = 100; // 1%
+  const reserve = ethers.parseUnits('10000', 6); // 1k USDC reserve
+  const npercentage = 20_00; // 20%
 
   const tx = await buildingFactory.newTreasury(building, token, reserve, npercentage, { gasLimit: 6000000 });
   await tx.wait();
@@ -188,7 +188,6 @@ async function run () {
   const treasury = await createTreasury(building, token);
   const governance = await createGovernance(building, token, treasury);
 
-  await addLiquidity(building);
   await mintAndDelegateTokens(token);
 }
 

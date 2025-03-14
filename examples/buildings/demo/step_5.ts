@@ -14,14 +14,17 @@ async function getProposalId(buildingFactory: BuildingGovernance, blockNumber: n
   return decodedEvent.args[1]; 
 }
 
-async function createTextProposal(governanceAddress: string, description: string): Promise<bigint> {
+async function createPaymentProposal(governanceAddress: string, description: string, amount: bigint): Promise<bigint> {
+  const [voter1] = await ethers.getSigners();
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
 
-  const proposaltx = await governance.createTextProposal(0, description);
+  const to = voter1.address;
+
+  const proposaltx = await governance.createPaymentProposal(amount, to, description);
   await proposaltx.wait();
   const proposalId = await getProposalId(governance, proposaltx.blockNumber as number) // ProposalCreated
 
-  console.log('- created text proposal', proposalId);
+  console.log('- created payment proposal', proposalId);
 
   return proposalId;
 }
@@ -44,7 +47,6 @@ async function castVotes(governanceAddress: string, proposalId: bigint): Promise
 
 async function logProposalState(governanceAddress: string, proposalId: bigint) {
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
-  const token = await ethers.getContractAt('BuildingERC20', await governance.token());
   console.log(
     `\n\n` + 
     `clock: ${await governance.clock()}\n` +
@@ -64,9 +66,9 @@ async function logProposalState(governanceAddress: string, proposalId: bigint) {
 async function run () {
   const governance = "GOVERNANCE_ADDRESS";
   
-  const proposalDescription = "Proposal #2: Create a new proposal";
-
-  const proposalId = await createTextProposal(governance, proposalDescription);
+  const proposalDescription = "Proposal #2: pay a dolar";
+  const amounr = ethers.parseUnits('1', 6);
+  const proposalId = await createPaymentProposal(governance, proposalDescription, amounr);
 
   await logProposalState(governance, proposalId);
 
