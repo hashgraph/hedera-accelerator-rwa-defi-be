@@ -1,4 +1,4 @@
-import { expect, ethers } from '../setup';
+import { expect, ethers, upgrades } from '../setup';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 
 async function deployFixture() {
@@ -9,45 +9,64 @@ async function deployFixture() {
   const usdc = await ERC20Mock.deploy(
     'USD Coin',
     'USDC',
-    await owner.getAddress(),
-    ethers.parseUnits('1000000', 6)
+    6n,
   );
   await usdc.waitForDeployment();
+  const usdcAddress = await usdc.getAddress();
 
   // mock vault
   const VaultMock = await ethers.getContractFactory('VaultMock', owner);
-  const vault = await VaultMock.deploy(usdc.target);
+  const vault = await VaultMock.deploy(usdcAddress);
   await vault.waitForDeployment();
+  const vaultAddress = await vault.getAddress();
 
   // mock building token
   const BuildingTokenMock = await ethers.getContractFactory('ERC20Mock', owner);
   const buildingToken = await BuildingTokenMock.deploy(
     'Building Token',
     'BT',
-    await owner.getAddress(),
-    ethers.parseUnits('1000000', 18)
+    18n
   );
   await buildingToken.waitForDeployment();
 
   // treasury 
-  const Treasury = await ethers.getContractFactory('Treasury', owner);
   const N_PERCENTAGE = 2000; // 20% to business
   const RESERVE_AMOUNT = ethers.parseUnits('10000', 6);
 
-  const treasury = await Treasury.deploy(
-    usdc.target,
-    buildingToken.target, // building token address
-    vault.target,
-    RESERVE_AMOUNT,
-    N_PERCENTAGE,
-    await business.getAddress(),
-    await governance.getAddress()
-  );
-  await treasury.waitForDeployment();
+  const treasuryImplmentation = await ethers.getContractFactory('Treasury');
 
+  // Deploy the Beacon which will hold the implementation address
+  const beacon = await upgrades.deployBeacon(treasuryImplmentation);
+  await beacon.waitForDeployment();
+
+  const treasuryProxy = await upgrades.deployBeaconProxy(
+      beacon,
+      treasuryImplmentation,
+      [
+        usdcAddress,
+        RESERVE_AMOUNT,
+        N_PERCENTAGE,
+        vaultAddress,
+        owner.address,
+        business.address,
+        ethers.ZeroAddress // buildingFactory
+      ],
+      { 
+        initializer: 'initialize'
+      }
+  );
+
+  await treasuryProxy.waitForDeployment();
+
+  const treasury = await ethers.getContractAt('Treasury', await treasuryProxy.getAddress());
+
+  await treasury.grantFactoryRole(owner.address);
+  await treasury.grantGovernanceRole(governance.address);
+  
   // USDC to addr1 and addr2 for testing
-  await usdc.connect(owner).transfer(await addr1.getAddress(), ethers.parseUnits('50000', 6));
-  await usdc.connect(owner).transfer(await addr2.getAddress(), ethers.parseUnits('50000', 6));
+  await usdc.mint(await addr1.getAddress(), ethers.parseUnits('50000', 6));
+  await usdc.mint(await addr2.getAddress(), ethers.parseUnits('50000', 6));
+  
 
   return {
     owner,
@@ -76,16 +95,16 @@ describe('Treasury Contract', () => {
 
   describe('Fund Distribution', () => {
     it('should distribute funds correctly on deposit', async () => {
-      const { usdc, treasury, vault, business, addr1 } = await loadFixture(deployFixture);
+      const { usdc, treasury, vault, business, owner, addr1 } = await loadFixture(deployFixture);
 
       // addr1 approves treasury to spend USDC
-      await usdc.connect(addr1).approve(treasury.target, ethers.parseUnits('50000', 6));
+      await usdc.connect(addr1).approve(await treasury.getAddress(), ethers.parseUnits('50000', 6));
 
-      // addr1 deposits 50,000 USDC into treasury
+      // // addr1 deposits 50,000 USDC into treasury
       await treasury.connect(addr1).deposit(ethers.parseUnits('50000', 6));
 
       // balance check
-      const businessBalance = await usdc.balanceOf(await business.getAddress());
+      const businessBalance = await usdc.balanceOf(business.address);
       const expectedBusinessAmount = ethers.parseUnits('10000', 6); // 20% of 50000
 
       expect(businessBalance).to.equal(expectedBusinessAmount);
@@ -107,7 +126,7 @@ describe('Treasury Contract', () => {
       const { usdc, treasury, vault, governance, addr2, owner } = await loadFixture(deployFixture);
 
       // send USDC to Treasury
-      await usdc.connect(owner).transfer(treasury.target, ethers.parseUnits('20000', 6));
+      await usdc.connect(owner).mint(treasury.target, ethers.parseUnits('20000', 6));
 
       // governance makes a payment
       await treasury.connect(governance).makePayment(await addr2.getAddress(), ethers.parseUnits('5000', 6));
@@ -126,6 +145,7 @@ describe('Treasury Contract', () => {
       const { usdc, treasury, addr1, addr2, owner } = await loadFixture(deployFixture);
     
       // owner approves and deposits USDC
+      await usdc.connect(owner).mint(owner.address, ethers.parseUnits('20000', 6));
       await usdc.connect(owner).approve(treasury.target, ethers.parseUnits('20000', 6));
       await treasury.connect(owner).deposit(ethers.parseUnits('20000', 6));
     
@@ -144,6 +164,7 @@ describe('Treasury Contract', () => {
       const { usdc, treasury, vault, owner, business } = await loadFixture(deployFixture);
 
       // owner approves treasury to spend USDC
+      await usdc.connect(owner).mint(owner.address, ethers.parseUnits('50000', 6));
       await usdc.connect(owner).approve(treasury.target, ethers.parseUnits('50000', 6));
 
       // owner deposits 50000 USDC into treasury

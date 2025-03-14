@@ -50,26 +50,47 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         emit ProposalCreated(ProposalType.Text, proposalId, msg.sender);
     }
 
-    function createPaymentProposal(address token, uint256 amount, address to, string memory description) public returns (uint256 proposalId) {
+    function createPaymentProposal(uint256 amount, address to, string memory description) public returns (uint256 proposalId) {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         // keep track of payments made in a month
         // decide between multisig vote proposal or governor proposal 
 
-        address[] memory _token = new address[](1);
-        _token[0] = token;
+        address[] memory _treasury = new address[](1);
+        _treasury[0] = $.treasury;
 
         uint256[] memory _values = new uint256[](1);
         _values[0] = 0;
 
         bytes[] memory _calldata = new bytes[](1);
         _calldata[0] = abi.encodeWithSignature(
-            "transferFrom(address,address,uint256)",
-            $.treasury,
+            "makePayment(address,uint256)",
             to,
             amount
         );
 
-        proposalId = propose(_token, _values, _calldata, description);
+        proposalId = propose(_treasury, _values, _calldata, description);
+        
+        emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
+    }
+
+    function createChangeReserveProposal(uint256 amount, string memory description) public returns (uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        // keep track of payments made in a month
+        // decide between multisig vote proposal or governor proposal 
+
+        address[] memory _treasury = new address[](1);
+        _treasury[0] = $.treasury;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "setReserveAmount(uint256)",
+            amount
+        );
+
+        proposalId = propose(_treasury, _values, _calldata, description);
         
         emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
     }

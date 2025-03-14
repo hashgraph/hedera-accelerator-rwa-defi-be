@@ -229,10 +229,13 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      */
     function _deployTreasury(uint256 reserveAmount, uint256 nPercentage, address vault, address initialOwner) private returns (address) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        
+        // initial owner as business address
+        address businessAddress = initialOwner;
 
         BeaconProxy treasuryProxy = new BeaconProxy(
             $.treasuryBeacon,
-            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, vault, initialOwner, address(this))
+            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, vault, initialOwner, businessAddress, address(this))
         );
 
         return address(treasuryProxy);

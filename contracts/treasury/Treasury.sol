@@ -21,15 +21,16 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         _disableInitializers();
     }
     
-    bytes32 constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
-    bytes32 constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
+    bytes32 constant public GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+    bytes32 constant public FACTORY_ROLE = keccak256("FACTORY_ROLE");
 
     function initialize(
         address _usdcAddress,
         uint256 _reserveAmount,
         uint256 _nPercentage,   
         address _vault,
-        address _initialOwner, // change to initialOwner, bc governance is created after treasury
+        address _initialOwner,
+        address _businessAddress,
         address _buildingFactory
     ) public initializer {
         require(_usdcAddress != address(0), "Invalid USDC address");
@@ -43,7 +44,7 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         $.nPercentage = _nPercentage;
         $.mPercentage = 10000 - _nPercentage; // N + M = 100% (in basis points)
         $.vault = _vault;
-        $.businessAddress = _initialOwner;
+        $.businessAddress = _businessAddress;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
         _grantRole(FACTORY_ROLE, _buildingFactory);
@@ -133,7 +134,7 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         uint256 balance = IERC20($.usdc).balanceOf(address(this));
         if (balance > $.reserveAmount) {
             uint256 excessAmount = balance - $.reserveAmount;
-            IERC20($.usdc).safeIncreaseAllowance(address($.vault), excessAmount);
+            IERC20($.usdc).safeIncreaseAllowance($.vault, excessAmount);
             IERC4626($.vault).deposit(excessAmount, $.businessAddress);
             emit ExcessFundsForwarded(excessAmount);
         }
