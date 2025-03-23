@@ -20,30 +20,20 @@ async function logProposalState(governanceAddress: string, proposalId: bigint) {
   );
 }
 
-async function executeTextProposal(governanceAddress: string, description: string) {
+async function executeTextProposal(governanceAddress: string, proposalId: bigint) {
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
   
-  const descriptionHash = ethers.id(description);
-
-  const extx = await governance.execute(
-    [ethers.ZeroAddress],
-    [0n],
-    ["0x"],
-    descriptionHash,
-    { gasLimit: 600000 }
-  );
-
+  const extx = await governance.executeTextProposal(proposalId, { gasLimit: 600000 });
   await extx.wait();
 
-  console.log(`- proposal ${description} executed`);
+  console.log(`- proposal executed`);
 }
 
 async function run () {
-  const governance = "GOVERNANCE_ADDRESS";
-  const proposalDescription = "Proposal #2: Create a new proposal";
-  const proposalId = 0n; // PROPOSAL_ID
+  const governance = "GOVERNANCE_ADDRESS"; // replace with the proposal address
+  const proposalId = 0n; // replace with the proposal ID
   
-  await executeTextProposal(governance, proposalDescription);
+  await executeTextProposal(governance, proposalId);
   await logProposalState(governance, proposalId);
 }
 

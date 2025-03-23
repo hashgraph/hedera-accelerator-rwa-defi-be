@@ -20,41 +20,21 @@ async function logProposalState(governanceAddress: string, proposalId: bigint) {
   );
 }
 
-async function executePaymentProposal(governanceAddress: string, description: string, treasury: string) {
+async function executePaymentProposal(governanceAddress: string, proposalId: bigint) {
 
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
   
-  const descriptionHash = ethers.id(description);
-
-  const targetAbi = [
-    "function makePayment(address to, uint256 amount) external"
-  ];
-
-  const iface = new ethers.Interface(targetAbi);
-  const [to] = await ethers.getSigners();
-  const amount = ethers.parseUnits('1', 6);
-  const calldata = iface.encodeFunctionData("makePayment", [to.address, amount]);
-
-  const extx = await governance.execute(
-    [treasury],
-    [0n],
-    [calldata],
-    descriptionHash,
-    { gasLimit: 600000 }
-  );
-
+  const extx = await governance.executePaymentProposal(proposalId, { gasLimit: 600000 });
   await extx.wait();
 
-  console.log(`- proposal ${description} executed ${extx.hash}`);
+  console.log(`- proposal executed ${extx.hash}`);
 }
 
 async function run () {
-  const governance = "GOVERNANCE_ADDRESS";
-  const treasury = "c";
-  const proposalDescription = "Proposal #2: pay a dolar";
-  const proposalId = 0n; // PROPOSAL ID
+  const governance = "GOVERNANCE_ADDRESS"; // replace with the governance address
+  const proposalId = 0n; // replace with the proposal ID
   
-  await executePaymentProposal(governance, proposalDescription, treasury);
+  await executePaymentProposal(governance, proposalId);
   await logProposalState(governance, proposalId);
 }
 
