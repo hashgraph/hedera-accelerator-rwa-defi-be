@@ -63,6 +63,12 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         return $.vault;
     }
 
+    // return reserve
+    function reserve() public view returns (uint256) {
+        TreasuryData storage $ = _getTreasuryStorage();
+        return $.reserveAmount;
+    }
+
     // deposit USDC into treasury
     function deposit(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");

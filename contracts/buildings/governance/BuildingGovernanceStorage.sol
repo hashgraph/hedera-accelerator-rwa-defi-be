@@ -5,6 +5,15 @@ abstract contract BuildingGovernanceStorage {
     /// @custom:storage-location erc7201:hashgraph.buildings.BuildingGovernance
     struct BuildingGovernanceData {
         address treasury;
+        mapping (uint256 => ProposalData) proposals;
+    }
+
+    struct ProposalData {
+        bool exists;
+        ProposalType proposalType;
+        address to;
+        uint256 amount;
+        bytes32 descriptionHash;
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingGovernance")) - 1)) & ~bytes32(uint256(0xff));
@@ -17,6 +26,6 @@ abstract contract BuildingGovernanceStorage {
     }    
     
     enum ProposalLevel { GovernorVote }
-    enum ProposalType { Text, Payment }
+    enum ProposalType { Text, Payment, ChangeReserve }
     event ProposalCreated(ProposalType proposalType, uint256 id, address proposer);
 }

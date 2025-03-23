@@ -32,6 +32,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
     }
 
     function createTextProposal(ProposalLevel level, string memory description) public returns(uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         // TODO: decide between multisig vote proposal or governor proposal giving the level
         // Multisig
         // GovernorVote
@@ -46,6 +47,10 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         calldatas[0] = new bytes(0x0);
 
         proposalId = propose(targets, values, calldatas, description);
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.Text;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
 
         emit ProposalCreated(ProposalType.Text, proposalId, msg.sender);
     }
@@ -69,14 +74,18 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         );
 
         proposalId = propose(_treasury, _values, _calldata, description);
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.Payment;
+        $.proposals[proposalId].to = to;
+        $.proposals[proposalId].amount = amount;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
         emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
     }
 
     function createChangeReserveProposal(uint256 amount, string memory description) public returns (uint256 proposalId) {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
-        // keep track of payments made in a month
-        // decide between multisig vote proposal or governor proposal 
 
         address[] memory _treasury = new address[](1);
         _treasury[0] = $.treasury;
@@ -91,8 +100,73 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         );
 
         proposalId = propose(_treasury, _values, _calldata, description);
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.ChangeReserve;
+        $.proposals[proposalId].amount = amount;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
+        emit ProposalCreated(ProposalType.ChangeReserve, proposalId, msg.sender);
+    }
+
+    function executePaymentProposal(uint256 proposalId) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.Payment , "BuildingGovernance: invalid proposal type");
+
+        address[] memory _treasury = new address[](1);
+        _treasury[0] = $.treasury;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "makePayment(address,uint256)",
+            $.proposals[proposalId].to,
+            $.proposals[proposalId].amount
+        );
+
+        execute(_treasury, _values, _calldata, $.proposals[proposalId].descriptionHash);
+    }
+
+    function executeTextProposal(uint256 proposalId) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.Text , "BuildingGovernance: invalid proposal type");
+
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+
+        targets[0] = address(0);
+        values[0] = 0 ether;
+        calldatas[0] = new bytes(0x0);
+
+        execute(targets, values, calldatas, $.proposals[proposalId].descriptionHash);
+    }
+
+    function executeChangeReserveProposal(uint256 proposalId) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.ChangeReserve , "BuildingGovernance: invalid proposal type");
+
+        address[] memory targets = new address[](1);
+        targets[0] = $.treasury;
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        calldatas[0] = abi.encodeWithSignature(
+            "setReserveAmount(uint256)",
+            $.proposals[proposalId].amount
+        );
+
+        execute(targets, values, calldatas, $.proposals[proposalId].descriptionHash);
     }
 
     function votingDelay() public pure override returns (uint256) {
