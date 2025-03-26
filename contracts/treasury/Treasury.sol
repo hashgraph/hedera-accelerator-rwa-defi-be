@@ -6,6 +6,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {TreasuryStorage} from "./TreasuryStorage.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ITreasury} from "./interfaces/ITreasury.sol";
+import {IRewards} from "../erc4626/interfaces/IRewards.sol";
 
 /**
  * @title Treasury
@@ -28,7 +29,6 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         address _usdcAddress,
         uint256 _reserveAmount,
         uint256 _nPercentage,   
-        address _vault,
         address _initialOwner,
         address _businessAddress,
         address _buildingFactory
@@ -43,7 +43,6 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         $.reserveAmount = _reserveAmount;
         $.nPercentage = _nPercentage;
         $.mPercentage = 10000 - _nPercentage; // N + M = 100% (in basis points)
-        $.vault = _vault;
         $.businessAddress = _businessAddress;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
@@ -107,6 +106,12 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         _forwardExcessFunds();
     }
 
+    // add vault to handle excess funds
+    function addVault(address _vault) public onlyRole(FACTORY_ROLE) {
+        TreasuryData storage $ = _getTreasuryStorage();
+        $.vault = _vault;
+    }
+
     // grant governance role
     function grantGovernanceRole(address governance) external onlyRole(FACTORY_ROLE) {
         require(governance != address(0), "Invalid governance address");
@@ -137,11 +142,13 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
     function _forwardExcessFunds() internal {
         TreasuryData storage $ = _getTreasuryStorage();
 
+        require($.vault != address(0), "Treasury: missing vault");
+
         uint256 balance = IERC20($.usdc).balanceOf(address(this));
         if (balance > $.reserveAmount) {
             uint256 excessAmount = balance - $.reserveAmount;
             IERC20($.usdc).safeIncreaseAllowance($.vault, excessAmount);
-            IERC4626($.vault).deposit(excessAmount, $.businessAddress);
+            IRewards($.vault).addReward($.usdc, excessAmount);
             emit ExcessFundsForwarded(excessAmount);
         }
     }

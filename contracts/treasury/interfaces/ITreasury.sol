@@ -20,4 +20,6 @@ interface ITreasury {
     function setReserveAmount(uint256 newReserveAmount) external;
     // granv governance role
     function grantGovernanceRole(address governance) external;
+    // add vault to treasury
+    function addVault(address vault) external;
 }

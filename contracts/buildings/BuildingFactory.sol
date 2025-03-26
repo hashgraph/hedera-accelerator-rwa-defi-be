@@ -154,8 +154,10 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             "BuildingFactory: Invalid token address"
         );
         
-        address vault = _deployVault(token, msg.sender);
-        address treasury = _deployTreasury(reserveAmount, nPercentage, vault, msg.sender);        
+        address treasury = _deployTreasury(reserveAmount, nPercentage, msg.sender);        
+        address vault = _deployVault(token, msg.sender, treasury);
+
+        ITreasury(treasury).addVault(vault);
         
         $.buildingDetails[building].treasury = treasury;
         emit NewTreasury(treasury, building, msg.sender);
@@ -194,7 +196,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * Deploy new vault
      * @param token address of the token
      */
-    function _deployVault(address token, address initialOwner) private  returns (address){
+    function _deployVault(address token, address initialOwner, address vaultRewardController) private  returns (address){
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         
         // increment vault nonce to create salt
@@ -208,7 +210,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             token, // address stakingToken;
             tokenName, // string shareTokenName;
             tokenSymbol, // string shareTokenSymbol;
-            initialOwner, // address vaultRewardController;
+            vaultRewardController, // address vaultRewardController;
             initialOwner // address feeConfigController;
         );
 
@@ -227,7 +229,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * @param nPercentage  n parcentage
      * @param initialOwner initial owner
      */
-    function _deployTreasury(uint256 reserveAmount, uint256 nPercentage, address vault, address initialOwner) private returns (address) {
+    function _deployTreasury(uint256 reserveAmount, uint256 nPercentage, address initialOwner) private returns (address) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         
         // initial owner as business address
@@ -235,7 +237,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
 
         BeaconProxy treasuryProxy = new BeaconProxy(
             $.treasuryBeacon,
-            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, vault, initialOwner, businessAddress, address(this))
+            abi.encodeWithSelector(Treasury.initialize.selector, $.usdc, reserveAmount, nPercentage, initialOwner, businessAddress, address(this))
         );
 
         return address(treasuryProxy);

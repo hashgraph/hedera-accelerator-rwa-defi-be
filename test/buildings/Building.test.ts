@@ -35,7 +35,7 @@ async function deployFixture() {
     [
       uniswapRouterAddress, 
       uniswapFactoryAddress, 
-      nftCollectionAddress
+      owner.address
     ], 
     { 
       initializer: 'initialize'

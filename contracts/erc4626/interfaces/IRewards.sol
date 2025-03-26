@@ -21,4 +21,12 @@ interface IRewards {
      * @return The index of the start position after the last claimed reward and the total number of reward tokens.
      */
     function claimAllReward(uint256 _startPosition, address receiver) external returns (uint256, uint256);
+
+    /**
+     * @dev add reward tokens to the vault.
+     *
+     * @param token addres of the reward token
+     * @param amount amount of tokens to add
+     */
+    function addReward(address token, uint256 amount) external;
 }

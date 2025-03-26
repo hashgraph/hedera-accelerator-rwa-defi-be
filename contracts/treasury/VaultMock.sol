@@ -7,11 +7,11 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 contract VaultMock is IERC4626 {
     using SafeERC20 for IERC20;
 
-    IERC20 public usdc;
+    IERC20 public underlying;
     uint256 public totalDeposits;
 
-    constructor(address _usdcAddress) {
-        usdc = IERC20(_usdcAddress);
+    constructor(address underlyingAddress) {
+        underlying = IERC20(underlyingAddress);
     }
 
     function totalSupply() external view override returns (uint256) {}
@@ -45,8 +45,12 @@ contract VaultMock is IERC4626 {
     function previewDeposit(uint256 assets) external view override returns (uint256 shares) {}
 
     function deposit(uint256 assets, address receiver) external override returns (uint256 shares) {
-        usdc.safeTransferFrom(msg.sender, address(this), assets);
+        underlying.safeTransferFrom(msg.sender, address(this), assets);
         totalDeposits += assets;
+    }
+
+    function addReward(address _token, uint256 _amount) external payable {
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
     }
 
     function maxMint(address receiver) external view override returns (uint256 maxShares) {}

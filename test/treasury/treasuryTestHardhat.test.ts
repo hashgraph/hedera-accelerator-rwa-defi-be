@@ -14,12 +14,6 @@ async function deployFixture() {
   await usdc.waitForDeployment();
   const usdcAddress = await usdc.getAddress();
 
-  // mock vault
-  const VaultMock = await ethers.getContractFactory('VaultMock', owner);
-  const vault = await VaultMock.deploy(usdcAddress);
-  await vault.waitForDeployment();
-  const vaultAddress = await vault.getAddress();
-
   // mock building token
   const BuildingTokenMock = await ethers.getContractFactory('ERC20Mock', owner);
   const buildingToken = await BuildingTokenMock.deploy(
@@ -46,10 +40,9 @@ async function deployFixture() {
         usdcAddress,
         RESERVE_AMOUNT,
         N_PERCENTAGE,
-        vaultAddress,
         owner.address,
         business.address,
-        ethers.ZeroAddress // buildingFactory
+        owner.address // buildingFactory
       ],
       { 
         initializer: 'initialize'
@@ -62,8 +55,16 @@ async function deployFixture() {
 
   await treasury.grantFactoryRole(owner.address);
   await treasury.grantGovernanceRole(governance.address);
+
+  // mock vault
+  const VaultMock = await ethers.getContractFactory('VaultMock', owner);
+  const vault = await VaultMock.deploy(usdcAddress);
+  await vault.waitForDeployment();
+  const vaultAddress = await vault.getAddress();
+
+  await treasury.addVault(vaultAddress);
   
-  // USDC to addr1 and addr2 for testing
+  // // USDC to addr1 and addr2 for testing
   await usdc.mint(await addr1.getAddress(), ethers.parseUnits('50000', 6));
   await usdc.mint(await addr2.getAddress(), ethers.parseUnits('50000', 6));
   
@@ -87,9 +88,9 @@ describe('Treasury Contract', () => {
     it('should deploy contracts successfully', async () => {
       const { usdc, vault, treasury } = await loadFixture(deployFixture);
 
-      expect(usdc.target).to.be.a('string');
-      expect(vault.target).to.be.a('string');
-      expect(treasury.target).to.be.a('string');
+      expect(usdc.target).to.be.properAddress;
+      expect(vault.target).to.be.properAddress;
+      expect(treasury.target).to.be.properAddress;
     });
   });
 
@@ -100,7 +101,7 @@ describe('Treasury Contract', () => {
       // addr1 approves treasury to spend USDC
       await usdc.connect(addr1).approve(await treasury.getAddress(), ethers.parseUnits('50000', 6));
 
-      // // addr1 deposits 50,000 USDC into treasury
+      // addr1 deposits 50,000 USDC into treasury
       await treasury.connect(addr1).deposit(ethers.parseUnits('50000', 6));
 
       // balance check

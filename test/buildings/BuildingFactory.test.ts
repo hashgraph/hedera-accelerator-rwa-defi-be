@@ -1,11 +1,11 @@
 import { Contract, LogDescription, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
-import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
+import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
-import { usdcAddress } from '../../constants';
+import { BuildingGovernance } from '../../typechain-types';
 
 async function deployFixture() {
-  const [owner, notOwner] = await ethers.getSigners();
+  const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
 
   const uniswapRouter = await ethers.deployContract('UniswapRouterMock', []);
   const uniswapRouterAddress = await uniswapRouter.getAddress();
@@ -13,12 +13,12 @@ async function deployFixture() {
   const uniswapFactoryAddress = await uniswapFactory.getAddress();
 
   const tokenA = await ethers.deployContract('ERC20Mock', ["Token A", "TKA", 18]);
-  const tokenB = await ethers.deployContract('ERC20Mock', ["Token B", "TkB", 6]); // USDC
+  const usdc = await ethers.deployContract('ERC20Mock', ["Token B", "TkB", 6]); // USDC
 
   await tokenA.waitForDeployment();
-  await tokenB.waitForDeployment();
+  await usdc.waitForDeployment();
   const tokenAAddress = await tokenA.getAddress();
-  const tokenBAddress = await tokenB.getAddress();
+  const usdcAddress = await usdc.getAddress();
 
   // create the NFT separately because ERC721Metadata is too large
   // must transfer ownership to BuildingFactory
@@ -138,8 +138,8 @@ async function deployFixture() {
     buildingFactoryBeacon,
     tokenA,
     tokenAAddress,
-    tokenB,
-    tokenBAddress,
+    usdc,
+    usdcAddress,
     nftCollection,
     nftCollectionAddress,
     uniswapRouterAddress,
@@ -149,7 +149,10 @@ async function deployFixture() {
     trexFactoryAddress,
     trexGatewayAddress,
     vaultFactory,
-    vaultFactoryAddress
+    vaultFactoryAddress,
+    voter1,
+    voter2,
+    voter3,
   }
 }
 
@@ -181,7 +184,7 @@ async function getDeployedToken(buildingFactory: Contract, blockNumber: number) 
   const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
 
   // Extract and verify the emitted address  
-  return await ethers.getContractAt('Token',  decodedEvent.args[0]); // Assuming the address is the first argument
+  return await ethers.getContractAt('BuildingERC20',  decodedEvent.args[0]); // Assuming the address is the first argument
 }
 
 async function getDeployedGovernance(buildingFactory: Contract, blockNumber: number) {
@@ -210,6 +213,17 @@ async function getDeployedTreasury(buildingFactory: Contract, blockNumber: numbe
 
   // Extract and verify the emitted address  
   return await ethers.getContractAt('Treasury',  decodedEvent.args[0]); // Assuming the address is the first argument
+}
+
+async function getProposalId(governance: BuildingGovernance, blockNumber: number) {
+  // Decode the event using queryFilter
+  const logs = await governance.queryFilter(governance.filters['ProposalCreated(uint8,uint256,address)'], blockNumber, blockNumber);
+
+  // Decode the log using the contract's interface  
+  const decodedEvent = governance.interface.parseLog(logs[0]) as LogDescription; // Get the first log
+
+  // Extract and verify the emitted address  
+  return decodedEvent.args[1]; 
 }
 
 describe('BuildingFactory', () => {
@@ -457,6 +471,89 @@ describe('BuildingFactory', () => {
         expect(governanceAdress).to.be.equal(buildingDetails.governance);
         await expect(newGovernanceTx).to.emit(buildingFactory, 'NewGovernance').withArgs(buildingDetails.governance, buildingAddress, owner);
       });
+    });
+  });
+
+  describe('integration flows', () => {
+    it('should create building suite (token, vault, treasury governance), create a payment proposal, execute payment proposal', async () => {
+        const { buildingFactory, usdc, owner, voter1, voter2, voter3 } = await loadFixture(deployFixture);
+
+        // create building
+        const buildingTx = await buildingFactory.newBuilding("ipfs:://anyurl");
+        const building  = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+        const buildingAddress = await building.getAddress();
+
+        // create building token
+        const tokenTx = await buildingFactory.newERC3643Token(buildingAddress, "TREX", "SNB", 18);
+        const token = await getDeployedToken(buildingFactory, tokenTx.blockNumber as number);
+        const tokenAddress = await token.getAddress();
+
+        // mint tokens to voter to be delegated for governance voting
+        const mintAmount = ethers.parseEther('1000');
+        await token.mint(owner.address, mintAmount);
+        await token.mint(voter1.address, mintAmount);
+        await token.mint(voter2.address, mintAmount);
+        await token.mint(voter3.address, mintAmount);
+        await token.connect(voter1).delegate(voter1.address);
+        await token.connect(voter2).delegate(voter2.address);
+        await token.connect(voter3).delegate(voter3.address);
+
+        // create new treasury
+        const reserve = ethers.parseUnits('1000', 6);
+        const percentage = 20_00n;
+        const treasuryTx = await buildingFactory.newTreasury(buildingAddress, tokenAddress, reserve, percentage);
+        const treasury = await getDeployedTreasury(buildingFactory, treasuryTx.blockNumber as number);
+        const treasuryAddress = await treasury.getAddress();
+
+        const vaultAddress = await treasury.vault();
+        const vault = await ethers.getContractAt('BasicVault', vaultAddress);
+
+        // stake tokens to vault
+        await token.approve(vaultAddress, mintAmount);
+        await vault.deposit(mintAmount, owner.address);
+        
+        // deposit usdc funds to the treasury in order to make payments
+        const fundingAmount = ethers.parseUnits('10000', 6);
+        await usdc.mint(owner.address, fundingAmount);
+        await usdc.approve(treasuryAddress, fundingAmount);
+        await treasury.deposit(fundingAmount);
+        
+        // make sure calculations of excess sent to vault are correct
+        const toBusiness = fundingAmount * percentage / 10000n;
+        const excessAmount = fundingAmount - reserve - toBusiness;
+        expect(await usdc.balanceOf(vaultAddress)).to.be.equal(excessAmount);
+
+        // create new governance
+        const newGovernanceTx = await buildingFactory.newGovernance(buildingAddress, "New Governance", tokenAddress, treasuryAddress);
+        const governance = await getDeployedGovernance(buildingFactory, newGovernanceTx.blockNumber as number);
+
+        // create govenrnace payment proposal
+        const amount = ethers.parseUnits('500', 6); // 500 USDT
+        const to = ethers.Wallet.createRandom();
+        const description = "Proposal #1: Pay 500 dollars";
+  
+        // receiver at this moment should have 0 usdc balance
+        expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('0', 6));
+  
+        const tx1 = await governance.createPaymentProposal(amount, to.address, description);
+        await tx1.wait();
+  
+        const proposalId = await getProposalId(governance, tx1.blockNumber as number);
+  
+        // cast votes
+        const votingDelay = await governance.votingDelay();
+        const votingPeriod = await governance.votingPeriod();        
+        await mine(votingDelay) // wait voting delay to begin casting votes
+        await governance.connect(voter1).castVote(proposalId, 1); // "for" vote.
+        await governance.connect(voter2).castVote(proposalId, 1); // "for" vote.
+        await governance.connect(voter3).castVote(proposalId, 1); // "for" vote.
+        await mine(votingPeriod); // wait for proposal voting period 
+  
+        // execute proposal
+        await governance.executePaymentProposal(proposalId);
+  
+        // receiver should have 500 usdc balance after payment executed; 
+        expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('500', 6));
     });
   });
 });

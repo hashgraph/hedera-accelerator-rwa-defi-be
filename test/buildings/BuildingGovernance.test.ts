@@ -18,12 +18,54 @@ async function deployFixture() {
 
   // mint and delegate tokens
   const mintAmount = ethers.parseEther('1000');
+  await governanceToken.mint(owner.address, mintAmount);
   await governanceToken.mint(voter1.address, mintAmount);
   await governanceToken.mint(voter2.address, mintAmount);
   await governanceToken.mint(voter3.address, mintAmount);
   await governanceToken.connect(voter1).delegate(voter1.address);
   await governanceToken.connect(voter2).delegate(voter2.address);
   await governanceToken.connect(voter3).delegate(voter3.address);
+
+  const ERC20Mock = await ethers.getContractFactory('ERC20Mock', owner);
+  const usdc = await ERC20Mock.deploy(
+    'USD Coin',
+    'USDC',
+    6n,
+  );
+  await usdc.waitForDeployment();
+  const usdcAddress = await usdc.getAddress();
+
+  // create Treasury
+  const N_PERCENTAGE = 2000; // 20% to business
+  const RESERVE_AMOUNT = ethers.parseUnits('1000', 6);
+
+  const treasuryImplmentation = await ethers.getContractFactory('Treasury');
+
+  // Deploy the Beacon which will hold the implementation address
+  const beacon = await upgrades.deployBeacon(treasuryImplmentation);
+  await beacon.waitForDeployment();
+
+  const treasuryProxy = await upgrades.deployBeaconProxy(
+      beacon,
+      treasuryImplmentation,
+      [
+        usdcAddress,
+        RESERVE_AMOUNT,
+        N_PERCENTAGE,
+        owner.address,
+        owner.address,
+        owner.address // buildingFactory
+      ],
+      { 
+        initializer: 'initialize'
+      }
+  );
+
+  await treasuryProxy.waitForDeployment();
+
+  const treasuryAddress = await treasuryProxy.getAddress();
+  const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
+  await treasury.grantFactoryRole(owner.address);
 
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
   const vaultFactory = await VaultFactory.deploy({ from: owner.address });
@@ -34,7 +76,7 @@ async function deployFixture() {
     stakingToken: governanceTokenAddress,
     shareTokenName: await governanceToken.name(),
     shareTokenSymbol: await governanceToken.symbol(),
-    vaultRewardController: initialOwner,
+    vaultRewardController: treasuryAddress,
     feeConfigController: initialOwner
   }
 
@@ -58,52 +100,14 @@ async function deployFixture() {
   const vaultAddress = await vaultFactory.vaultDeployed(salt);
   const vault = await ethers.getContractAt('BasicVault', vaultAddress);
 
-  // create Treasury
-  const ERC20Mock = await ethers.getContractFactory('ERC20Mock', owner);
-  const usdc = await ERC20Mock.deploy(
-    'USD Coin',
-    'USDC',
-    6n,
-  );
-  await usdc.waitForDeployment();
-  const usdcAddress = await usdc.getAddress();
+  await treasury.addVault(vaultAddress);
 
-  // treasury 
-  const N_PERCENTAGE = 2000; // 20% to business
-  const RESERVE_AMOUNT = ethers.parseUnits('10000', 6);
-
-  const treasuryImplmentation = await ethers.getContractFactory('Treasury');
-
-  // Deploy the Beacon which will hold the implementation address
-  const beacon = await upgrades.deployBeacon(treasuryImplmentation);
-  await beacon.waitForDeployment();
-
-  const treasuryProxy = await upgrades.deployBeaconProxy(
-      beacon,
-      treasuryImplmentation,
-      [
-        usdcAddress,
-        RESERVE_AMOUNT,
-        N_PERCENTAGE,
-        vaultAddress,
-        owner.address,
-        owner.address,
-        ethers.ZeroAddress // buildingFactory
-      ],
-      { 
-        initializer: 'initialize'
-      }
-  );
-
-  await treasuryProxy.waitForDeployment();
-
-  const treasuryAddress = await treasuryProxy.getAddress();
-  const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
-
-  await treasury.grantFactoryRole(owner.address);
+  // stake tokens to vault
+  await governanceToken.approve(vaultAddress, mintAmount);
+  await vault.deposit(mintAmount, owner.address);
 
   // fund treasury
-  const fundingAmount = ethers.parseUnits('1000', 6);
+  const fundingAmount = ethers.parseUnits('10000', 6);
   await usdc.mint(owner.address, fundingAmount);
   await usdc.approve(treasuryAddress, fundingAmount);
   await treasury.deposit(fundingAmount);
