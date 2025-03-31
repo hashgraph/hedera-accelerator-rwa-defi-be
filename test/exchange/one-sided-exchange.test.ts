@@ -1,6 +1,9 @@
 import { expect } from "chai";
+import { ethers } from "hardhat";
+import { ExampleERC20, OneSidedExchange } from "../../typechain-types";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
-async function preDeployExchange() {
+async function preDeployExchange(): Promise<[OneSidedExchange, ExampleERC20, ExampleERC20]> {
     const [deployer] = await ethers.getSigners();
     const oneSidedExchangeImplementation = await ethers.deployContract("OneSidedExchange", deployer);
     const tokenAImplementation = await ethers.deployContract("ExampleERC20", [100, "TokenA", "TOKA"], deployer);
@@ -10,10 +13,10 @@ async function preDeployExchange() {
 }
 
 describe("OneSidedExchange", async () => {
-    let oneSidedExchangeInstance;
-    let tokenAInstance;
-    let tokenBInstance;
-    let owner;
+    let oneSidedExchangeInstance: OneSidedExchange;
+    let tokenAInstance: ExampleERC20;
+    let tokenBInstance: ExampleERC20;
+    let owner: HardhatEthersSigner;
 
     before(async () => {
         const [deployer] = await ethers.getSigners();
@@ -82,7 +85,7 @@ describe("OneSidedExchange", async () => {
 
         try {
             await oneSidedExchangeInstance.swap(tokenAAddress, tokenBAddress, tokenASwapAmount);
-        } catch (err) {
+        } catch (err: any) {
             const parsedMessage = err.message?.split("InvalidAmount")[1];
 
             expect(parsedMessage).to.be.includes("Max sell amount of tokens exceeded");
@@ -102,7 +105,7 @@ describe("OneSidedExchange", async () => {
                 tokenABuyAmount,
                 twoDaysAfterInSeconds,
             );
-        } catch (err) {
+        } catch (err: any) {
             const parsedMessage = err.message?.split("InvalidAddress")[1];
 
             expect(parsedMessage).to.be.includes("No zero address is allowed");
@@ -119,7 +122,7 @@ describe("OneSidedExchange", async () => {
                 tokenBAddress,
                 tokenASwapAmount,
             );
-        } catch (err) {
+        } catch (err: any) {
             const parsedMessage = err.message?.split("InvalidAddress")[1];
 
             expect(parsedMessage).to.be.includes("No zero address is allowed");
@@ -137,7 +140,7 @@ describe("OneSidedExchange", async () => {
                 0n,
                 twoDaysAfterInSeconds
             );
-        } catch (err) {
+        } catch (err: any) {
             const parsedMessage = err.message?.split("InvalidAmount")[1];
 
             expect(parsedMessage).to.be.includes("Zero amount is not allowed");

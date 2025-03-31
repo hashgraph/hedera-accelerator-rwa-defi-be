@@ -31,9 +31,9 @@ contract IdFactory is IIdFactory, Ownable {
 
 
     // setting
-    constructor (address implementationAuthority) Ownable(msg.sender) {
-        require(implementationAuthority != address(0), "invalid argument - zero address");
-        _implementationAuthority = implementationAuthority;
+    constructor (address implementationAuthority_) Ownable(msg.sender) {
+        require(implementationAuthority_ != address(0), "invalid argument - zero address");
+        _implementationAuthority = implementationAuthority_;
     }
 
     /**
@@ -244,11 +244,11 @@ contract IdFactory is IIdFactory, Ownable {
     function _deployIdentity
     (
         string memory _salt,
-        address implementationAuthority,
+        address implementationAuthority_,
         address _wallet
     ) private returns (address){
         bytes memory _code = type(IdentityProxy).creationCode;
-        bytes memory _constructData = abi.encode(implementationAuthority, _wallet);
+        bytes memory _constructData = abi.encode(implementationAuthority_, _wallet);
         bytes memory bytecode = abi.encodePacked(_code, _constructData);
         return _deploy(_salt, bytecode);
     }

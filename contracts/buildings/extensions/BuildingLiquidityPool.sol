@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import {SafeHTS} from "../../common/safe-HTS/SafeHTS.sol";
-import {HederaTokenService} from "../../common/hedera/HederaTokenService.sol";
 import {IUniswapV2Factory, IUniswapV2Pair, IUniswapV2Router02} from "../interface/UniswapInterface.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -10,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @title BuildingLiquidityPool
 /// @author Hashgraph
 /// @notice This contract uses namespaced storage see https://docs.openzeppelin.com/contracts/5.x/upgradeable#namespaced_storage
-abstract contract BuildingLiquidityPool is Initializable, HederaTokenService {
+abstract contract BuildingLiquidityPool is Initializable{
     /// @custom:storage-location erc7201:hashgraph.buildings.BuildingLiquidityPool
     struct BuildingLiquidityPoolStorage {
         address uniswapRouter;

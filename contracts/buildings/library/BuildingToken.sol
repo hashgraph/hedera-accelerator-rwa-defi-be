@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import "../../common/safe-HTS/SafeHTS.sol";
 import "../extensions/BuildingERC20.sol";
 // import {ITREXGateway} from "../../erc3643/factory/ITREXGateway.sol";
 // import {ITREXFactory} from "../../erc3643/factory/ITREXFactory.sol";
@@ -9,36 +8,6 @@ import "../extensions/BuildingERC20.sol";
 
 library BuildingToken {
     using Bits for uint256; // used to create HTS token
-
-    function createHTSToken(string memory _name, string memory _symbol, uint8 decimals, address buildingAddress) internal returns (address _token) {
-        uint256 supplyKeyType;
-        uint256 adminKeyType;
-
-        IHederaTokenService.KeyValue memory supplyKeyValue;
-        supplyKeyType = supplyKeyType.setBit(4);
-        supplyKeyValue.delegatableContractId = buildingAddress;
-
-        IHederaTokenService.KeyValue memory adminKeyValue;
-        adminKeyType = adminKeyType.setBit(0);
-        adminKeyValue.delegatableContractId = buildingAddress;
-
-        IHederaTokenService.TokenKey[] memory keys = new IHederaTokenService.TokenKey[](2);
-
-        keys[0] = IHederaTokenService.TokenKey(supplyKeyType, supplyKeyValue);
-        keys[1] = IHederaTokenService.TokenKey(adminKeyType, adminKeyValue);
-
-        IHederaTokenService.Expiry memory expiry;
-        expiry.autoRenewAccount = buildingAddress;
-        expiry.autoRenewPeriod = 8000000;
-
-        IHederaTokenService.HederaToken memory newToken;
-        newToken.name = _name;
-        newToken.symbol = _symbol;
-        newToken.treasury = buildingAddress;
-        newToken.expiry = expiry;
-        newToken.tokenKeys = keys;
-        _token = SafeHTS.safeCreateFungibleToken(newToken, 0, decimals);
-    }
 
     function createERC3643Token(address /*trexGateway*/, address /*buildingAddress*/, string memory name, string memory symbol, uint8 decimals) internal returns (address) {
         // use simple ERC20 tokens for now, this will be replaced later to ERC3643 token

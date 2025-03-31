@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
 
@@ -111,5 +111,27 @@ contract AsyncVaultFactory is Ownable, IVaultFactory, ERC165 {
      */
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IVaultFactory).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * Gen Salt string for CREATE2
+     * @param deployer address
+     * @param nonce uint256
+     * @param token address
+     */
+    function generateSalt(
+        address deployer,
+        address token,
+        uint256 nonce
+    ) external pure returns (string memory) {
+        // Convert the deployer and token addresses to hexadecimal strings,
+        // and the nonce to a decimal string.
+        return string(
+            abi.encodePacked(
+                Strings.toHexString(uint256(uint160(deployer)), 20),
+                Strings.toHexString(uint256(uint160(token)), 20),
+                Strings.toString(nonce)
+            )
+        );
     }
 }

@@ -55,6 +55,8 @@ contract IdentityProxy {
         }
     }
 
+    receive() external payable {}
+
     function implementationAuthority() public view returns(address) {
         address implemAuth;
         // solhint-disable-next-line no-inline-assembly

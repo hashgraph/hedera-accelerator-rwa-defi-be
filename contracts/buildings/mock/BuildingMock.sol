@@ -34,5 +34,7 @@ contract BuildingMock is Building {
             tokenB, 
             tokenBAmount
         );
+
+        return (amountA, amountB, liquidity, pair);
     }
 }

@@ -31,7 +31,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.treasury = treasury;
     }
 
-    function createTextProposal(ProposalLevel level, string memory description) public returns(uint256 proposalId) {
+    function createTextProposal(ProposalLevel /*level*/, string memory description) public returns(uint256 proposalId) {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         // TODO: decide between multisig vote proposal or governor proposal giving the level
         // Multisig
