@@ -452,6 +452,34 @@ async function createBuildingFactory(contracts: Record<string, any>): Promise<Re
   }
 }
 
+async function deployAudit(contracts: Record<string, any>): Promise<Record<string, any>> {
+  const AuditRegistry = await ethers.getContractFactory('AuditRegistry');
+  const auditRegistry = await AuditRegistry.deploy();
+  await auditRegistry.waitForDeployment();
+  const auditRegistryAddress = await auditRegistry.getAddress();
+  
+  return {
+    ...contracts,
+    implementations: {
+      ...contracts.implementations,
+      AuditRegistry: auditRegistryAddress,
+    }
+  }
+}
+
+async function deployExchange(contracts: Record<string, any>): Promise<Record<string, any>>{
+  const oneSidedExchangeImplementation = await ethers.deployContract('OneSidedExchange');
+  const exchangeAddress = await oneSidedExchangeImplementation.getAddress();
+
+  return {
+    ...contracts,
+    implementations: {
+      ...contracts.implementations,
+      OneSidedExchange: exchangeAddress
+    }
+  }
+}
+
 async function logContracts(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(contracts);
   return contracts;
@@ -486,6 +514,8 @@ init()
   .then(deployHTSTokenFactory)
   .then(createERC721Metadata)
   .then(createBuildingFactory)
+  .then(deployAudit)
+  .then(deployExchange)
   .then(exportDeploymentVersion)
   .then(logContracts)
   .then(finish)
