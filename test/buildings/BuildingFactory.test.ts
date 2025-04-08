@@ -217,13 +217,13 @@ async function getDeployedTreasury(buildingFactory: Contract, blockNumber: numbe
 
 async function getProposalId(governance: BuildingGovernance, blockNumber: number) {
   // Decode the event using queryFilter
-  const logs = await governance.queryFilter(governance.filters['ProposalCreated(uint8,uint256,address)'], blockNumber, blockNumber);
+  const logs = await governance.queryFilter(governance.filters.ProposalCreated, blockNumber, blockNumber);
 
   // Decode the log using the contract's interface  
   const decodedEvent = governance.interface.parseLog(logs[0]) as LogDescription; // Get the first log
 
   // Extract and verify the emitted address  
-  return decodedEvent.args[1]; 
+  return decodedEvent.args[0]; 
 }
 
 describe('BuildingFactory', () => {

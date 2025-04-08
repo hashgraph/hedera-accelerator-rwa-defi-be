@@ -27,5 +27,5 @@ abstract contract BuildingGovernanceStorage {
     
     enum ProposalLevel { GovernorVote }
     enum ProposalType { Text, Payment, ChangeReserve }
-    event ProposalCreated(ProposalType proposalType, uint256 id, address proposer);
+    event ProposalDefined(uint256 id, ProposalType proposalType, address proposer, address receiver, uint256 amount);
 }

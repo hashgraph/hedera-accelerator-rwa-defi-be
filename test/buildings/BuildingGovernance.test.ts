@@ -150,13 +150,13 @@ async function deployFixture() {
 
 async function getProposalId(governance: BuildingGovernance, blockNumber: number) {
   // Decode the event using queryFilter
-  const logs = await governance.queryFilter(governance.filters['ProposalCreated(uint8,uint256,address)'], blockNumber, blockNumber);
+  const logs = await governance.queryFilter(governance.filters.ProposalCreated, blockNumber, blockNumber);
 
   // Decode the log using the contract's interface  
   const decodedEvent = governance.interface.parseLog(logs[0]) as LogDescription; // Get the first log
 
   // Extract and verify the emitted address  
-  return decodedEvent.args[1]; 
+  return decodedEvent.args[0]; 
 }
 
 describe('BuildingGovernance', () => {
@@ -182,25 +182,42 @@ describe('BuildingGovernance', () => {
   describe('.createTextProposal()', () => {
     it('should create text proposal', async () => {
       const { 
-        buildingGovernance,
+        owner,
+        governance,
       } = await loadFixture(deployFixture);
 
        const level = 0; // Governor Vote
        const description = "Host a Community Workshop";
-       await buildingGovernance.createTextProposal(level, description);
+       const tx = await governance.createTextProposal(level, description);
+       const proposalId = getProposalId(governance, tx.blockNumber as number);
+
+      const proposalType = 0 // text
+      const proposer = owner.address
+      const receiver = ethers.ZeroAddress // text proposal have zero address for receiver
+      const amount = 0n // text proposal have zero amount
+
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, amount);
     });
   });
 
   describe('.createPaymentProposal()', () => {
     it('should create payment proposal', async () => {
       const { 
-        governance
+        governance,
+        owner
       } = await loadFixture(deployFixture);
 
       const amount = ethers.parseEther('1');
       const to = ethers.ZeroAddress;
       const description = "Replace Lobby Furniture";
-      await governance.createPaymentProposal(amount, to, description);
+      const tx = await governance.createPaymentProposal(amount, to, description);
+      const proposalId = getProposalId(governance, tx.blockNumber as number);
+
+      const proposalType = 1 // payment
+      const proposer = owner.address
+      const receiver = to;
+
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, amount);
     });
 
     it('should execute payment proposal', async () => {

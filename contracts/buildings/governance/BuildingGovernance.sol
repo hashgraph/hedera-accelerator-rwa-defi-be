@@ -52,7 +52,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].proposalType = ProposalType.Text;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
 
-        emit ProposalCreated(ProposalType.Text, proposalId, msg.sender);
+        emit ProposalDefined(proposalId, ProposalType.Text, msg.sender, address(0), 0);
     }
 
     function createPaymentProposal(uint256 amount, address to, string memory description) public returns (uint256 proposalId) {
@@ -81,7 +81,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].amount = amount;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalCreated(ProposalType.Payment, proposalId, msg.sender);
+        emit ProposalDefined(proposalId, ProposalType.Payment, msg.sender, to, amount);
     }
 
     function createChangeReserveProposal(uint256 amount, string memory description) public returns (uint256 proposalId) {
@@ -106,7 +106,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].amount = amount;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalCreated(ProposalType.ChangeReserve, proposalId, msg.sender);
+        emit ProposalDefined(proposalId, ProposalType.ChangeReserve, msg.sender, address(0), amount);
     }
 
     function executePaymentProposal(uint256 proposalId) external {
