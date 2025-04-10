@@ -11,14 +11,14 @@ import wethAbi from "@uniswap/v2-periphery/build/WETH9.json";
 import { VaultType, deployBasicVault, deployAsyncVault } from "./helper";
 
 // constants
-const testAccountAddress = "0x934b9afc8be0f78f698753a8f67131fa58cd9884";
-const operatorPrKeyTest = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY_TEST || '');
-const operatorAccountIdTest = AccountId.fromString(process.env.ACCOUNT_ID_TEST || '');
+// const testAccountAddress = "0x934b9afc8be0f78f698753a8f67131fa58cd9884";
+// const operatorPrKeyTest = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY_TEST || '');
+// const operatorAccountIdTest = AccountId.fromString(process.env.ACCOUNT_ID_TEST || '');
 
-const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || '');
-const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || '');
+// const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || '');
+// const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || '');
 
-const testAccount = new hre.ethers.Wallet(process.env.PRIVATE_KEY_TEST!, ethers.provider);
+// const testAccount = new hre.ethers.Wallet(process.env.PRIVATE_KEY_TEST!, ethers.provider);
 
 // Zero fee
 const feeConfig = {
@@ -72,7 +72,7 @@ describe("AutoCompounder", function () {
         ) as VaultToken;
         await stakingToken.waitForDeployment();
 
-        await stakingToken.mint(testAccount.address, ethers.parseUnits("500000000", 18));
+        // await stakingToken.mint(testAccount.address, ethers.parseUnits("500000000", 18));
 
         const RewardToken = await ethers.getContractFactory("VaultToken");
         const rewardToken = await RewardToken.deploy(

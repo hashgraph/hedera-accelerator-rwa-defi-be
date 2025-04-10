@@ -17,14 +17,14 @@ async function deposit(vault: BasicVault, address: string, amount: BigNumberish,
 }
 
 // constants
-const testAccountAddress = "0x934b9afc8be0f78f698753a8f67131fa58cd9884";
-const operatorPrKeyTest = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY_TEST || '');
-const operatorAccountIdTest = AccountId.fromString(process.env.ACCOUNT_ID_TEST || '');
+// const testAccountAddress = "0x934b9afc8be0f78f698753a8f67131fa58cd9884";
+// const operatorPrKeyTest = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY_TEST || '');
+// const operatorAccountIdTest = AccountId.fromString(process.env.ACCOUNT_ID_TEST || '');
 
 const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || '');
 const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || '');
 
-const testAccount = new hre.ethers.Wallet(process.env.PRIVATE_KEY_TEST!, ethers.provider);
+// const testAccount = new hre.ethers.Wallet(process.env.PRIVATE_KEY_TEST!, ethers.provider);
 
 // Zero fee
 const feeConfig = {
@@ -83,7 +83,7 @@ describe("BasicVault", function () {
             client,
             owner,
             staker,
-            testAccount
+            // testAccount
         };
     }
 
