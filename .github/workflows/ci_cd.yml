@@ -23,8 +23,6 @@ jobs:
     env:
       RPC_URL: ${{ secrets.RPC_URL }}
       PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-      PRIVATE_KEY2: ${{ secrets.PRIVATE_KEY2 }}
-      PRIVATE_KEY3: ${{ secrets.PRIVATE_KEY3 }}
       ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
 
     steps:
