@@ -114,7 +114,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             identity,
             address(0), // ERC3643 lazy deploy
             address(0), // treasury lazy deploy
-            address(0) // governance lazy deploy
+            address(0), // governance lazy deploy
+            address(0) // lazy vault deploy
         );
 
         $.buildingsList.push($.buildingDetails[address(buildingProxy)]);
@@ -181,6 +182,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         ITreasury(treasury).addVault(vault);
 
         $.buildingDetails[building].treasury = treasury;
+        $.buildingDetails[building].vault = vault;
         emit NewTreasury(treasury, building, msg.sender);
     }
 

@@ -27,6 +27,7 @@ abstract contract BuildingFactoryStorage {
         address erc3643Token; // TRex token
         address treasury;
         address governance;
+        address vault;
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
