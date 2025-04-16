@@ -19,6 +19,15 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         _disableInitializers();
     }
 
+    // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Governor")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant GovernorStorageLocation = 0x7c712897014dbe49c045ef1299aa2d5f9e67e48eea4403efa21f1e0f3ac0cb00;
+
+    function _governorStorage() private pure returns (GovernorStorage storage $) {
+        assembly {
+            $.slot := GovernorStorageLocation
+        }
+    }
+
     function initialize(IVotes _token, string memory name, address initialOwner, address treasury) public initializer {
         __Governor_init(name);
         __GovernorCountingSimple_init();
@@ -170,18 +179,63 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
     }
 
     function votingDelay() public pure override returns (uint256) {
-        return 0; // 0 minutes
+        return 60; // 60 seconds delay
     }
 
     function votingPeriod() public pure override returns (uint256) {
-        return 150; // 30 minutes
+        return 3600; // 1 hour voting period
     }
 
-     // Override clock() to return block.number
-    function clock() public view override(GovernorUpgradeable, GovernorVotesUpgradeable) returns (uint48) {
-        return SafeCast.toUint48(block.number);
+    // Override _propose function to user block.timestamp in order to work on hedera
+    function _propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description,
+        address proposer
+    ) internal override returns (uint256 proposalId) {
+        GovernorStorage storage $ = _governorStorage();
+        proposalId = hashProposal(targets, values, calldatas, keccak256(bytes(description)));
+
+        if (targets.length != values.length || targets.length != calldatas.length || targets.length == 0) {
+            revert GovernorInvalidProposalLength(targets.length, calldatas.length, values.length);
+        }
+        if ($._proposals[proposalId].voteStart != 0) {
+            revert GovernorUnexpectedProposalState(proposalId, state(proposalId), bytes32(0));
+        }
+
+        uint256 snapshot = block.timestamp + votingDelay(); 
+        uint256 duration = votingPeriod();
+
+        ProposalCore storage proposal = $._proposals[proposalId];
+        proposal.proposer = proposer;
+        proposal.voteStart = SafeCast.toUint48(snapshot);
+        proposal.voteDuration = SafeCast.toUint32(duration);
+
+        emit ProposalCreated(
+            proposalId,
+            proposer,
+            targets,
+            values,
+            new string[](targets.length),
+            calldatas,
+            snapshot,
+            snapshot + duration,
+            description
+        );
+
+        // Using a named return variable to avoid stack too deep errors
     }
     
+    // using timestamp as clock in order to work on hedera network
+    function clock() public view virtual override(GovernorUpgradeable, GovernorVotesUpgradeable) returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    // using mode=timestamp as clock mode in order to work on hedera network
+    function CLOCK_MODE() public pure virtual override(GovernorUpgradeable, GovernorVotesUpgradeable) returns (string memory) {
+        return "mode=timestamp";
+    }
 
     function _authorizeUpgrade(address newImplementation)
         internal

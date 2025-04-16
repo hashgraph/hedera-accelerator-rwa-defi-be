@@ -41,4 +41,13 @@ contract BuildingERC20 is ERC20, ERC20Permit, ERC20Votes, Ownable {
     {
         return super.nonces(owner);
     }
+
+      // 👇 override for ERC-6372 clock using timestamps
+    function clock() public view virtual override returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    function CLOCK_MODE() public pure virtual override returns (string memory) {
+        return "mode=timestamp";
+    }
 }
