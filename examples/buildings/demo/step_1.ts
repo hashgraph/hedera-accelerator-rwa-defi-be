@@ -55,7 +55,7 @@ async function createBuilding(): Promise<string> {
   );
 
   const tokenURI = "ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq"; // URl of building metadata, it will be used to mint new building NFT 
-  const tx = await buildingFactory.newBuilding(tokenURI);
+  const tx = await buildingFactory.newBuilding(tokenURI, { gasLimit: 1220000 });
   await tx.wait();
 
   const building = await getDeployedBuilding(buildingFactory, tx.blockNumber as number)
