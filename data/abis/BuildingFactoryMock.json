@@ -387,16 +387,6 @@
           "internalType": "uint256",
           "name": "nPercentage",
           "type": "uint256"
-        },
-        {
-          "internalType": "uint32",
-          "name": "cliff",
-          "type": "uint32"
-        },
-        {
-          "internalType": "uint32",
-          "name": "unlockDuration",
-          "type": "uint32"
         }
       ],
       "name": "newTreasury",
