@@ -1,51 +1,17 @@
 import { ethers } from 'hardhat';
 import Deployments from '../../../data/deployments/chain-296.json';
 import { LogDescription } from 'ethers';
-import { BuildingFactory, BuildingGovernance } from '../../../typechain-types';
+import { BuildingFactory } from '../../../typechain-types';
 
-async function getDeployedBuilding(buildingFactory: BuildingFactory, blockNumber: number) {
+async function getDeployedBuilding(buildingFactory: BuildingFactory, blockNumber: number): Promise<unknown[]> {
   // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewBuilding(address,address)'], blockNumber, blockNumber);
+  const logs = await buildingFactory.queryFilter(buildingFactory.filters.NewBuilding, blockNumber, blockNumber);
   // Decode the log using the contract's interface
   const event = logs[0]; // Get the first log
   const decodedEvent = buildingFactory.interface.parseLog(event) as LogDescription;
 
   // Extract and verify the emitted address
-  const newBuildingAddress = decodedEvent.args[0]; // Assuming the address is the first argument
-  return await ethers.getContractAt('Building', newBuildingAddress);
-}
-
-async function getDeployedToken(buildingFactory: BuildingFactory, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewERC3643Token(address,address,address)'], blockNumber, blockNumber);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('Token',  decodedEvent.args[0]); // Assuming the address is the first argument
-}
-
-async function getDeployedGovernance(buildingFactory: BuildingFactory, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewGovernance(address,address,address)'], blockNumber, blockNumber);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('BuildingGovernance',  decodedEvent.args[0]); // Assuming the address is the first argument
-}
-
-async function getDeployedTreasury(buildingFactory: BuildingFactory, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewTreasury(address,address,address)'], blockNumber, blockNumber);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('Treasury',  decodedEvent.args[0]); // Assuming the address is the first argument
+  return decodedEvent.args as unknown[];
 }
 
 async function createBuilding(): Promise<string> {
@@ -54,72 +20,32 @@ async function createBuilding(): Promise<string> {
     Deployments.factories.BuildingFactory
   );
 
-  const tokenURI = "ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq"; // URl of building metadata, it will be used to mint new building NFT 
-  const tx = await buildingFactory.newBuilding(tokenURI, { gasLimit: 1220000 });
+  const buildingDetails = {
+    tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+    tokenName: 'MyToken', 
+    tokenSymbol: 'MYT', 
+    tokenDecimals: 18n,
+    treasuryNPercent: 2000n, 
+    treasuryReserveAmount: ethers.parseUnits('1000', 6),
+    governanceName : 'MyGovernance',
+    vaultCliff: 0n,
+    vaultUnlockDuration: 0n
+  }
+  const tx = await buildingFactory.newBuilding(buildingDetails);  
   await tx.wait();
 
-  const building = await getDeployedBuilding(buildingFactory, tx.blockNumber as number)
+  const [building, token, treasury, vault, governance] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
 
-  console.log("- created new building: ", await building.getAddress());
+  console.log("- tx sent with hash" + tx.hash);
+  console.log("- created new building: ", building);
+  console.log("- created new token: ", token);
+  console.log("- created new treasury: ", treasury);
+  console.log("- created new vault: ", vault);
+  console.log("- created new governance: ", governance);
 
-  return building.getAddress();
-}
+  await mintAndDelegateTokens(token as string);
 
-async function createToken(building: string): Promise<string> {
-  const buildingFactory = await ethers.getContractAt(
-    "BuildingFactory",
-    Deployments.factories.BuildingFactory
-  );
-
-  const name = "Token Name";
-  const symbol = "Token Symbol";
-  const decimals = 18;
-
-  const tx = await buildingFactory.newERC3643Token(building, name, symbol, decimals);
-  await tx.wait();
-
-  const token = await getDeployedToken(buildingFactory, tx.blockNumber as number)
-
-  console.log("- created new token: ", await token.getAddress());
-
-  return token.getAddress();
-}
-
-async function createTreasury(building: string, token: string): Promise<string> {
-  const buildingFactory = await ethers.getContractAt(
-    "BuildingFactory",
-    Deployments.factories.BuildingFactory
-  );
-
-  const reserve = ethers.parseUnits('10000', 6); // 1k USDC reserve
-  const npercentage = 20_00; // 20%
-
-  const tx = await buildingFactory.newTreasury(building, token, reserve, npercentage, { gasLimit: 6000000 });
-  await tx.wait();
-
-  const treasury = await getDeployedTreasury(buildingFactory, tx.blockNumber as number)
-
-  console.log("- created new treasury: ", await treasury.getAddress());
-
-  return treasury.getAddress();
-}
-
-async function createGovernance(building: string, token: string, treasury: string): Promise<string> {
-  const buildingFactory = await ethers.getContractAt(
-    "BuildingFactory",
-    Deployments.factories.BuildingFactory
-  );
-
-  const name = "Governance";
-
-  const tx = await buildingFactory.newGovernance(building, name, token, treasury);
-  await tx.wait();
-
-  const governance = await getDeployedGovernance(buildingFactory, tx.blockNumber as number);
-
-  console.log("- created new governance: ", await governance.getAddress());
-
-  return governance.getAddress();
+  return building as string;
 }
 
 async function addLiquidity(buildingAddress: string) {
@@ -183,12 +109,7 @@ async function mintAndDelegateTokens(tokenAddress: string) {
 
 
 async function run () {
-  const building = await createBuilding();
-  const token = await createToken(building);
-  const treasury = await createTreasury(building, token);
-  const governance = await createGovernance(building, token, treasury);
-
-  await mintAndDelegateTokens(token);
+  await createBuilding();
 }
 
 run()

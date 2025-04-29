@@ -62,23 +62,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
     }
 
     /**
-     * OnlyBuildingOwner modifier
-     * Requires that building address is valid and sender is the building owner
-     */
-    modifier onlyBuildingOwner(address building) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        require(
-            building != address(0) && $.buildingDetails[building].addr != address(0),
-            "BuildingFactory: Invalid building address"
-        );
-        require(OwnableUpgradeable(building).owner() == msg.sender, "BuildingFactory: Not building owner");
-        _;
-    }
-
-    /**
      * getBuildingList get list of buildings deployed
      */
-    function getBuildingList() public view returns (BuildingInfo[] memory) {
+    function getBuildingList() public view returns (BuildingDetails[] memory) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         return $.buildingsList;
     }
@@ -87,40 +73,49 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * getBuildingDetails get details of building
      * @param buildingAddress address of the building contract
      */
-    function getBuildingDetails(address buildingAddress) public view returns (BuildingInfo memory) {
+    function getBuildingDetails(address buildingAddress) public view returns (BuildingDetails memory) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         return $.buildingDetails[buildingAddress];
     }
 
     /**
      * newBuilding Creates new building with create2, mints NFT and store it.
-     * @param tokenURI metadata location
+     * @param details NewBuildingDetails struct
      */
-    function newBuilding(string memory tokenURI) public virtual {
+    function newBuilding(NewBuildingDetails calldata details) public virtual {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        BeaconProxy buildingProxy = new BeaconProxy(
+        address building = address(new BeaconProxy(
             $.buildingBeacon,
             abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, msg.sender)
-        );
+        ));
 
         // deploy new token
-        uint256 nftId = IERC721Metadata($.nft).mint(address(buildingProxy), tokenURI);
-        address identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(address(buildingProxy));
+        address initialOwner = msg.sender;
+        uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);
+        address identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(building);
+        address erc3643Token = _deployERC3643Token(building, details.tokenName, details.tokenSymbol, details.tokenDecimals);
+        address treasury = _deployTreasury(details.treasuryReserveAmount, details.treasuryNPercent, initialOwner);
+        address vault = _deployVault(erc3643Token, initialOwner, treasury, details.vaultCliff, details.vaultUnlockDuration);
+        address governance = _deployGovernance(erc3643Token, details.governanceName, treasury, initialOwner);
+        
+        ITreasury(treasury).grantGovernanceRole(governance);
+        ITreasury(treasury).addVault(vault);
 
-        $.buildingDetails[address(buildingProxy)] = BuildingInfo(
-            address(buildingProxy),
+        BuildingDetails memory buildingDetails = BuildingDetails(
+            building,
             nftId,
-            tokenURI,
+            details.tokenURI,
             identity,
-            address(0), // ERC3643 lazy deploy
-            address(0), // treasury lazy deploy
-            address(0), // governance lazy deploy
-            address(0) // lazy vault deploy
+            erc3643Token,
+            treasury, 
+            governance,
+            vault 
         );
 
-        $.buildingsList.push($.buildingDetails[address(buildingProxy)]);
+        $.buildingDetails[building] = buildingDetails;
+        $.buildingsList.push(buildingDetails);
 
-        emit NewBuilding(address(buildingProxy), msg.sender);
+        emit NewBuilding(building, erc3643Token, treasury, vault, governance, initialOwner);
     }
 
     /**
@@ -130,92 +125,17 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * @param symbol string symbol of the token
      * @param decimals uint8 token decimals
      */
-    function newERC3643Token(
+    function _deployERC3643Token(
         address building,
         string memory name,
         string memory symbol,
         uint8 decimals
-    ) external onlyBuildingOwner(building) {
+    ) private returns (address token) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
 
-        require(
-            building != address(0) && $.buildingDetails[building].addr != address(0),
-            "BuildingFactory: Invalid building address"
-        );
-        require(
-            $.buildingDetails[building].erc3643Token == address(0),
-            "BuildingFactory: token already created for building"
-        );
-
-        address token = BuildingToken.createERC3643Token($.trexGateway, building, name, symbol, decimals);
+        token = BuildingToken.createERC3643Token($.trexGateway, building, name, symbol, decimals);
 
         OwnableUpgradeable(token).transferOwnership(msg.sender);
-
-        $.buildingDetails[building].erc3643Token = token;
-
-        emit NewERC3643Token(token, building, msg.sender);
-    }
-
-    /**
-     * Deploy new Treasury for building
-     * @param building address of building
-     * @param token address of token
-     */
-    function newTreasury(
-        address building,
-        address token,
-        uint256 reserveAmount,
-        uint256 nPercentage
-    ) external onlyBuildingOwner(building) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        require(
-            token != address(0) && $.buildingDetails[building].erc3643Token != address(0),
-            "BuildingFactory: Invalid token address"
-        );
-
-        address treasury = _deployTreasury(reserveAmount, nPercentage, msg.sender);
-        address vault = _deployVault(token, msg.sender, treasury);
-
-        ITreasury(treasury).addVault(vault);
-
-        $.buildingDetails[building].treasury = treasury;
-        $.buildingDetails[building].vault = vault;
-        emit NewTreasury(treasury, building, msg.sender);
-    }
-
-    /**
-     * Deploy new Governance contract for the building
-     * @param building address of the building
-     * @param name name of the governance
-     * @param token token address ( needs to be voting token )
-     * @param treasury treasury address
-     */
-    function newGovernance(
-        address building,
-        string memory name,
-        address token,
-        address treasury
-    ) external onlyBuildingOwner(building) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        require(
-            token != address(0) && $.buildingDetails[building].erc3643Token != address(0),
-            "BuildingFactory: Invalid token address"
-        );
-
-        require(
-            treasury != address(0) && $.buildingDetails[building].treasury != address(0),
-            "BuildingFactory: Invalid treasury address"
-        );
-
-        address governance = _deployGovernance(token, name, treasury, msg.sender);
-
-        $.buildingDetails[building].governance = governance;
-
-        ITreasury(treasury).grantGovernanceRole(governance);
-
-        emit NewGovernance(governance, building, msg.sender);
     }
 
     /**
@@ -225,7 +145,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
     function _deployVault(
         address token,
         address initialOwner,
-        address vaultRewardController
+        address vaultRewardController,
+        uint32 cliff,
+        uint32 unlockDuration
     ) private returns (address) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
 
@@ -235,9 +157,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         string memory salt = IVaultFactory($.vaultFactory).generateSalt(initialOwner, token, $.vaultNonce);
         string memory tokenName = IERC20Metadata(token).name();
         string memory tokenSymbol = IERC20Metadata(token).symbol();
-
-        uint32 cliff = 0;
-        uint32 unlockDuration = 0;
 
         IVaultFactory.VaultDetails memory vaultDetails = IVaultFactory.VaultDetails(
             token, // address stakingToken;

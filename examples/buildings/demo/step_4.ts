@@ -9,7 +9,7 @@ async function mintUsdc(usdcAddress: string, amount: bigint) {
   console.log(`- minted usdc`);
 }
 
-async function fundTreasury(treasuryAddress: string, usdcAddress: string, amount: bigint) {
+async function fundTreasury(treasuryAddress: string, usdcAddress: string, amount: bigint, tokenAddress: string) {
   const [owner] = await ethers.getSigners();
   const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
   const usdc = await ethers.getContractAt('ERC20Mock', usdcAddress);
@@ -20,7 +20,7 @@ async function fundTreasury(treasuryAddress: string, usdcAddress: string, amount
   console.log('- approved usdc to treasury');
 
   // stake token to vault
-  const token = await ethers.getContractAt('BuildingERC20', "0x10Ed6a785d59aDc8099F2eDBB78a6B1239F284eb");
+  const token = await ethers.getContractAt('BuildingERC20', tokenAddress);
   const vaultAddress = await treasury.vault();
   const vault = await ethers.getContractAt('BasicVault', vaultAddress);
   const stakeAmount = ethers.parseEther('1');
@@ -39,13 +39,14 @@ async function fundTreasury(treasuryAddress: string, usdcAddress: string, amount
 
 async function run () {
   const treasuryAddress = "GOVERNANCE_ADDRESS";
+  const tokenAddress = "TOKEN_ADDRESS";
   const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
   
   const usdc = await treasury.usdc();
   const amount = ethers.parseUnits('20000', 6) // mint 1 usdc
 
   await mintUsdc(usdc, amount);
-  await fundTreasury(treasuryAddress, usdc, amount);  // send 1 dolar to treasury;
+  await fundTreasury(treasuryAddress, usdc, amount, tokenAddress);  // send 1 dolar to treasury;
 }
 
 run()

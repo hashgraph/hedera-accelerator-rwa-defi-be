@@ -66,14 +66,14 @@ async function logProposalState(governanceAddress: string, proposalId: bigint) {
 async function run () {
   const governance = "GOVERNANCE_ADDRESS";
   
-  const proposalDescription = "Proposal #2: pay a dolar";
+  const proposalDescription = "Proposal #1: pay a dolar";
   const amounr = ethers.parseUnits('1', 6);
   const proposalId = await createPaymentProposal(governance, proposalDescription, amounr);
 
   await logProposalState(governance, proposalId);
 
-  await new Promise((r) => { setTimeout(() => {r(true)}, 10000)})
-  console.log('- waited 10 sec');
+  await new Promise((r) => { setTimeout(() => {r(true)}, 60000)})
+  console.log('- waited 60 sec');
 
   await castVotes(governance, proposalId);
 }

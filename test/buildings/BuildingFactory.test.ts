@@ -1,8 +1,8 @@
-import { Contract, LogDescription, } from 'ethers';
+import { Contract, LogDescription, Result, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
-import { BuildingGovernance } from '../../typechain-types';
+import { BuildingFactoryStorage, BuildingGovernance } from '../../typechain-types';
 
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
@@ -157,9 +157,9 @@ async function deployFixture() {
 }
 
 // get ERC721Metadata NFT collection deployed on contract deployment
-async function getDeployedBuilding(buildingFactory: Contract, blockNumber: number) {
+async function getDeployedBuilding(buildingFactory: Contract, blockNumber: number): Promise<Array<string>> {
   // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewBuilding(address, address)'], blockNumber, blockNumber);
+  const logs = await buildingFactory.queryFilter(buildingFactory.filters.NewBuilding, blockNumber, blockNumber);
 
   // Ensure one event was emitted
   expect(logs.length).to.equal(1);
@@ -169,50 +169,7 @@ async function getDeployedBuilding(buildingFactory: Contract, blockNumber: numbe
   const decodedEvent = buildingFactory.interface.parseLog(event) as LogDescription;
 
   // Extract and verify the emitted address
-  const newBuildingAddress = decodedEvent.args[0]; // Assuming the address is the first argument
-  return await ethers.getContractAt('Building', newBuildingAddress);
-}
-
-async function getDeployedToken(buildingFactory: Contract, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewERC3643Token(address, address, address)'], blockNumber, blockNumber);
-
-  // Ensure one event was emitted
-  expect(logs.length).to.equal(1);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('BuildingERC20',  decodedEvent.args[0]); // Assuming the address is the first argument
-}
-
-async function getDeployedGovernance(buildingFactory: Contract, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewGovernance(address, address, address)'], blockNumber, blockNumber);
-
-  // Ensure one event was emitted
-  expect(logs.length).to.equal(1);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('BuildingGovernance',  decodedEvent.args[0]); // Assuming the address is the first argument
-}
-
-async function getDeployedTreasury(buildingFactory: Contract, blockNumber: number) {
-  // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['NewTreasury(address, address, address)'], blockNumber, blockNumber);
-
-  // Ensure one event was emitted
-  expect(logs.length).to.equal(1);
-
-  // Decode the log using the contract's interface  
-  const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
-
-  // Extract and verify the emitted address  
-  return await ethers.getContractAt('Treasury',  decodedEvent.args[0]); // Assuming the address is the first argument
+  return Array.from(decodedEvent.args);
 }
 
 async function getProposalId(governance: BuildingGovernance, blockNumber: number) {
@@ -245,7 +202,6 @@ describe('BuildingFactory', () => {
     });
   });
 
-
   describe('.newBuilding()', () => {    
     it('should create a building', async () => {
       const { 
@@ -256,15 +212,28 @@ describe('BuildingFactory', () => {
         identityFactory
       } = await loadFixture(deployFixture);
 
-      const tokenURI = "ipfs://building-nft-uri";
-      const tx = await buildingFactory.newBuilding(tokenURI);
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseEther('1000'),
+        governanceName : 'MyGovernance',
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n
+      }
+
+      const tx = await buildingFactory.newBuilding(buildingDetails);
       await tx.wait();
       
-      const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+      const [buildingAddress] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+      
+      const building = await ethers.getContractAt('Building', buildingAddress);
       
       expect(await building.getAddress()).to.be.properAddress;
       expect(await nftCollection.ownerOf(0)).to.be.equal(await building.getAddress());
-      expect(await nftCollection.tokenURI(0)).to.be.equal(tokenURI);
+      expect(await nftCollection.tokenURI(0)).to.be.equal(buildingDetails.tokenURI);
       expect(await building.getUniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
       expect(await building.getUniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
       
@@ -272,20 +241,20 @@ describe('BuildingFactory', () => {
       
       expect(firstBuilding[0]).to.be.hexEqual(await building.getAddress());
       expect(firstBuilding[1]).to.be.equal(0n);
-      expect(firstBuilding[2]).to.be.equal(tokenURI);
+      expect(firstBuilding[2]).to.be.equal(buildingDetails.tokenURI);
       expect(firstBuilding[3]).to.be.properAddress;
       
       const firstBuildingDetails = await buildingFactory.getBuildingDetails(await building.getAddress());
       
       expect(firstBuildingDetails[0]).to.be.hexEqual(await building.getAddress());
       expect(firstBuildingDetails[1]).to.be.equal(0n);
-      expect(firstBuildingDetails[2]).to.be.equal(tokenURI);
+      expect(firstBuildingDetails[2]).to.be.equal(buildingDetails.tokenURI);
       expect(firstBuildingDetails[3]).to.be.equal(firstBuilding[3]);
 
-      const buildingAddress = firstBuilding[0];
-      const identityAddress = firstBuilding[3];
+      const detailsBuildingAddress = firstBuilding[0];
+      const detailsIdentityAddress = firstBuilding[3];
       
-      await expect(tx).to.emit(identityFactory, 'WalletLinked').withArgs(buildingAddress, identityAddress);
+      await expect(tx).to.emit(identityFactory, 'WalletLinked').withArgs(detailsBuildingAddress, detailsIdentityAddress);
     });
 
   });
@@ -297,11 +266,22 @@ describe('BuildingFactory', () => {
           const { buildingFactory, nftCollection, nftCollectionAddress } = await loadFixture(deployFixture);
           const NFT_ID = 0;
 
-          const tokenURI = "ipfs://building-nft-uri";
-          const tx = await buildingFactory.newBuilding(tokenURI);
+          const buildingDetails = {
+            tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+            tokenName: 'MyToken', 
+            tokenSymbol: 'MYT', 
+            tokenDecimals: 18n,
+            treasuryNPercent: 2000n, 
+            treasuryReserveAmount: ethers.parseEther('1000'),
+            governanceName : 'MyGovernance',
+            vaultCliff: 0n,
+            vaultUnlockDuration: 0n
+          }
+          const tx = await buildingFactory.newBuilding(buildingDetails);
           await tx.wait();
           
-          const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+          const [buildingAddress] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+          const building = await ethers.getContractAt('Building', buildingAddress);
   
           const ERC721MetadataIface = new ethers.Interface(ERC721MetadataABI.abi);
           const encodedMetadataFunctionData = ERC721MetadataIface.encodeFunctionData(
@@ -332,161 +312,37 @@ describe('BuildingFactory', () => {
     });
   });
 
-  describe('.newERC3643Building()', () => {
-    describe('when building address is not valid', () => {
-      it('should revert', async () => {
-        const { 
-          buildingFactory, 
-         } = await loadFixture(deployFixture);
-
-         await expect(buildingFactory.newERC3643Token(ethers.ZeroAddress, "token name", "TKN", 18))
-          .to.be.revertedWith('BuildingFactory: Invalid building address');
-
-          const randomWallet = ethers.Wallet.createRandom();
-
-          await expect(buildingFactory.newERC3643Token(randomWallet.address, "token name", "TKN", 18))
-          .to.be.revertedWith('BuildingFactory: Invalid building address');
-
-      });
-    });
-
-    describe('when building address is valid', () => {
-      it('should create token', async () => {
-        const { 
-          buildingFactory, 
-          owner
-         } = await loadFixture(deployFixture);
-
-          const tx = await buildingFactory.newBuilding("ipfs://tokenuri");
-          await tx.wait();
-          
-          const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
-          const buildingAddress = await building.getAddress();
-
-         const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN", 18);
-         await tx2.wait();
-
-         const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
-         const deployedToken = buildingDetails[4];
-
-         expect(deployedToken).to.be.properAddress; // tokenAddress;
-         await expect(tx2).to.emit(buildingFactory, 'NewERC3643Token').withArgs(deployedToken, buildingAddress, owner.address);
-      });
-
-      describe('when building already deployed', () => {
-        it('shoud revert', async () => {
-          const { 
-            buildingFactory, 
-           } = await loadFixture(deployFixture);
-  
-            const tx = await buildingFactory.newBuilding("ipfs://tokenuri");
-            await tx.wait();
-            
-            const building  = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
-            const buildingAddress = await building.getAddress();
-  
-           const tx2 = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN", 18);
-           await tx2.wait();
-
-           await expect(buildingFactory.newERC3643Token(buildingAddress, "other name", "OTKN", 18))
-            .to.be.revertedWith('BuildingFactory: token already created for building');
-        });
-      });
-    });
-  });
-
-  describe('.newTreasury()', () => {
-    describe('when building address is invalid', () => {
-      it('should revert', async () => {
-        const { buildingFactory } = await loadFixture(deployFixture);
-        await expect(buildingFactory.newTreasury(ethers.ZeroAddress, ethers.ZeroAddress, 0, 0)).to.be.revertedWith('BuildingFactory: Invalid building address');
-        await expect(buildingFactory.newTreasury(ethers.Wallet.createRandom().address, ethers.ZeroAddress, 0, 0)).to.be.revertedWith('BuildingFactory: Invalid building address');
-      });
-    });
-
-    describe('when token address is invalid', () => {
-      it('should revert', async () => {
-        const { buildingFactory, owner } = await loadFixture(deployFixture);
-        
-        const buildingTx = await buildingFactory.newBuilding("ipfs:://anyurl");
-        const building  = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
-        const buildingAddress = await building.getAddress();
-
-        await expect(buildingFactory.newTreasury(buildingAddress, ethers.ZeroAddress, 0, 0)).to.be.revertedWith('BuildingFactory: Invalid token address');
-        await expect(buildingFactory.newTreasury(buildingAddress, ethers.Wallet.createRandom().address, 0, 0)).to.be.revertedWith('BuildingFactory: Invalid token address');
-      });
-    });
-
-    describe('when building and token addresses are valid', () => {
-      it('should create treasury', async () => {
-        const { buildingFactory, owner } = await loadFixture(deployFixture);
-
-        const buildingTx = await buildingFactory.newBuilding("ipfs:://anyurl");
-        const building  = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
-        const buildingAddress = await building.getAddress();
-
-        const tokenTx = await buildingFactory.newERC3643Token(buildingAddress, "token name", "TKN", 18);
-        await tokenTx.wait();
-
-        const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
-        const tokenAddress = buildingDetails.erc3643Token;
-
-        const newTreasuryTx = await buildingFactory.newTreasury(buildingAddress, tokenAddress, 100, 100);
-        await newTreasuryTx.wait();
-
-        const buildingDetails2 = await buildingFactory.getBuildingDetails(buildingAddress);
-        const treasuryAddress = buildingDetails2.treasury;
-        
-        expect(treasuryAddress).to.be.properAddress; // treasuryAddress;
-        await expect(newTreasuryTx).to.emit(buildingFactory, 'NewTreasury').withArgs(treasuryAddress, buildingAddress, owner);
-  
-      });
-    });
-  });
-
-  describe('.newGovernance()', () => {
-    describe('when is valid building, token and treasury', () => {
-      it('should create new governance', async () => {
-        const { buildingFactory, owner } = await loadFixture(deployFixture);
-
-        const buildingTx = await buildingFactory.newBuilding("ipfs:://anyurl");
-        const building  = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
-        const buildingAddress = await building.getAddress();
-
-        const tokenTx = await buildingFactory.newERC3643Token(buildingAddress, "Token Name", "Symbol", 18);
-        const token = await getDeployedToken(buildingFactory, tokenTx.blockNumber as number);
-        const tokenAddress = await token.getAddress();
-
-        const treasuryTx = await buildingFactory.newTreasury(buildingAddress, tokenAddress, 100, 100)
-        const treasury = await getDeployedTreasury(buildingFactory, treasuryTx.blockNumber as number);
-        const treasuryAddress = await treasury.getAddress();
-
-        const newGovernanceTx = await buildingFactory.newGovernance(buildingAddress, "New Governance", tokenAddress, treasuryAddress);
-        const governance = await getDeployedGovernance(buildingFactory, newGovernanceTx.blockNumber as number);
-        const governanceAdress = await governance.getAddress();
-
-        const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
-        
-        expect(buildingDetails.governance).to.be.properAddress; // treasuryAddress;
-        expect(governanceAdress).to.be.equal(buildingDetails.governance);
-        await expect(newGovernanceTx).to.emit(buildingFactory, 'NewGovernance').withArgs(buildingDetails.governance, buildingAddress, owner);
-      });
-    });
-  });
-
   describe('integration flows', () => {
     it('should create building suite (token, vault, treasury governance), create a payment proposal, execute payment proposal', async () => {
         const { buildingFactory, usdc, owner, voter1, voter2, voter3 } = await loadFixture(deployFixture);
 
         // create building
-        const buildingTx = await buildingFactory.newBuilding("ipfs:://anyurl");
-        const building  = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
-        const buildingAddress = await building.getAddress();
+        const buildingDetails = {
+          tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+          tokenName: 'MyToken', 
+          tokenSymbol: 'MYT', 
+          tokenDecimals: 18n,
+          treasuryNPercent: 2000n, 
+          treasuryReserveAmount: ethers.parseUnits('1000', 6),
+          governanceName : 'MyGovernance',
+          vaultCliff: 0n,
+          vaultUnlockDuration: 0n
+        }
+  
+        const buildingTx = await buildingFactory.newBuilding(buildingDetails);
+        const [
+          /*buildingAddress*/, 
+          tokenAddress,
+          treasuryAddress,
+          vaultAddress,
+          governanceAddress
+        ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
 
         // create building token
-        const tokenTx = await buildingFactory.newERC3643Token(buildingAddress, "TREX", "SNB", 18);
-        const token = await getDeployedToken(buildingFactory, tokenTx.blockNumber as number);
-        const tokenAddress = await token.getAddress();
+        const token = await ethers.getContractAt('BuildingERC20', tokenAddress);
+        const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
+        const vault = await ethers.getContractAt('BasicVault', vaultAddress);
+        const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
 
         // mint tokens to voter to be delegated for governance voting
         const mintAmount = ethers.parseEther('1000');
@@ -497,16 +353,6 @@ describe('BuildingFactory', () => {
         await token.connect(voter1).delegate(voter1.address);
         await token.connect(voter2).delegate(voter2.address);
         await token.connect(voter3).delegate(voter3.address);
-
-        // create new treasury
-        const reserve = ethers.parseUnits('1000', 6);
-        const percentage = 20_00n;
-        const treasuryTx = await buildingFactory.newTreasury(buildingAddress, tokenAddress, reserve, percentage);
-        const treasury = await getDeployedTreasury(buildingFactory, treasuryTx.blockNumber as number);
-        const treasuryAddress = await treasury.getAddress();
-
-        const vaultAddress = await treasury.vault();
-        const vault = await ethers.getContractAt('BasicVault', vaultAddress);
 
         // stake tokens to vault
         await token.approve(vaultAddress, mintAmount);
@@ -519,13 +365,9 @@ describe('BuildingFactory', () => {
         await treasury.deposit(fundingAmount);
         
         // make sure calculations of excess sent to vault are correct
-        const toBusiness = fundingAmount * percentage / 10000n;
-        const excessAmount = fundingAmount - reserve - toBusiness;
+        const toBusiness = fundingAmount * buildingDetails.treasuryNPercent / 10000n;
+        const excessAmount = fundingAmount - buildingDetails.treasuryReserveAmount - toBusiness;
         expect(await usdc.balanceOf(vaultAddress)).to.be.equal(excessAmount);
-
-        // create new governance
-        const newGovernanceTx = await buildingFactory.newGovernance(buildingAddress, "New Governance", tokenAddress, treasuryAddress);
-        const governance = await getDeployedGovernance(buildingFactory, newGovernanceTx.blockNumber as number);
 
         // create govenrnace payment proposal
         const amount = ethers.parseUnits('500', 6); // 500 USDT

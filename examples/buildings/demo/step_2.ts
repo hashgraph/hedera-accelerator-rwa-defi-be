@@ -5,19 +5,19 @@ import * as deployments from "../../../data/deployments/chain-296.json";
 
 async function getProposalId(buildingFactory: BuildingGovernance, blockNumber: number) {
   // Decode the event using queryFilter
-  const logs = await buildingFactory.queryFilter(buildingFactory.filters['ProposalCreated(uint8,uint256,address)'], blockNumber, blockNumber);
+  const logs = await buildingFactory.queryFilter(buildingFactory.filters.ProposalDefined, blockNumber, blockNumber);
 
   // Decode the log using the contract's interface  
   const decodedEvent = buildingFactory.interface.parseLog(logs[0]) as LogDescription; // Get the first log
 
   // Extract and verify the emitted address  
-  return decodedEvent.args[1]; 
+  return decodedEvent.args[0]; 
 }
 
 async function createTextProposal(governanceAddress: string, description: string): Promise<bigint> {
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
 
-  const proposaltx = await governance.createTextProposal(0, description);
+  const proposaltx = await governance.createTextProposal(0, description, { gasLimit: 1_000_000});
   await proposaltx.wait();
   const proposalId = await getProposalId(governance, proposaltx.blockNumber as number) // ProposalCreated
 
@@ -64,14 +64,14 @@ async function logProposalState(governanceAddress: string, proposalId: bigint) {
 async function run () {
   const governance = "GOVERNANCE_ADDRESS";
   
-  const proposalDescription = "Proposal #2: Create a new proposal";
+  const proposalDescription = "Proposal #1: Create a new proposal";
 
   const proposalId = await createTextProposal(governance, proposalDescription);
 
   await logProposalState(governance, proposalId);
 
-  await new Promise((r) => { setTimeout(() => {r(true)}, 10000)})
-  console.log('- waited 10 sec');
+  await new Promise((r) => { setTimeout(() => {r(true)}, 60000)})
+  console.log('- waited 60 sec');
 
   await castVotes(governance, proposalId);
 }

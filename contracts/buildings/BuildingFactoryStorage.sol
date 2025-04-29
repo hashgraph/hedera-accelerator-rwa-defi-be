@@ -15,11 +15,11 @@ abstract contract BuildingFactoryStorage {
         address governanceBeacon;
         address vaultFactory;
         uint256 vaultNonce;
-        BuildingInfo[] buildingsList;
-        mapping (address => BuildingInfo) buildingDetails;
+        BuildingDetails[] buildingsList;
+        mapping (address => BuildingDetails) buildingDetails;
     }
 
-    struct BuildingInfo {
+    struct BuildingDetails {
         address addr; // building address
         uint256 nftId; // NFT token ID attributed to the building
         string tokenURI; // NFT metadatada location
@@ -28,6 +28,18 @@ abstract contract BuildingFactoryStorage {
         address treasury;
         address governance;
         address vault;
+    }
+
+    struct NewBuildingDetails {
+        string tokenURI;
+        string tokenName;
+        string tokenSymbol;
+        uint8 tokenDecimals;
+        uint256 treasuryReserveAmount;
+        uint256 treasuryNPercent;
+        string governanceName;
+        uint32 vaultCliff;
+        uint32 vaultUnlockDuration;
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
@@ -39,9 +51,5 @@ abstract contract BuildingFactoryStorage {
         }
     }
 
-    event NewAuditRegistry(address addr);
-    event NewBuilding(address addr, address initialOwner);
-    event NewERC3643Token(address token, address building, address initialOwner);
-    event NewTreasury(address treasury, address building, address initialOwner);
-    event NewGovernance(address governance, address building, address initialOwner);
+    event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner);
 }
