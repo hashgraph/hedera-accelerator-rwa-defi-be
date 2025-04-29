@@ -82,7 +82,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * newBuilding Creates new building with create2, mints NFT and store it.
      * @param details NewBuildingDetails struct
      */
-    function newBuilding(NewBuildingDetails calldata details) public virtual {
+    function newBuilding(NewBuildingDetails calldata details) public virtual returns (BuildingDetails memory buildingDetails){
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         address building = address(new BeaconProxy(
             $.buildingBeacon,
@@ -101,7 +101,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         ITreasury(treasury).grantGovernanceRole(governance);
         ITreasury(treasury).addVault(vault);
 
-        BuildingDetails memory buildingDetails = BuildingDetails(
+        buildingDetails = BuildingDetails(
             building,
             nftId,
             details.tokenURI,
