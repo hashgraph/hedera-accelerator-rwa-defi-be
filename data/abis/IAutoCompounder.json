@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IAutoCompounder",
-  "sourceName": "contracts/erc4626/interfaces/IAutoCompounder.sol",
+  "sourceName": "contracts/autocompounder/interfaces/IAutoCompounder.sol",
   "abi": [
     {
       "inputs": [],

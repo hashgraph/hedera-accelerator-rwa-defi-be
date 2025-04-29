@@ -18,18 +18,18 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {FeeConfiguration} from "../common/FeeConfiguration.sol";
 
-import {FixedPointMathLib} from "./FixedPointMathLib.sol";
+import {FixedPointMathLib} from "../math/FixedPointMathLib.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title Basic Vault
+ * @author Hashgraph
  *
  * The contract which represents a custom Vault.
  */
 contract BasicVault is ERC4626, ERC165, FeeConfiguration, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
-    using Bits for uint256;
 
     // Min reward amount considired in case of small reward
     uint256 private constant MIN_REWARD = 1;
@@ -462,18 +462,5 @@ contract BasicVault is ERC4626, ERC165, FeeConfiguration, Ownable, ReentrancyGua
      */
     function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || super.supportsInterface(interfaceId);
-    }
-}
-
-library Bits {
-    uint256 internal constant ONE = uint256(1);
-
-    /**
-     * @dev Sets the bit at the given 'index' in 'self' to '1'.
-     *
-     * @return Returns the modified value.
-     */
-    function setBit(uint256 self, uint8 index) internal pure returns (uint256) {
-        return self | (ONE << index);
     }
 }

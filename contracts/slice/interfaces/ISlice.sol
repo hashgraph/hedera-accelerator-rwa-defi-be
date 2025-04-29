@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 /**
  * @title Slice
+ * @author Hashgraph
  */
 interface ISlice {
     /**
@@ -46,6 +47,27 @@ interface ISlice {
      * @param allocationPercentage The new allocation percentage to maintain.
      */
     event AllocationPercentageChanged(address indexed token, uint16 allocationPercentage);
+
+    /**
+     * @dev Thrown when user tries to add new allocation, but allocation associated with passed aToken
+     * already exists.
+     */
+    error AssociatedAllocationExists(address aToken);
+
+    /**
+     * @dev Thrown when user passes existing allocation, but actually there is no one.
+     */
+    error AllocationNotFound(address aToken);
+
+    /**
+     * @dev Thrown when user tries to add new allocation, but allocations limit is reached.
+     */
+    error AllocationsLimitReached();
+
+    /**
+     * @dev Thrown when user tries to add aToken which doesn't implement target interface.
+     */
+    error UnsupportedAToken(address aToken);
 
     // Allocation struct
     struct Allocation {

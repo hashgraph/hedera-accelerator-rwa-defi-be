@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Router02} from "../uniswap/interfaces/IUniswapV2Router02.sol";
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
@@ -18,12 +18,13 @@ import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165C
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC7540} from "../erc7540/interfaces/IERC7540.sol";
 
-import {IAutoCompounder} from "./interfaces/IAutoCompounder.sol";
+import {IAutoCompounder} from "../autocompounder/interfaces/IAutoCompounder.sol";
 import {ISlice} from "./interfaces/ISlice.sol";
-import {IRewards} from "./interfaces/IRewards.sol";
+import {IRewards} from "../erc4626/interfaces/IRewards.sol";
 
 /**
  * @title Slice
+ * @author Hashgraph
  *
  * The contract represents a derivatives fund on tokenized assets, in current case buildings.
  * The main contract responsibility is to rebalance the asset portfolio (utilising USD prices)
@@ -104,7 +105,8 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
 
         address _asset = getTokenAllocation(aToken).asset;
 
-        require(_asset != address(0), "Slice: Allocation for the token doesn't exist");
+        // Check allocation exists
+        if (_asset == address(0)) revert AllocationNotFound(aToken);
 
         address _sender = msg.sender;
 
@@ -166,11 +168,16 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
         require(priceFeed != address(0), "Slice: Invalid price feed address");
         require(percentage != 0 && percentage != BASIS_POINTS, "Slice: Invalid allocation percentage");
         require(getTokenAllocation(aToken).aToken == address(0), "Slice: Allocation for the passed token exists");
-        require(_allocations.length < MAX_TOKENS_AMOUNT, "Slice: Allocation limit exceeds");
-        require(
-            ERC165Checker.supportsInterface(aToken, type(IAutoCompounder).interfaceId),
-            "Slice: Unsupported interface ID"
-        );
+
+        // Check there is no associated allocation
+        if (getTokenAllocation(aToken).aToken != address(0)) revert AssociatedAllocationExists(aToken);
+
+        // Check aToken implements needed interface
+        if (!ERC165Checker.supportsInterface(aToken, type(IAutoCompounder).interfaceId))
+            revert UnsupportedAToken(aToken);
+
+        // Check current allocations amount isn't gt max allowed
+        if (_allocations.length == MAX_TOKENS_AMOUNT) revert AllocationsLimitReached();
 
         // Get underlying asset from Autocompounder
         address asset = IAutoCompounder(aToken).asset();
@@ -188,11 +195,10 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
     function setAllocationPercentage(address aToken, uint16 newPercentage) external {
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(newPercentage != 0 && newPercentage != BASIS_POINTS, "Slice: Invalid percentage");
-        require(
-            getTokenAllocation(aToken).aToken != address(0),
-            "Slice: Allocation for the passed token doesn't exist"
-        );
 
+        // Check allocation exists
+        if (getTokenAllocation(aToken).aToken == address(0)) revert AllocationNotFound(aToken);
+ 
         for (uint256 i = 0; i < _allocations.length; i++) {
             if (_allocations[i].aToken == aToken) {
                 _allocations[i].targetPercentage = newPercentage;

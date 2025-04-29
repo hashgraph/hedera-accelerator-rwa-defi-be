@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IOwnable",
-  "sourceName": "contracts/erc4626/factory/interfaces/IOwnable.sol",
+  "sourceName": "contracts/common/interfaces/IOwnable.sol",
   "abi": [
     {
       "inputs": [

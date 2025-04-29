@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.24;
 
-import {FixedPointMathLib} from "../../erc4626/FixedPointMathLib.sol";
+import {FixedPointMathLib} from "../../math/FixedPointMathLib.sol";
 
 /**
  * @title ERC7540 Request Type

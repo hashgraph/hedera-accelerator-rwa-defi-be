@@ -6,16 +6,16 @@ import {console} from "forge-std/console.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {Slice} from "../../contracts/erc4626/Slice.sol";
+import {Slice} from "../../contracts/slice/Slice.sol";
 
-import {AutoCompounder} from "../../contracts/erc4626/AutoCompounder.sol";
+import {AutoCompounder} from "../../contracts/autocompounder/AutoCompounder.sol";
 import {BasicVault} from "../../contracts/erc4626/BasicVault.sol";
 
 import {VaultToken} from "../../contracts/erc4626/VaultToken.sol";
 
 import {FeeConfiguration} from "../../contracts/common/FeeConfiguration.sol";
 
-import {IUniswapV2Router02} from "../../contracts/erc4626/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Router02} from "../../contracts/uniswap/interfaces/IUniswapV2Router02.sol";
 
 contract SliceTest is Test {
     string internal constant metadataURI = "ipfs://bafybeibnsoufr2renqzsh347nrx54wcubt5lgkeivez63xvivplfwhtpym/m";

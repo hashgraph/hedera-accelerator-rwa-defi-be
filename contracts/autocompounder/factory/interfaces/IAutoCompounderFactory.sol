@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 /**
  * @title AutoCompounder Factory
+ * @author Hashgraph
  *
  * The contract which allows to deploy AutoCompounder contracts with different parameters
  * and track contract addresses.

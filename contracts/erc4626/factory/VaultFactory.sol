@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
+import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 
 import {IVaultFactory} from "./interfaces/IVaultFactory.sol";
 
@@ -15,6 +15,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title Vault Factory
+ * @author Hashgraph
  *
  * The contract which allows to deploy Vaults with different parameters
  * and track contract addresses.

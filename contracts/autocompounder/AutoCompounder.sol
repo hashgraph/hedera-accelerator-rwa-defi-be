@@ -2,11 +2,9 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {ERC20} from "./ERC20.sol";
-import {FixedPointMathLib} from "./FixedPointMathLib.sol";
-
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,19 +14,19 @@ import {IERC7540} from "../erc7540/interfaces/IERC7540.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
-import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Router02} from "../uniswap/interfaces/IUniswapV2Router02.sol";
+
 import {IAutoCompounder} from "./interfaces/IAutoCompounder.sol";
-import {IRewards} from "./interfaces/IRewards.sol";
+import {IRewards} from "../erc4626/interfaces/IRewards.sol";
 
 /**
  * @title AutoCompounder
+ * @author Hashgraph
  *
  * The contract represents a simple AutoCompounder, that allows to reinvest vault rewards.
  */
 contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
     using SafeERC20 for IERC20;
-    using FixedPointMathLib for uint256;
-    using Bits for uint256;
 
     // Vault
     IERC4626 private immutable _vault;
@@ -64,7 +62,7 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
         string memory name_,
         string memory symbol_,
         address operator_
-    ) payable ERC20(name_, symbol_, ERC20(IERC4626(vault_).asset()).decimals()) Ownable(msg.sender) {
+    ) payable ERC20(name_, symbol_) Ownable(msg.sender) {
         require(uniswapV2Router_ != address(0), "AutoCompounder: Invalid Uniswap Router address");
         require(vault_ != address(0), "AutoCompounder: Invalid Vault address");
         require(usdc_ != address(0), "AutoCompounder: Invalid USDC token address");
@@ -216,18 +214,5 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
      */
     function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IAutoCompounder).interfaceId || super.supportsInterface(interfaceId);
-    }
-}
-
-library Bits {
-    uint256 internal constant ONE = uint256(1);
-
-    /**
-     * @dev Sets the bit at the given 'index' in 'self' to '1'.
-     *
-     * @return Returns the modified value.
-     */
-    function setBit(uint256 self, uint8 index) internal pure returns (uint256) {
-        return self | (ONE << index);
     }
 }

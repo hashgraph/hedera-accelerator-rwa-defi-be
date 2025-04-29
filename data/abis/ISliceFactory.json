@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "ISliceFactory",
-  "sourceName": "contracts/erc4626/factory/interfaces/ISliceFactory.sol",
+  "sourceName": "contracts/slice/factory/interfaces/ISliceFactory.sol",
   "abi": [
     {
       "anonymous": false,

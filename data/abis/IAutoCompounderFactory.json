@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IAutoCompounderFactory",
-  "sourceName": "contracts/erc4626/factory/interfaces/IAutoCompounderFactory.sol",
+  "sourceName": "contracts/autocompounder/factory/interfaces/IAutoCompounderFactory.sol",
   "abi": [
     {
       "anonymous": false,

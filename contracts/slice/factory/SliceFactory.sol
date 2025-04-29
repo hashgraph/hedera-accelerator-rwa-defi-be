@@ -4,12 +4,14 @@ pragma solidity 0.8.24;
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+import {IOwnable} from "../../common/interfaces/IOwnable.sol";
+
 import {ISliceFactory} from "./interfaces/ISliceFactory.sol";
 import {Slice} from "../Slice.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
 
 /**
  * @title Slice Factory
+ * @author Hashgraph
  *
  * The contract which allows to deploy Slices with different parameters
  * and track contract addresses.

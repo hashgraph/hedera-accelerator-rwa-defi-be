@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 /**
  * @title Auto Compounder
+ * @author Hashgraph
  */
 interface IAutoCompounder {
     /**
@@ -39,7 +40,7 @@ interface IAutoCompounder {
     event Deposit(address indexed caller, uint256 assets, uint256 aTokenMinted);
 
     /**
-     * @dev Throw during claim process if there is no reward to reinvest
+     * @dev Thrown during claim process if there is no reward to reinvest.
      */
     error ZeroReward();
 

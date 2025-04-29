@@ -493,7 +493,6 @@ describe("Slice", function () {
                 slice,
                 owner,
                 autoCompounder1,
-                vault1,
                 mockV3Aggregator,
                 stakingToken1,
             } = await deployFixture(VaultType.Basic, VaultType.Basic);
@@ -506,8 +505,6 @@ describe("Slice", function () {
                 mockV3Aggregator.target,
                 allocationPercentage1
             );
-
-            console.log("Tracking tokens added");
 
             // Deposit to Slice
             await stakingToken1.approve(slice.target, amountToDeposit);
@@ -546,7 +543,8 @@ describe("Slice", function () {
 
             await expect(
                 slice.deposit(ZeroAddress, amountToDeposit)
-            ).to.be.revertedWith("Slice: Allocation for the token doesn't exist");
+            ).to.be.revertedWithCustomError(slice, 'AllocationNotFound')
+                .withArgs(ZeroAddress);
         });
     });
 
@@ -694,7 +692,8 @@ describe("Slice", function () {
                     mockV3Aggregator.target,
                     allocationPercentage,
                 )
-            ).to.be.revertedWith("Slice: Allocation for the passed token exists");
+            ).to.be.revertedWithCustomError(slice, 'AssociatedAllocationExists')
+                .withArgs(autoCompounder1.target);
         });
     });
 
@@ -737,7 +736,8 @@ describe("Slice", function () {
                     autoCompounder1.target,
                     allocationPercentage,
                 )
-            ).to.be.revertedWith("Slice: Allocation for the passed token doesn't exist");
+            ).to.be.revertedWithCustomError(slice, 'AllocationNotFound')
+                .withArgs(autoCompounder1.target);
         });
 
         it("Should revert if invalid percentage", async function () {

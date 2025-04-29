@@ -1,8 +1,46 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "ISlice",
-  "sourceName": "contracts/erc4626/interfaces/ISlice.sol",
+  "sourceName": "contracts/slice/interfaces/ISlice.sol",
   "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "aToken",
+          "type": "address"
+        }
+      ],
+      "name": "AllocationNotFound",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AllocationsLimitReached",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "aToken",
+          "type": "address"
+        }
+      ],
+      "name": "AssociatedAllocationExists",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "aToken",
+          "type": "address"
+        }
+      ],
+      "name": "UnsupportedAToken",
+      "type": "error"
+    },
     {
       "anonymous": false,
       "inputs": [

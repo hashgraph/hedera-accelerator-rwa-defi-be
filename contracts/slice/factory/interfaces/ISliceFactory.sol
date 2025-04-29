@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 /**
  * @title Slice Factory
+ * @author Hashgraph
  *
  * The contract which allows to deploy Slices with different parameters
  * and track contract addresses.
