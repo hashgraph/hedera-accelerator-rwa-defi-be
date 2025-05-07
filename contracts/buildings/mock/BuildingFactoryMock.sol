@@ -17,7 +17,6 @@ contract BuildingFactoryMock is BuildingFactory {
         address _trexGateway,
         address _usdc,
         address _buildingBeacon,
-        address _vaultFactory,
         address _treasuryBeacon,
         address _governanceBeacon
     ) public override initializer {
@@ -29,7 +28,6 @@ contract BuildingFactoryMock is BuildingFactory {
             _trexGateway, 
             _usdc, 
             _buildingBeacon, 
-            _vaultFactory,
             _treasuryBeacon, 
             _governanceBeacon
         );

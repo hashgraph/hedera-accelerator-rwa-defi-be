@@ -2,7 +2,7 @@ import { Contract, LogDescription, Result, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
-import { BuildingFactoryStorage, BuildingGovernance } from '../../typechain-types';
+import { BuildingGovernance } from '../../typechain-types';
 
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
@@ -96,9 +96,6 @@ async function deployFixture() {
 
   const trexGatewayAddress = await trexGateway.getAddress();
   const trexFactoryAddress = await trexFactory.getAddress();
-  
-  const vaultFactory = await ethers.deployContract('VaultFactory');
-  const vaultFactoryAddress = await vaultFactory.getAddress();
 
   // ------------------------------------------------------
 
@@ -116,7 +113,6 @@ async function deployFixture() {
       trexGatewayAddress,
       usdcAddress,
       buildingBeaconAddress,
-      vaultFactoryAddress,
       treasuryBeaconAddress,
       governanceBeaconAddress
     ],
@@ -148,8 +144,6 @@ async function deployFixture() {
     identityGateway,
     trexFactoryAddress,
     trexGatewayAddress,
-    vaultFactory,
-    vaultFactoryAddress,
     voter1,
     voter2,
     voter3,

@@ -6,6 +6,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
 import {IdentityGateway} from "../onchainid/gateway/Gateway.sol";
@@ -13,9 +14,9 @@ import {BuildingToken} from "./library/BuildingToken.sol";
 import {BuildingFactoryStorage} from "./BuildingFactoryStorage.sol";
 import {Treasury} from "../treasury/Treasury.sol";
 import {BuildingGovernance} from "./governance/BuildingGovernance.sol";
-import {IVaultFactory} from "../erc4626/factory/interfaces/IVaultFactory.sol";
 import {FeeConfiguration} from "../common/FeeConfiguration.sol";
 import {ITreasury} from "../treasury/interfaces/ITreasury.sol";
+import {BasicVault} from "../erc4626/BasicVault.sol";
 
 /**
  * @title BuildingFactory
@@ -43,7 +44,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address _trexGateway,
         address _usdc,
         address _buildingBeacon,
-        address _vaultFactory,
         address _treasuryBeacon,
         address _governanceBeacon
     ) public virtual initializer {
@@ -57,8 +57,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         $.treasuryBeacon = _treasuryBeacon;
         $.usdc = _usdc;
         $.governanceBeacon = _governanceBeacon;
-        $.vaultFactory = _vaultFactory;
-        $.vaultNonce = 0;
     }
 
     /**
@@ -113,7 +111,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         tmp.treasury = _deployTreasury(details.treasuryReserveAmount, details.treasuryNPercent, tmp.initialOwner);
         
         tmp.vault = _deployVault(
-            tmp.initialOwner, 
             tmp.erc3643Token, 
             details.vaultShareTokenName, 
             details.vaultShareTokenSymbol, 
@@ -168,12 +165,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         OwnableUpgradeable(token).transferOwnership(msg.sender);
     }
 
-    /**
-     * Deploy new vault
-     * @param token address of the token
-     */
     function _deployVault(
-        address initialOwner,
         address token,
         string memory tokenName,
         string memory tokenSymbol,
@@ -184,31 +176,23 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         uint256 feePercentage,
         uint32 cliff,
         uint32 unlockDuration
-    ) private returns (address) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        // increment vault nonce to create salt
-        $.vaultNonce++;
-
-        string memory salt = IVaultFactory($.vaultFactory).generateSalt(initialOwner, token, $.vaultNonce);
-
-        IVaultFactory.VaultDetails memory vaultDetails = IVaultFactory.VaultDetails(
-            token, // address stakingToken;
-            tokenName, // string shareTokenName;
-            tokenSymbol, // string shareTokenSymbol;
-            rewardController, // address vaultRewardController;
-            feeConfigController, // address feeConfigController;
-            cliff, // uint32 cliff;
-            unlockDuration // uint32 unlockDuration;
-        );
-
+    ) private returns (address vault) {
         FeeConfiguration.FeeConfig memory feeConfig = FeeConfiguration.FeeConfig(
             feeReceiver, // address receiver;
             feeToken, // address token;
             feePercentage // uint256 feePercentage;
         );
 
-        return IVaultFactory($.vaultFactory).deployVault(salt, vaultDetails, feeConfig);
+        vault = address(new BasicVault(
+            IERC20(token),
+            tokenName,
+            tokenSymbol,
+            feeConfig,
+            rewardController,
+            feeConfigController,
+            cliff,
+            unlockDuration
+        ));
     }
 
     /**

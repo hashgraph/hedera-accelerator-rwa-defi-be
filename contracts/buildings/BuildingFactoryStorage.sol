@@ -13,8 +13,6 @@ abstract contract BuildingFactoryStorage {
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;
-        address vaultFactory;
-        uint256 vaultNonce;
         BuildingDetails[] buildingsList;
         mapping (address => BuildingDetails) buildingDetails;
     }
