@@ -205,6 +205,8 @@ describe('BuildingFactory', () => {
   describe('.newBuilding()', () => {    
     it('should create a building', async () => {
       const { 
+        owner,
+        usdcAddress,
         buildingFactory, 
         uniswapFactoryAddress, 
         uniswapRouterAddress, 
@@ -220,6 +222,11 @@ describe('BuildingFactory', () => {
         treasuryNPercent: 2000n, 
         treasuryReserveAmount: ethers.parseEther('1000'),
         governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
         vaultCliff: 0n,
         vaultUnlockDuration: 0n
       }
@@ -263,7 +270,7 @@ describe('BuildingFactory', () => {
     describe('when VAlID building address', () => {
       describe('when contract IS whitelisted', () => {
         it('should call ERC721Metadata contract and set metadata', async () => {
-          const { buildingFactory, nftCollection, nftCollectionAddress } = await loadFixture(deployFixture);
+          const { owner, usdcAddress, buildingFactory, nftCollection, nftCollectionAddress } = await loadFixture(deployFixture);
           const NFT_ID = 0;
 
           const buildingDetails = {
@@ -274,6 +281,11 @@ describe('BuildingFactory', () => {
             treasuryNPercent: 2000n, 
             treasuryReserveAmount: ethers.parseEther('1000'),
             governanceName : 'MyGovernance',
+            vaultShareTokenName: 'Vault Token Name',
+            vaultShareTokenSymbol: 'VTS',
+            vaultFeeReceiver: owner,
+            vaultFeeToken: usdcAddress,
+            vaultFeePercentage: 2000,
             vaultCliff: 0n,
             vaultUnlockDuration: 0n
           }
@@ -314,7 +326,7 @@ describe('BuildingFactory', () => {
 
   describe('integration flows', () => {
     it('should create building suite (token, vault, treasury governance), create a payment proposal, execute payment proposal', async () => {
-        const { buildingFactory, usdc, owner, voter1, voter2, voter3 } = await loadFixture(deployFixture);
+        const { buildingFactory, usdc, usdcAddress, owner, voter1, voter2, voter3 } = await loadFixture(deployFixture);
 
         // create building
         const buildingDetails = {
@@ -325,6 +337,11 @@ describe('BuildingFactory', () => {
           treasuryNPercent: 2000n, 
           treasuryReserveAmount: ethers.parseUnits('1000', 6),
           governanceName : 'MyGovernance',
+          vaultShareTokenName: 'Vault Token Name',
+          vaultShareTokenSymbol: 'VTS',
+          vaultFeeReceiver: owner,
+          vaultFeeToken: usdcAddress,
+          vaultFeePercentage: 2000,
           vaultCliff: 0n,
           vaultUnlockDuration: 0n
         }

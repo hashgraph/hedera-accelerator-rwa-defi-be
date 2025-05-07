@@ -66,7 +66,7 @@ describe('AuditRegistry', () => {
       expect(record.revoked).to.be.false;
     });
 
-    it.only('should revert in case of duplicate ipfs hash', async () => {
+    it('should revert in case of duplicate ipfs hash', async () => {
       const { auditRegistry, owner, auditor1 } = await loadFixture(deployFixture);
       const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
       await auditRegistry.connect(owner).grantRole(await auditRegistry.AUDITOR_ROLE(), await auditor1.getAddress());
@@ -89,7 +89,7 @@ describe('AuditRegistry', () => {
         .to.be.revertedWithCustomError(auditRegistry, 'DuplicateIpfsHash');
     });
 
-    it.only('should revert in case of duplicate ipfs hash during record update', async () => {
+    it('should revert in case of duplicate ipfs hash during record update', async () => {
       const { auditRegistry, owner, auditor1 } = await loadFixture(deployFixture);
       const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
       await auditRegistry.connect(owner).grantRole(await auditRegistry.AUDITOR_ROLE(), await auditor1.getAddress());

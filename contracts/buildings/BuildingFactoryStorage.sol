@@ -38,6 +38,11 @@ abstract contract BuildingFactoryStorage {
         uint256 treasuryReserveAmount;
         uint256 treasuryNPercent;
         string governanceName;
+        string vaultShareTokenName;
+        string vaultShareTokenSymbol;
+        address vaultFeeReceiver;
+        address vaultFeeToken;
+        uint256 vaultFeePercentage;
         uint32 vaultCliff;
         uint32 vaultUnlockDuration;
     }

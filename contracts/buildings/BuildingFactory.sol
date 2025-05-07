@@ -78,44 +78,74 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         return $.buildingDetails[buildingAddress];
     }
 
+    // Temporary struct to handle new building variables
+    // used to avoid stack too deep error.
+    struct Tmp {
+        address initialOwner;
+        address building;
+        uint256 nftId;
+        address identity;
+        address erc3643Token;
+        address treasury;
+        address vault;
+        address governance;
+    }
+
     /**
      * newBuilding Creates new building with create2, mints NFT and store it.
      * @param details NewBuildingDetails struct
      */
     function newBuilding(NewBuildingDetails calldata details) public virtual returns (BuildingDetails memory buildingDetails){
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        address building = address(new BeaconProxy(
+        
+        Tmp memory tmp; // temp var to avoid stack too deep errors
+
+        tmp.building = address(new BeaconProxy(
             $.buildingBeacon,
             abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, msg.sender)
         ));
 
         // deploy new token
-        address initialOwner = msg.sender;
-        uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);
-        address identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(building);
-        address erc3643Token = _deployERC3643Token(building, details.tokenName, details.tokenSymbol, details.tokenDecimals);
-        address treasury = _deployTreasury(details.treasuryReserveAmount, details.treasuryNPercent, initialOwner);
-        address vault = _deployVault(erc3643Token, initialOwner, treasury, details.vaultCliff, details.vaultUnlockDuration);
-        address governance = _deployGovernance(erc3643Token, details.governanceName, treasury, initialOwner);
+        tmp.initialOwner = msg.sender;
+        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);
+        tmp.identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.building);
+        tmp.erc3643Token = _deployERC3643Token(tmp.building, details.tokenName, details.tokenSymbol, details.tokenDecimals);
+        tmp.treasury = _deployTreasury(details.treasuryReserveAmount, details.treasuryNPercent, tmp.initialOwner);
         
-        ITreasury(treasury).grantGovernanceRole(governance);
-        ITreasury(treasury).addVault(vault);
+        tmp.vault = _deployVault(
+            tmp.initialOwner, 
+            tmp.erc3643Token, 
+            details.vaultShareTokenName, 
+            details.vaultShareTokenSymbol, 
+            tmp.treasury, // details.vaultRewardController, 
+            tmp.initialOwner, // details.vaultFeeConfigController, 
+            details.vaultFeeReceiver, 
+            details.vaultFeeToken, 
+            details.vaultFeePercentage, 
+            details.vaultCliff, 
+            details.vaultUnlockDuration
+        );
+        
+        tmp.governance = _deployGovernance(tmp.erc3643Token, details.governanceName, tmp.treasury, tmp.initialOwner);
+        
+        ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
+        ITreasury(tmp.treasury).addVault(tmp.vault);
 
         buildingDetails = BuildingDetails(
-            building,
-            nftId,
+            tmp.building,
+            tmp.nftId,
             details.tokenURI,
-            identity,
-            erc3643Token,
-            treasury, 
-            governance,
-            vault 
+            tmp.identity,
+            tmp.erc3643Token,
+            tmp.treasury, 
+            tmp.governance,
+            tmp.vault 
         );
 
-        $.buildingDetails[building] = buildingDetails;
+        $.buildingDetails[tmp.building] = buildingDetails;
         $.buildingsList.push(buildingDetails);
 
-        emit NewBuilding(building, erc3643Token, treasury, vault, governance, initialOwner);
+        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner);
     }
 
     /**
@@ -143,9 +173,15 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
      * @param token address of the token
      */
     function _deployVault(
-        address token,
         address initialOwner,
-        address vaultRewardController,
+        address token,
+        string memory tokenName,
+        string memory tokenSymbol,
+        address rewardController,
+        address feeConfigController,
+        address feeReceiver,
+        address feeToken,
+        uint256 feePercentage,
         uint32 cliff,
         uint32 unlockDuration
     ) private returns (address) {
@@ -155,23 +191,21 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         $.vaultNonce++;
 
         string memory salt = IVaultFactory($.vaultFactory).generateSalt(initialOwner, token, $.vaultNonce);
-        string memory tokenName = IERC20Metadata(token).name();
-        string memory tokenSymbol = IERC20Metadata(token).symbol();
 
         IVaultFactory.VaultDetails memory vaultDetails = IVaultFactory.VaultDetails(
             token, // address stakingToken;
             tokenName, // string shareTokenName;
             tokenSymbol, // string shareTokenSymbol;
-            vaultRewardController, // address vaultRewardController;
-            initialOwner, // address feeConfigController;
+            rewardController, // address vaultRewardController;
+            feeConfigController, // address feeConfigController;
             cliff, // uint32 cliff;
             unlockDuration // uint32 unlockDuration;
         );
 
         FeeConfiguration.FeeConfig memory feeConfig = FeeConfiguration.FeeConfig(
-            address(0), // address receiver;
-            address(0), // address token;
-            0 // uint256 feePercentage;
+            feeReceiver, // address receiver;
+            feeToken, // address token;
+            feePercentage // uint256 feePercentage;
         );
 
         return IVaultFactory($.vaultFactory).deployVault(salt, vaultDetails, feeConfig);
