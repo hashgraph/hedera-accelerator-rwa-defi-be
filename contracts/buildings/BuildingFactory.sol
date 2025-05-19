@@ -7,6 +7,7 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
 import {IdentityGateway} from "../onchainid/gateway/Gateway.sol";
@@ -114,7 +115,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             tmp.erc3643Token, 
             details.vaultShareTokenName, 
             details.vaultShareTokenSymbol, 
-            tmp.treasury, // details.vaultRewardController, 
+            tmp.initialOwner, // details.vaultRewardController, 
             tmp.initialOwner, // details.vaultFeeConfigController, 
             details.vaultFeeReceiver, 
             details.vaultFeeToken, 
@@ -127,6 +128,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
         ITreasury(tmp.treasury).addVault(tmp.vault);
+        
+        // grant reward controller role to treasury
+        IAccessControl(tmp.vault).grantRole(BasicVault(tmp.vault).VAULT_REWARD_CONTROLLER_ROLE(), tmp.treasury);
 
         buildingDetails = BuildingDetails(
             tmp.building,
