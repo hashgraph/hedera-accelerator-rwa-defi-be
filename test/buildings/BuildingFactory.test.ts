@@ -58,9 +58,16 @@ async function deployFixture() {
   await governanceBeacon.waitForDeployment();
   const governanceBeaconAddress = await governanceBeacon.getAddress();
 
+  const libraries = {
+    "BuildingTokenLib" : await (await (await ethers.deployContract("BuildingTokenLib")).waitForDeployment()).getAddress(),
+    "BuildingGovernanceLib" : await (await (await ethers.deployContract("BuildingGovernanceLib")).waitForDeployment()).getAddress(),
+    "BuildingTreasuryLib" : await (await (await ethers.deployContract("BuildingTreasuryLib")).waitForDeployment()).getAddress(),
+    "BuildingVaultLib" : await (await (await ethers.deployContract("BuildingVaultLib")).waitForDeployment()).getAddress(),
+  }
+
   // Deploy BuildingFactory
-  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', owner);
-  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
+  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', { libraries } );
+  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory, { unsafeAllowLinkedLibraries: true });
 
   // TREX SUITE ------------------------------------
   const claimTopicsRegistryImplementation = await ethers.deployContract('ClaimTopicsRegistry', owner);
@@ -117,8 +124,8 @@ async function deployFixture() {
       governanceBeaconAddress
     ],
     { 
-      initializer: 'initialize'
-    }
+      initializer: 'initialize',
+    }, 
   );
 
   await buildingFactory.waitForDeployment();
@@ -147,6 +154,7 @@ async function deployFixture() {
     voter1,
     voter2,
     voter3,
+    libraries,
   }
 }
 
@@ -182,12 +190,13 @@ describe('BuildingFactory', () => {
     it('should be uprgradable', async () => {
       const { 
         buildingFactory,
-        buildingFactoryBeacon
+        buildingFactoryBeacon,
+        libraries,
        } = await loadFixture(deployFixture);
 
       const previousBuildingFactoryAddress = await buildingFactory.getAddress();
-      const v2contractFactory = await ethers.getContractFactory('BuildingFactoryMock');
-      await upgrades.upgradeBeacon(await buildingFactoryBeacon.getAddress(), v2contractFactory);
+      const v2contractFactory = await ethers.getContractFactory('BuildingFactoryMock', { libraries });
+      await upgrades.upgradeBeacon(await buildingFactoryBeacon.getAddress(), v2contractFactory, { unsafeAllowLinkedLibraries: true });
 
       const upgradedBuildinFactory = await ethers.getContractAt('BuildingFactoryMock', previousBuildingFactoryAddress);
 
