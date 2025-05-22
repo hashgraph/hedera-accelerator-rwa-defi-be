@@ -12,6 +12,7 @@ import {BuildingVaultLib, VaultDetails} from "./library/BuildingVault.sol";
 import {BuildingGovernanceLib, GovernanceDetails} from "./library/BuildingGovernance.sol";
 import {BuildingTreasuryLib, TreasuryDetails} from "./library/BuildingTreasury.sol";
 import {BuildingTokenLib, TokenDetails} from "./library/BuildingToken.sol";
+import {BuildingAutoCompounderLib, AutoCompounderDetails} from "./library/BuildingAutoCompounder.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -21,6 +22,9 @@ interface IIdentityGateway {
     function deployIdentityForWallet(address wallet) external returns (address);
 }
 
+interface IERC20 {
+    function mint(address to, uint256 amount) external;
+}
 /**
  * @title BuildingFactory
  * @author Hashgraph
@@ -90,6 +94,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address treasury;
         address vault;
         address governance;
+        address autoCompounder;
     }
 
     /**
@@ -154,12 +159,25 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 tmp.initialOwner
             )
         );
-        
+
+        tmp.autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
+            AutoCompounderDetails (
+                $.uniswapFactory,
+                tmp.vault,
+                $.usdc,
+                details.aTokenName,
+                details.aTokenSymbol,
+                tmp.initialOwner // operator
+            )
+        );
+
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
         ITreasury(tmp.treasury).addVault(tmp.vault); 
         IAccessControl(tmp.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), tmp.treasury);// grant reward controller role to treasury
         IOwnable(tmp.vault).transferOwnership(tmp.initialOwner);
+        IERC20(tmp.erc3643Token).mint(tmp.initialOwner, details.tokenMintAmount);
         IOwnable(tmp.erc3643Token).transferOwnership(tmp.initialOwner);
+        IOwnable(tmp.autoCompounder).transferOwnership(tmp.initialOwner);
 
         buildingDetails = BuildingDetails(
             tmp.building,
@@ -169,12 +187,13 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             tmp.erc3643Token,
             tmp.treasury, 
             tmp.governance,
-            tmp.vault 
+            tmp.vault,
+            tmp.autoCompounder
         );
 
         $.buildingDetails[tmp.building] = buildingDetails;
         $.buildingsList.push(buildingDetails);
 
-        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner);
+        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner, tmp.autoCompounder);
     }
 }

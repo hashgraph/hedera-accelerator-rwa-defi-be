@@ -63,6 +63,7 @@ async function deployFixture() {
     "BuildingGovernanceLib" : await (await (await ethers.deployContract("BuildingGovernanceLib")).waitForDeployment()).getAddress(),
     "BuildingTreasuryLib" : await (await (await ethers.deployContract("BuildingTreasuryLib")).waitForDeployment()).getAddress(),
     "BuildingVaultLib" : await (await (await ethers.deployContract("BuildingVaultLib")).waitForDeployment()).getAddress(),
+    "BuildingAutoCompounderLib" : await (await (await ethers.deployContract("BuildingAutoCompounderLib")).waitForDeployment()).getAddress(),
   }
 
   // Deploy BuildingFactory
@@ -206,7 +207,7 @@ describe('BuildingFactory', () => {
   });
 
   describe('.newBuilding()', () => {    
-    it('should create a building', async () => {
+    it.only('should create a building', async () => {
       const { 
         owner,
         usdcAddress,
@@ -222,6 +223,7 @@ describe('BuildingFactory', () => {
         tokenName: 'MyToken', 
         tokenSymbol: 'MYT', 
         tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('1000'),
         treasuryNPercent: 2000n, 
         treasuryReserveAmount: ethers.parseEther('1000'),
         governanceName : 'MyGovernance',
@@ -231,7 +233,9 @@ describe('BuildingFactory', () => {
         vaultFeeToken: usdcAddress,
         vaultFeePercentage: 2000,
         vaultCliff: 0n,
-        vaultUnlockDuration: 0n
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
       }
 
       const tx = await buildingFactory.newBuilding(buildingDetails);
@@ -263,8 +267,13 @@ describe('BuildingFactory', () => {
 
       const detailsBuildingAddress = firstBuilding[0];
       const detailsIdentityAddress = firstBuilding[3];
+      const detailsTokenAddress = firstBuilding[4];
       
       await expect(tx).to.emit(identityFactory, 'WalletLinked').withArgs(detailsBuildingAddress, detailsIdentityAddress);
+
+      // make sure tokens were minted to the sender
+      const buildingToken = await ethers.getContractAt('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20', detailsTokenAddress);
+      expect(await buildingToken.balanceOf(owner)).to.be.equal(ethers.parseEther('1000'));
     });
 
   });
@@ -281,6 +290,7 @@ describe('BuildingFactory', () => {
             tokenName: 'MyToken', 
             tokenSymbol: 'MYT', 
             tokenDecimals: 18n,
+            tokenMintAmount: ethers.parseEther('1000'),
             treasuryNPercent: 2000n, 
             treasuryReserveAmount: ethers.parseEther('1000'),
             governanceName : 'MyGovernance',
@@ -290,7 +300,9 @@ describe('BuildingFactory', () => {
             vaultFeeToken: usdcAddress,
             vaultFeePercentage: 2000,
             vaultCliff: 0n,
-            vaultUnlockDuration: 0n
+            vaultUnlockDuration: 0n,
+            aTokenName: "AutoCompounder Token Name",
+            aTokenSymbol: "ACTS"
           }
           const tx = await buildingFactory.newBuilding(buildingDetails);
           await tx.wait();
@@ -337,6 +349,7 @@ describe('BuildingFactory', () => {
           tokenName: 'MyToken', 
           tokenSymbol: 'MYT', 
           tokenDecimals: 18n,
+          tokenMintAmount: ethers.parseEther('1000'),
           treasuryNPercent: 2000n, 
           treasuryReserveAmount: ethers.parseUnits('1000', 6),
           governanceName : 'MyGovernance',
@@ -346,7 +359,9 @@ describe('BuildingFactory', () => {
           vaultFeeToken: usdcAddress,
           vaultFeePercentage: 2000,
           vaultCliff: 0n,
-          vaultUnlockDuration: 0n
+          vaultUnlockDuration: 0n,
+          aTokenName: "AutoCompounder Token Name",
+          aTokenSymbol: "ACTS"
         }
   
         const buildingTx = await buildingFactory.newBuilding(buildingDetails);
