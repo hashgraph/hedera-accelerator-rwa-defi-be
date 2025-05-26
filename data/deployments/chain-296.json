@@ -8,7 +8,7 @@
     "ModularCompliance": "0xF5564619EcF4100F204a5040140E13b727C4f42f",
     "Identity": "0x3e56b1C2fFbE347b6727884B328805Ef7f914e8a",
     "ImplementationAuthority": "0x0765FdfDcf78d29aEf10E77b55f417182d458E73",
-    "ERC721Metadata": "0x212a586E75318eB4c90Db59885b0400F1987d56B"
+    "ERC721Metadata": "0x8b8EBA3f99DBb9d59d0A1Aec435F1Ccb6dc7C055"
   },
   "factories": {
     "IdFactory": "0x140108F2D8731F582F25849A3f195A11fE62679E",
@@ -16,7 +16,7 @@
     "TREXFactory": "0xDae14ffe7F67bb63457f2c718Ea2c8091518B711",
     "TREXGateway": "0x00E73eA36A10252274e070A0B19d3f04Db423A56",
     "IdentityGateway": "0xA18D6fbcD34c1cb9E09Df31ceb9d2fAEB64E925C",
-    "BuildingFactory": "0xDa3E62a174b2F22e27300bc37E8CD0273A4D26FD"
+    "BuildingFactory": "0x3E52Ca7A1ef4ADf7e77656039DF1c2bb9491B4c7"
   },
   "compliance": {
     "RequiresNFTModule": "0xA318d349488531882b4fCa6b412A8766F7421044",
@@ -28,27 +28,16 @@
     "TransferLimitOneHundredModule": "0xF29a8A633018984A19315D1080975FA793118076"
   },
   "vault": {
-    "Vault": "0x66940FCa4F49bF79EB2505a9b634C93faB759129",
-    "VaultFactory": "0x6F1701ee920904D0De6628815B6F6a7d7f70602C",
-    "StakingToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-    "RewardToken": "0x11724c1E87cb63eb570383CFC260F597F71f9605"
+    "VaultFactory": "0x6F1701ee920904D0De6628815B6F6a7d7f70602C"
   },
   "slice": {
-    "Slice": "0x2dc9C11744FDd592c4a3033D4319d86F3A9E6fc0",
     "SliceFactory": "0x3CCb7268B68B0AA3450AB3dd579796619Fc2e64f"
   },
   "autoCompounder": {
-    "AutoCompounder": "0xa250aeA16b9Aed0996Dd33D70d91536e523A9Fc2",
     "AutoCompounderFactory": "0xf6A517F696c525142DAa679bf7725459bC543F9c"
   },
-  "nft": {
-    "HederaNFT": "0xCeabeC99782c70840A8C11eE931473Ec6407678B"
-  },
   "asyncVault": {
-    "AsyncVault": "0x9d2cDA1A5e3A527Ce6E9eD733350AfEC00B3f83c",
-    "AsyncVaultFactory": "0x2b8246D5f6ad1049b02A2173c2b9cc0D715eE010",
-    "StakingToken": "0x0Ef8B789bB76752B70749f87EF9bE31082e465F9",
-    "RewardToken": "0x11724c1E87cb63eb570383CFC260F597F71f9605"
+    "AsyncVaultFactory": "0x2b8246D5f6ad1049b02A2173c2b9cc0D715eE010"
   },
   "libraries": {
     "BuildingTokenLib": "0x47aFE1db3E9c818C6D7B2928B266a1d976D159ae",
