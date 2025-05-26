@@ -148,6 +148,8 @@ describe("AsyncVault", function () {
                 owner.address,
                 amountToDeposit
             );
+
+            await expect(claimRewardTx).to.emit(asyncVault, 'RewardClaimed').withArgs(rewardToken, owner.address, 4999999999);
         });
 
         it("Should revert if max deposit request", async function () {

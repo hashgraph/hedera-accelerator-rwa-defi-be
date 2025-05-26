@@ -73,6 +73,16 @@ abstract contract AsyncVaultStorage {
     event RewardAdded(address indexed rewardToken, uint256 amount);
 
     /**
+     * @notice RewardClaimed event.
+     * @dev Emitted when permissioned user claims reward from the Vault.
+     *
+     * @param rewardToken The address of reward token.
+     * @param receiver The receiver address.
+     * @param amount The added reward token amount.
+     */
+    event RewardClaimed(address indexed rewardToken, address indexed receiver, uint256 amount);
+
+    /**
      * @notice SetSharesLockTime event.
      * @dev Emitted when permissioned user updates shares lock time.
      *

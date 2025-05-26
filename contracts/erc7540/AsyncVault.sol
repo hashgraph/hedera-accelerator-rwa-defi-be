@@ -317,10 +317,11 @@ contract AsyncVault is ERC7540, ERC165, FeeConfiguration, Ownable {
 
             // Fee management
             if (_feeToken != address(0)) {
-                IERC20(_rewardToken).safeTransfer(_receiver, _deductFee(_reward));
-            } else {
-                IERC20(_rewardToken).safeTransfer(_receiver, _reward);
+                _reward = _deductFee(_reward);
             }
+
+            IERC20(_rewardToken).safeTransfer(_receiver, _reward);
+            emit RewardClaimed(_rewardToken, _receiver, _reward);
         }
         return (_startPosition, _rewardTokensSize);
     }
