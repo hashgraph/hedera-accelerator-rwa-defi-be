@@ -718,6 +718,9 @@ describe("BasicVault", function () {
                 2499999999999999999999999n
             );
 
+            await expect(ownerClaimTx).to.emit(hederaVault, 'RewardClaimed').withArgs(rewardToken, owner, 2499999999999999999999999n);
+            await expect(stakerClaimTx).to.emit(hederaVault, 'RewardClaimed').withArgs(rewardToken, staker, 2499999999999999999999999n);
+
             console.log("Reward Owner balance after claim", await rewardToken.balanceOf(owner.address));
             console.log("Reward Staker balance after claim", await rewardToken.balanceOf(staker.address));
 

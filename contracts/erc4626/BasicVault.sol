@@ -303,10 +303,12 @@ contract BasicVault is BasicVaultStorage, ERC4626, ERC165, FeeConfiguration, Own
 
             // Fee management
             if (_feeToken != address(0)) {
-                IERC20(_rewardToken).safeTransfer(receiver, _deductFee(_reward));
-            } else {
-                IERC20(_rewardToken).safeTransfer(receiver, _reward);
+                _reward = _deductFee(_reward);
             }
+            
+            IERC20(_rewardToken).safeTransfer(receiver, _reward);
+
+            emit RewardClaimed(_rewardToken, receiver, _reward);
         }
         return (_startPosition, _rewardTokensSize);
     }
