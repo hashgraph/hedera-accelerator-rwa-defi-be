@@ -29,57 +29,6 @@ contract AsyncVault is ERC7540, ERC165, FeeConfiguration, Ownable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
-    // Total duration of vesting (after cliff date) expressed in seconds
-    // uint32 private _unlockDuration;
-
-    // // Cliff date expressed in seconds
-    // uint32 public _cliff;
-
-    // // Reward tokens
-    // address[] private _rewardTokens;
-
-    // // Timestamp of deposit lock
-    // mapping(address => uint256) private _depositLockCheckPoint;
-
-    // // Info by user
-    // mapping(address => UserInfo) private _userContribution;
-
-    // // Reward info by user
-    // mapping(address => RewardsInfo) private _tokensRewardInfo;
-
-    // // User Info struct
-    // struct UserInfo {
-    //     uint256 sharesAmount;
-    //     uint256 totalLocked;
-    //     uint256 totalReleased;
-    //     uint256 depositLockCheckpoint;
-    //     mapping(address => uint256) lastClaimedAmountT;
-    //     bool exist;
-    // }
-
-    // // Rewards Info struct
-    // struct RewardsInfo {
-    //     uint256 amount;
-    //     bool exist;
-    // }
-
-    // /**
-    //  * @notice SetSharesLockTime event.
-    //  * @dev Emitted when permissioned user updates shares lock time.
-    //  *
-    //  * @param time The shares lock period.
-    //  */
-    // event SetSharesLockTime(uint32 time);
-
-    // /**
-    //  * @notice RewardAdded event.
-    //  * @dev Emitted when permissioned user adds reward to the Vault.
-    //  *
-    //  * @param rewardToken The address of reward token.
-    //  * @param amount The added reward token amount.
-    //  */
-    // event RewardAdded(address indexed rewardToken, uint256 amount);
-
     /**
      * @dev Initializes contract with passed parameters.
      *

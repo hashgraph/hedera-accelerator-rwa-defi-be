@@ -178,7 +178,7 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
         uint256 vTotalSupply = _vault.totalSupply();
         uint256 aTotalSupply = totalSupply();
 
-        return aTotalSupply == 0 ? 1 : aTotalSupply / vTotalSupply;
+        return aTotalSupply == 0 ? 1 : vTotalSupply / aTotalSupply;
     }
 
     /**

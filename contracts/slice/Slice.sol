@@ -167,7 +167,6 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(priceFeed != address(0), "Slice: Invalid price feed address");
         require(percentage != 0 && percentage != BASIS_POINTS, "Slice: Invalid allocation percentage");
-        require(getTokenAllocation(aToken).aToken == address(0), "Slice: Allocation for the passed token exists");
 
         // Check there is no associated allocation
         if (getTokenAllocation(aToken).aToken != address(0)) revert AssociatedAllocationExists(aToken);

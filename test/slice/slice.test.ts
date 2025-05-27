@@ -1,7 +1,7 @@
 import { ethers, expect, time } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { AddressLike, ZeroAddress } from "ethers";
-import { VaultToken, Slice, BasicVault, AsyncVault, AutoCompounder, MockV3Aggregator, UniswapRouterMock } from "../../typechain-types";
+import { VaultToken, Slice, BasicVault, AsyncVault, AutoCompounder, UniswapRouterMock } from "../../typechain-types";
 
 import factoryAbi from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import routerAbi from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
@@ -42,6 +42,7 @@ describe("Slice", function () {
     async function deployFixture(vault1Type: VaultType, vault2Type: VaultType) {
         const [
             owner,
+            staker
         ] = await ethers.getSigners();
 
         let client = Client.forTestnet();
@@ -90,8 +91,13 @@ describe("Slice", function () {
         ) as VaultToken;
         await stakingToken2.waitForDeployment();
 
+        // Mint staking token for owner
         await stakingToken1.mint(owner.address, ethers.parseUnits("500000000", 18));
         await stakingToken2.mint(owner.address, ethers.parseUnits("500000000", 18));
+
+        // Mint staking token for staker
+        await stakingToken1.mint(staker.address, ethers.parseUnits("500000000", 18));
+        await stakingToken2.mint(staker.address, ethers.parseUnits("500000000", 18));
 
         // Reward Token
         const rewardToken = await VaultToken.deploy(
@@ -116,8 +122,6 @@ describe("Slice", function () {
             feeConfig,
             unlockDuration2
         );
-
-        // await stakingToken.mint(testAccount.address, ethers.parseUnits("500000000", 18));
 
         // Slice
         const Slice = await ethers.getContractFactory("Slice");
@@ -166,6 +170,7 @@ describe("Slice", function () {
             rewardToken,
             client,
             owner,
+            staker
         };
     }
 
@@ -174,6 +179,7 @@ describe("Slice", function () {
             const {
                 slice,
                 owner,
+                staker,
                 vault1,
                 vault2,
                 autoCompounder1,
@@ -188,6 +194,19 @@ describe("Slice", function () {
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const rewardAmount = ethers.parseUnits("50000000", 18);
+
+            // Initial deposit to prevent lack of reward during reinvest
+            await stakingToken1.connect(staker).approve(vault1.target, amountToDeposit);
+            await stakingToken2.connect(staker).approve(vault2.target, amountToDeposit);
+
+            await vault1.connect(staker).deposit(
+                amountToDeposit / 2n,
+                staker.address
+            );
+            await vault2.connect(staker).deposit(
+                amountToDeposit / 2n,
+                staker.address
+            );
 
             // Add Liquidity
             await rewardToken.approve(uniswapV2Router02.target, ethers.parseUnits("50000000", 18));
@@ -384,6 +403,7 @@ describe("Slice", function () {
             const {
                 slice,
                 owner,
+                staker,
                 vault1,
                 vault2,
                 autoCompounder1,
@@ -398,6 +418,24 @@ describe("Slice", function () {
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const rewardAmount = ethers.parseUnits("50000000", 18);
+
+            // Initial deposit to prevent lack of reward during reinvest
+            await stakingToken1.connect(staker).approve(vault1.target, amountToDeposit);
+            await stakingToken2.connect(staker).approve(vault2.target, amountToDeposit);
+
+            await vault1.connect(staker).deposit(
+                amountToDeposit / 2n,
+                staker.address
+            );
+            await vault2.connect(staker).requestDeposit(
+                amountToDeposit / 2n,
+                staker.address,
+                staker.address
+            );
+            await vault2.connect(staker).deposit(
+                amountToDeposit / 2n,
+                staker.address
+            );
 
             // Add Liquidity
             await rewardToken.approve(uniswapV2Router02.target, ethers.parseUnits("50000000", 18));

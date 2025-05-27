@@ -25,10 +25,15 @@ abstract contract AsyncVaultStorage {
         mapping(address => ERC7540_FilledRequest) claimableRedeemRequest;
         // ERC7540 operator approvals
         mapping(address controller => mapping(address operator => bool)) isOperator;
+        // Total duration of vesting (after cliff date) expressed in seconds
         uint32 unlockDuration;
+        // Cliff date expressed in seconds
         uint32 cliff;
+        // Reward tokens
         address[] rewardTokens;
+        // Info by user
         mapping(address => UserInfo) userContribution;
+        // Reward info by user
         mapping(address => RewardsInfo) tokensRewardInfo;
     }
 
