@@ -1,23 +1,24 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "IERC20",
+  "contractName": "IIdentityGateway",
   "sourceName": "contracts/buildings/BuildingFactory.sol",
   "abi": [
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "to",
+          "name": "wallet",
           "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
         }
       ],
-      "name": "mint",
-      "outputs": [],
+      "name": "deployIdentityForWallet",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     }

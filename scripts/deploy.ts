@@ -374,7 +374,6 @@ async function createERC721Metadata(contracts: Record<string, any>): Promise<Rec
   await ERC721Metadata.waitForDeployment();
   const ERC721MetadataAddress = await ERC721Metadata.getAddress();
 
-
   return {
     ...contracts,
     implementations: {
@@ -388,10 +387,12 @@ async function createERC721Metadata(contracts: Record<string, any>): Promise<Rec
 async function createBuildingFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
   const buildingFact = await ethers.getContractFactory('Building');
   const buildingBeacon = await upgrades.deployBeacon(buildingFact);
+  await buildingBeacon.waitForDeployment();
   const buildingBeaconAddress = await buildingBeacon.getAddress();
 
-  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory');
-  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory);
+  const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', { libraries: contracts.libraries });
+  const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory, { unsafeAllow: ["external-library-linking"] } );
+  await buildingFactoryBeacon.waitForDeployment();
   const buildingFactoryBeaconAddress = await buildingFactoryBeacon.getAddress();
   const identityGateway = await ethers.getContractAt('IdentityGateway', contracts.factories.IdentityGateway);
   const identityGatewayAddress = await identityGateway.getAddress();
@@ -403,24 +404,22 @@ async function createBuildingFactory(contracts: Record<string, any>): Promise<Re
   const trexGateway = await ethers.getContractAt('TREXGateway', trexGatewayAddress);
 
   // Beacon Upgradable Pattern for Treasury
-  const treasuryImplementation = await ethers.deployContract('Treasury');
+  const treasuryImplementation = await ethers.deployContract('Treasury', { gasLimit: 1000000 });
+  await treasuryImplementation.waitForDeployment();
   const treasuryImplementationAddress = await treasuryImplementation.getAddress();
   const treasuryBeaconFactory = await ethers.getContractFactory('TreasuryBeacon');
-  const treasuryBeacon = await treasuryBeaconFactory.deploy(treasuryImplementationAddress)
+  const treasuryBeacon = await treasuryBeaconFactory.deploy(treasuryImplementationAddress, { gasLimit: 1000000 })
   await treasuryBeacon.waitForDeployment();
   const treasuryBeaconAddress = await treasuryBeacon.getAddress();
 
   // Beacon Upgradable Pattern for Treasury
   const governanceImplementation = await ethers.deployContract('BuildingGovernance');
+  await governanceImplementation.waitForDeployment();
   const governanceImplementationAddress = await governanceImplementation.getAddress();
   const governanceBeaconFactory = await ethers.getContractFactory('BuildingGovernanceBeacon');
-  const governanceBeacon = await governanceBeaconFactory.deploy(governanceImplementationAddress)
+  const governanceBeacon = await governanceBeaconFactory.deploy(governanceImplementationAddress, { gasLimit: 1000000 })
   await governanceBeacon.waitForDeployment();
   const governanceBeaconAddress = await governanceBeacon.getAddress();
-
-  // deploy new ERC20 to be used as USDC for demo/phase1 porpose
-  const usdcMock = await ethers.deployContract('ERC20Mock', ["USDC", "USDC", 6]);
-  const usdcMockAddress = await usdcMock.getAddress();
 
   const buildingFactory = await upgrades.deployBeaconProxy(
     buildingFactoryBeaconAddress,
@@ -431,9 +430,8 @@ async function createBuildingFactory(contracts: Record<string, any>): Promise<Re
       uniswapFactoryAddress,
       identityGatewayAddress,
       trexGatewayAddress,
-      usdcMockAddress,
+      usdcAddress,
       buildingBeaconAddress,
-      contracts.vault.VaultFactory,
       treasuryBeaconAddress,
       governanceBeaconAddress
     ],
@@ -486,6 +484,21 @@ async function deployExchange(contracts: Record<string, any>): Promise<Record<st
   }
 }
 
+async function deployLibraries(contracts: Record<string, any>): Promise<Record<string, any>> { 
+  const libraries = {
+    "BuildingTokenLib" : await (await (await ethers.deployContract("BuildingTokenLib")).waitForDeployment()).getAddress(),
+    "BuildingGovernanceLib" : await (await (await ethers.deployContract("BuildingGovernanceLib")).waitForDeployment()).getAddress(),
+    "BuildingTreasuryLib" : await (await (await ethers.deployContract("BuildingTreasuryLib")).waitForDeployment()).getAddress(),
+    "BuildingVaultLib" : await (await (await ethers.deployContract("BuildingVaultLib")).waitForDeployment()).getAddress(),
+    "BuildingAutoCompounderLib" : await (await (await ethers.deployContract("BuildingAutoCompounderLib")).waitForDeployment()).getAddress(),
+  }
+
+  return {
+    ...contracts,
+    libraries
+  }
+}
+
 async function logContracts(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(contracts);
   return contracts;
@@ -521,6 +534,7 @@ init()
   .then(deployAutoCompounderFactory)
   .then(deployHTSTokenFactory)
   .then(createERC721Metadata)
+  .then(deployLibraries)
   .then(createBuildingFactory)
   .then(deployAudit)
   .then(deployExchange)

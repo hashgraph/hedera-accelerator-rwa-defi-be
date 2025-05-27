@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {BuildingToken} from "./library/BuildingToken.sol";
 import {CallContract} from "./library/CallContract.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 

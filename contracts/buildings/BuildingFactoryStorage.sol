@@ -26,6 +26,7 @@ abstract contract BuildingFactoryStorage {
         address treasury;
         address governance;
         address vault;
+        address autoCompounder;
     }
 
     struct NewBuildingDetails {
@@ -33,6 +34,7 @@ abstract contract BuildingFactoryStorage {
         string tokenName;
         string tokenSymbol;
         uint8 tokenDecimals;
+        uint256 tokenMintAmount;
         uint256 treasuryReserveAmount;
         uint256 treasuryNPercent;
         string governanceName;
@@ -43,6 +45,8 @@ abstract contract BuildingFactoryStorage {
         uint256 vaultFeePercentage;
         uint32 vaultCliff;
         uint32 vaultUnlockDuration;
+        string aTokenName;
+        string aTokenSymbol;
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
@@ -54,5 +58,5 @@ abstract contract BuildingFactoryStorage {
         }
     }
 
-    event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner);
+    event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner, address autoCompounder);
 }

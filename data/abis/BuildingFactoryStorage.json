@@ -41,6 +41,12 @@
           "internalType": "address",
           "name": "initialOwner",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "autoCompounder",
+          "type": "address"
         }
       ],
       "name": "NewBuilding",

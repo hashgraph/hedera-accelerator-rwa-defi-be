@@ -6,10 +6,17 @@ import "../extensions/BuildingERC20.sol";
 // import {ITREXFactory} from "../../erc3643/factory/ITREXFactory.sol";
 // import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-library BuildingToken {
-    using Bits for uint256; // used to create HTS token
+struct TokenDetails {
+    address trexGateway; 
+    address buildingAddress; 
+    string name;
+    string symbol;
+    uint8 decimals;
+}
 
-    function createERC3643Token(address /*trexGateway*/, address /*buildingAddress*/, string memory name, string memory symbol, uint8 decimals) internal returns (address) {
+library BuildingTokenLib {
+
+    function detployERC3643Token(TokenDetails memory details) external returns (address) {
         // use simple ERC20 tokens for now, this will be replaced later to ERC3643 token
         // ITREXGateway(trexGateway).deployTREXSuite(
         //     buildTokenDetails(buildingAddress, name, symbol, decimals), 
@@ -20,7 +27,7 @@ library BuildingToken {
         // address factory = ITREXGateway(trexGateway).getFactory();
         // address token = ITREXFactory(factory).getToken(salt);
 
-        return address(new BuildingERC20(name, symbol, decimals));
+        return address(new BuildingERC20(details.name, details.symbol, details.decimals));
     }
 
     // function buildTokenDetails(address buildingAddress, string memory name, string memory symbol, uint8 decimals) internal pure returns (ITREXFactory.TokenDetails memory)  {
@@ -56,17 +63,4 @@ library BuildingToken {
     //         issuerClaims
     //     );
     // }
-}
-
-library Bits {
-    uint256 internal constant ONE = uint256(1);
-
-    /**
-     * @dev Sets the bit at the given 'index' in 'self' to '1'.
-     *
-     * @return Returns the modified value.
-     */
-    function setBit(uint256 self, uint8 index) internal pure returns (uint256) {
-        return self | (ONE << index);
-    }
 }

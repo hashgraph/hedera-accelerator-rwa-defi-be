@@ -2,23 +2,29 @@
 pragma solidity 0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Building} from "./Building.sol";
 import {IERC721Metadata} from "../erc721/interface/IERC721Metadata.sol";
-import {IdentityGateway} from "../onchainid/gateway/Gateway.sol";
-import {BuildingToken} from "./library/BuildingToken.sol";
 import {BuildingFactoryStorage} from "./BuildingFactoryStorage.sol";
-import {Treasury} from "../treasury/Treasury.sol";
-import {BuildingGovernance} from "./governance/BuildingGovernance.sol";
-import {FeeConfiguration} from "../common/FeeConfiguration.sol";
 import {ITreasury} from "../treasury/interfaces/ITreasury.sol";
-import {BasicVault} from "../erc4626/BasicVault.sol";
+import {BuildingVaultLib, VaultDetails} from "./library/BuildingVault.sol";
+import {BuildingGovernanceLib, GovernanceDetails} from "./library/BuildingGovernance.sol";
+import {BuildingTreasuryLib, TreasuryDetails} from "./library/BuildingTreasury.sol";
+import {BuildingTokenLib, TokenDetails} from "./library/BuildingToken.sol";
+import {BuildingAutoCompounderLib, AutoCompounderDetails} from "./library/BuildingAutoCompounder.sol";
 
+interface IOwnable {
+    function transferOwnership(address to) external;
+}
+
+interface IIdentityGateway {
+    function deployIdentityForWallet(address wallet) external returns (address);
+}
+
+interface IERC20 {
+    function mint(address to, uint256 amount) external;
+}
 /**
  * @title BuildingFactory
  * @author Hashgraph
@@ -88,6 +94,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address treasury;
         address vault;
         address governance;
+        address autoCompounder;
     }
 
     /**
@@ -107,30 +114,70 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         // deploy new token
         tmp.initialOwner = msg.sender;
         tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);
-        tmp.identity = IdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.building);
-        tmp.erc3643Token = _deployERC3643Token(tmp.building, details.tokenName, details.tokenSymbol, details.tokenDecimals);
-        tmp.treasury = _deployTreasury(details.treasuryReserveAmount, details.treasuryNPercent, tmp.initialOwner);
-        
-        tmp.vault = _deployVault(
-            tmp.erc3643Token, 
-            details.vaultShareTokenName, 
-            details.vaultShareTokenSymbol, 
-            tmp.initialOwner, // details.vaultRewardController, 
-            tmp.initialOwner, // details.vaultFeeConfigController, 
-            details.vaultFeeReceiver, 
-            details.vaultFeeToken, 
-            details.vaultFeePercentage, 
-            details.vaultCliff, 
-            details.vaultUnlockDuration
+        tmp.identity = IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.building);
+        tmp.erc3643Token = BuildingTokenLib.detployERC3643Token(
+            TokenDetails(
+                $.trexGateway, 
+                tmp.building, 
+                details.tokenName, 
+                details.tokenSymbol, 
+                details.tokenDecimals
+            )
         );
-        
-        tmp.governance = _deployGovernance(tmp.erc3643Token, details.governanceName, tmp.treasury, tmp.initialOwner);
-        
+        tmp.treasury = BuildingTreasuryLib.deployTreasury(
+            TreasuryDetails(
+                $.treasuryBeacon, 
+                tmp.initialOwner, 
+                details.treasuryReserveAmount, 
+                details.treasuryNPercent, 
+                tmp.initialOwner, // business address
+                $.usdc,
+                address(this) // building factory
+            )
+        );
+
+        tmp.vault = BuildingVaultLib.deployVault(
+            VaultDetails(
+                tmp.erc3643Token,
+                details.vaultShareTokenName, 
+                details.vaultShareTokenSymbol, 
+                details.vaultFeeReceiver, 
+                details.vaultFeeToken, 
+                details.vaultFeePercentage,
+                tmp.initialOwner, // rewardController
+                tmp.initialOwner, // feeConfigController
+                details.vaultCliff, 
+                details.vaultUnlockDuration
+            )
+        );        
+        tmp.governance = BuildingGovernanceLib.deployGovernance(
+            GovernanceDetails(
+                $.governanceBeacon, 
+                tmp.erc3643Token, 
+                details.governanceName, 
+                tmp.treasury, 
+                tmp.initialOwner
+            )
+        );
+
+        tmp.autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
+            AutoCompounderDetails (
+                $.uniswapFactory,
+                tmp.vault,
+                $.usdc,
+                details.aTokenName,
+                details.aTokenSymbol,
+                tmp.initialOwner // operator
+            )
+        );
+
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
-        ITreasury(tmp.treasury).addVault(tmp.vault);
-        
-        // grant reward controller role to treasury
-        IAccessControl(tmp.vault).grantRole(BasicVault(tmp.vault).VAULT_REWARD_CONTROLLER_ROLE(), tmp.treasury);
+        ITreasury(tmp.treasury).addVault(tmp.vault); 
+        IAccessControl(tmp.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), tmp.treasury);// grant reward controller role to treasury
+        IOwnable(tmp.vault).transferOwnership(tmp.initialOwner);
+        IERC20(tmp.erc3643Token).mint(tmp.initialOwner, details.tokenMintAmount);
+        IOwnable(tmp.erc3643Token).transferOwnership(tmp.initialOwner);
+        IOwnable(tmp.autoCompounder).transferOwnership(tmp.initialOwner);
 
         buildingDetails = BuildingDetails(
             tmp.building,
@@ -140,117 +187,13 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             tmp.erc3643Token,
             tmp.treasury, 
             tmp.governance,
-            tmp.vault 
+            tmp.vault,
+            tmp.autoCompounder
         );
 
         $.buildingDetails[tmp.building] = buildingDetails;
         $.buildingsList.push(buildingDetails);
 
-        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner);
-    }
-
-    /**
-     * Create new ERC3643 token
-     * @param building address of the building
-     * @param name string name of the token
-     * @param symbol string symbol of the token
-     * @param decimals uint8 token decimals
-     */
-    function _deployERC3643Token(
-        address building,
-        string memory name,
-        string memory symbol,
-        uint8 decimals
-    ) private returns (address token) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        token = BuildingToken.createERC3643Token($.trexGateway, building, name, symbol, decimals);
-
-        OwnableUpgradeable(token).transferOwnership(msg.sender);
-    }
-
-    function _deployVault(
-        address token,
-        string memory tokenName,
-        string memory tokenSymbol,
-        address rewardController,
-        address feeConfigController,
-        address feeReceiver,
-        address feeToken,
-        uint256 feePercentage,
-        uint32 cliff,
-        uint32 unlockDuration
-    ) private returns (address vault) {
-        FeeConfiguration.FeeConfig memory feeConfig = FeeConfiguration.FeeConfig(
-            feeReceiver, // address receiver;
-            feeToken, // address token;
-            feePercentage // uint256 feePercentage;
-        );
-
-        vault = address(new BasicVault(
-            IERC20(token),
-            tokenName,
-            tokenSymbol,
-            feeConfig,
-            rewardController,
-            feeConfigController,
-            cliff,
-            unlockDuration
-        ));
-    }
-
-    /**
-     * Deploy new treasury contract using Beacon Proxy
-     * @param reserveAmount reserve amount
-     * @param nPercentage  n parcentage
-     * @param initialOwner initial owner
-     */
-    function _deployTreasury(
-        uint256 reserveAmount,
-        uint256 nPercentage,
-        address initialOwner
-    ) private returns (address) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        // initial owner as business address
-        address businessAddress = initialOwner;
-
-        BeaconProxy treasuryProxy = new BeaconProxy(
-            $.treasuryBeacon,
-            abi.encodeWithSelector(
-                Treasury.initialize.selector,
-                $.usdc,
-                reserveAmount,
-                nPercentage,
-                initialOwner,
-                businessAddress,
-                address(this)
-            )
-        );
-
-        return address(treasuryProxy);
-    }
-
-    /**
-     * Deploy new Governance for building
-     * @param token building token address
-     * @param name governance name
-     * @param initialOwner initial owner
-     * @param treasury treasury contract address
-     */
-    function _deployGovernance(
-        address token,
-        string memory name,
-        address treasury,
-        address initialOwner
-    ) private returns (address) {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-
-        BeaconProxy governanceProxy = new BeaconProxy(
-            $.governanceBeacon,
-            abi.encodeWithSelector(BuildingGovernance.initialize.selector, token, name, initialOwner, treasury)
-        );
-
-        return address(governanceProxy);
+        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner, tmp.autoCompounder);
     }
 }
