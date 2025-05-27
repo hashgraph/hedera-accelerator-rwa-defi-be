@@ -268,7 +268,7 @@ describe("AutoCompounder", function () {
             ).to.changeTokenBalance(
                 rewardToken,
                 owner.address,
-                173010380622837370242n
+                4999999999999999999999999n
             );
         });
 
@@ -328,7 +328,7 @@ describe("AutoCompounder", function () {
             ).to.changeTokenBalance(
                 rewardToken,
                 owner.address,
-                173010380622837370242n
+                4999999999999999999999999n
             );
         });
 

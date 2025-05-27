@@ -203,6 +203,11 @@ describe("Slice", function () {
                 amountToDeposit / 2n,
                 staker.address
             );
+            await vault2.connect(staker).requestDeposit(
+                amountToDeposit / 2n,
+                staker.address,
+                staker.address
+            );
             await vault2.connect(staker).deposit(
                 amountToDeposit / 2n,
                 staker.address
