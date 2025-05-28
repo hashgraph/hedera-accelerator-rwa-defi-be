@@ -158,7 +158,7 @@ await identityFactory
 
 ## Deploy Compliance Modules
 
->Each “rule” or “transfer manager” module is deployed separately, making it easy to plug and play as needed. The following are some modules used for the Buildings R US suite.
+>Each “rule” or “transfer manager” module is deployed separately, making it easy to plug and play as needed. The following are some modules used for the RWA/DeFi demo codebase.
 
 ```ts
 const requiresNFTModule = await ethers.deployContract('RequiresNFTModule', deployer);
