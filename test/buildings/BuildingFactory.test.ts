@@ -187,7 +187,7 @@ async function getProposalId(governance: BuildingGovernance, blockNumber: number
   return decodedEvent.args[0]; 
 }
 
-describe.only('BuildingFactory', () => {
+describe('BuildingFactory', () => {
   describe('upgrade', () => {
     it('should be uprgradable', async () => {
       const { 

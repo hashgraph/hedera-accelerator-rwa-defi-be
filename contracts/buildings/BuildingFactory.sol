@@ -100,6 +100,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address vault;
         address governance;
         address autoCompounder;
+        address uniswapRouter;
     }
 
     /**
@@ -110,21 +111,13 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         
         Tmp memory tmp; // temp var to avoid stack too deep errors
+        tmp.initialOwner = msg.sender; // initial owner is sender
+        tmp.uniswapRouter = $.uniswapRouter;
 
         tmp.building = address(new BeaconProxy(
             $.buildingBeacon,
-            abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, msg.sender)
+            abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, tmp.initialOwner)
         ));
-
-        // deploy new token
-        tmp.initialOwner = msg.sender;
-        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);        
-        tmp.identity = IIdentityGateway($.onchainIdGateway).idFactory().getIdentity(tmp.initialOwner);
-
-        // if user doesn't have identity, create one
-        if (tmp.identity == address(0)) {
-            tmp.identity = IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.initialOwner);
-        }
 
         // deploy trex token and suite
         tmp.erc3643Token = BuildingTokenLib.detployERC3643Token(
@@ -136,6 +129,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 details.tokenDecimals
             )
         );
+        
+        // deploy treasury
         tmp.treasury = BuildingTreasuryLib.deployTreasury(
             TreasuryDetails(
                 $.treasuryBeacon, 
@@ -147,7 +142,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 address(this) // building factory
             )
         );
-
+        
+        // deploy vault
         tmp.vault = BuildingVaultLib.deployVault(
             VaultDetails(
                 tmp.erc3643Token,
@@ -162,6 +158,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 details.vaultUnlockDuration
             )
         );        
+
+        // deploy governance
         tmp.governance = BuildingGovernanceLib.deployGovernance(
             GovernanceDetails(
                 $.governanceBeacon, 
@@ -172,6 +170,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             )
         );
 
+        // deploy autocompounder
         tmp.autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
             AutoCompounderDetails (
                 $.uniswapRouter,
@@ -183,37 +182,37 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             )
         );
 
-        address[] memory addressess = new address[](5);
+        IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
+        IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(tmp.erc3643Token).identityRegistry());
+        address[] memory controllers = getControllerAddresses(tmp);
+        IIdentity[] memory identities = new IIdentity[](controllers.length);
+        uint16[] memory countries = new uint16[](controllers.length);
 
-        addressess[0] = tmp.initialOwner;
-        addressess[1] = tmp.treasury;
-        addressess[2] = tmp.vault;
-        addressess[3] = tmp.governance;
-        addressess[4] = tmp.autoCompounder;
 
-        IIdentity[] memory identities = new IIdentity[](5);
+        // For indices 1…n, deploy new identities via the gateway:
+        for (uint256 i = 0; i < controllers.length; i++) {
+            // enforce the need of an identity for the owner
+            address nIdentity = identityGateway.idFactory().getIdentity(controllers[i]);
 
-        identities[0] = IIdentity(tmp.identity);
-        identities[1] = IIdentity(IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.treasury));
-        identities[2] = IIdentity(IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.vault));
-        identities[3] = IIdentity(IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.governance));
-        identities[4] = IIdentity(IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.autoCompounder));
+            if (nIdentity == address(0)) { // if controller does not have identity, create one
+                identities[i] = IIdentity(identityGateway.deployIdentityForWallet(controllers[i]));
+            } else {
+                identities[i] = IIdentity(nIdentity);                
+            }
+        }
 
-        uint16[] memory countries = new uint16[](5);
+        // fill all the contries with default contry
+        for (uint256 i = 0; i < controllers.length; i++) {
+            countries[i] = 840; // DEFAULT COUNTRY 840 = United States
+        }
 
-        countries[0] = 840;
-        countries[1] = 840;
-        countries[2] = 840;
-        countries[3] = 840;
-        countries[4] = 840;
+        identityRegistry.batchRegisterIdentity(
+            controllers,
+            identities,
+            countries
+        );
 
-        IIdentityRegistry(ITokenVotes(tmp.erc3643Token).identityRegistry())
-            .batchRegisterIdentity(
-                addressess,
-                identities,
-                countries
-            );
-
+        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);        
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
         ITreasury(tmp.treasury).addVault(tmp.vault); 
         IAccessControl(tmp.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), tmp.treasury);// grant reward controller role to treasury
@@ -280,5 +279,22 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         IIdFactory idFactory = IIdentityGateway($.onchainIdGateway).idFactory();
 
         return IIdentity(idFactory.getIdentity(wallet));
+    }
+
+    /**
+     * return an arreay of addresses that might interacto with the erc3643 token;
+     * erc3643 tokens might be sent to them, so they need to have identities registered
+     * @param tmp temporary state variable
+     */
+    function getControllerAddresses(Tmp memory tmp) private pure returns (address[] memory controllers) {
+        uint8 NUM_CONTROLLERS = 5;
+        controllers = new address[](NUM_CONTROLLERS);
+
+        controllers[0] = tmp.initialOwner;
+        controllers[1] = tmp.vault;
+        controllers[2] = tmp.autoCompounder;
+        controllers[3] = tmp.building;
+        controllers[4] = tmp.uniswapRouter;
+        // controllers[5] = tmp.oneSidedExchange;
     }
 }
