@@ -17,6 +17,7 @@ import {IIdFactory} from "../onchainid/factory/IIdFactory.sol";
 import {IIdentity} from "../onchainid/interface/IIdentity.sol";
 import {IIdentityRegistry} from "../erc3643/registry/interface/IIdentityRegistry.sol";
 import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
+import {IModularCompliance} from "../erc3643/compliance/modular/IModularCompliance.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -296,5 +297,23 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         controllers[3] = tmp.building;
         controllers[4] = tmp.uniswapRouter;
         // controllers[5] = tmp.oneSidedExchange;
+    }
+
+    /**
+     * Adds a compliance module to the token modular compliance and calls configuration function
+     * @param building address of the building
+     * @param module address od the modular compliance
+     * @param callData initial calldata configuration
+     */
+    function addComplianceModule(address building, address module, bytes calldata callData) external {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        address erc3643Token = $.buildingDetails[building].erc3643Token;
+        
+        require(erc3643Token != address(0), "Building token not found");
+        require(Building(erc3643Token).owner() != msg.sender, "Only building owner can add compliance");
+
+        IModularCompliance compliance = ITokenVotes(erc3643Token).compliance();
+        compliance.addModule(module);
+        compliance.callModuleFunction(callData, module);
     }
 }
