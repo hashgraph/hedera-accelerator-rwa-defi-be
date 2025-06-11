@@ -59,6 +59,6 @@ abstract contract BuildingFactoryStorage {
     }
 
     event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner, address autoCompounder);
-    event IdentityRegistered(address wallet, address identity, uint16 country);
+    event IdentityRegistered(address building, address wallet, address identity, uint16 country);
     event ComplianceModuleAdded(address building, address module);
 }

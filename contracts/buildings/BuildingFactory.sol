@@ -203,6 +203,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                     identity,
                     country
                 );
+
+                emit IdentityRegistered(tmp.building, controllers[i], address(identity), country);
             }
         }
 
@@ -262,7 +264,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
 
         ir.registerIdentity(wallet, IIdentity(identity), country);
 
-        emit IdentityRegistered(wallet, identity, country);
+        emit IdentityRegistered(buildingAddress, wallet, identity, country);
     }
 
     /**
