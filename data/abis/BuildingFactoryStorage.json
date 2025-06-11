@@ -28,6 +28,12 @@
         {
           "indexed": false,
           "internalType": "address",
+          "name": "building",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
           "name": "wallet",
           "type": "address"
         },
