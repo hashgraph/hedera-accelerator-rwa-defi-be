@@ -1,50 +1,50 @@
 {
   "implementations": {
-    "Token": "0x391919ca4655F767eA2E1F711cA725CFF536A93D",
-    "ClaimTopicsRegistry": "0x0003aEc459E4A89Afc285dC4D89Ed80bae797D35",
-    "TrustedIssuersRegistry": "0x12315a4b719B172bdd203F51aAC75E7d8D88EAcf",
-    "IdentityRegistryStorage": "0xD67fFf2Ea27CF09507a1A7E33be5Ec67B71d5390",
-    "IdentityRegistry": "0x5545fBa51A8694370152aCBc26a30873b8740336",
-    "ModularCompliance": "0xD2c5835d9529312F806d9BDaD65f446832C0679E",
-    "Identity": "0xcb0f1377A9464116a23e8B0E6FC6D7E9A49Bc339",
-    "ImplementationAuthority": "0x29E04d316C1E3C6990b0631B57499D95a0998936",
-    "ERC721Metadata": "0x531e9978B1dd66D3F284489A33d1555fA0aE5773",
-    "AuditRegistry": "0x68c3E26773A698E81fCD9e4c10f1fbe4D9e41043",
-    "OneSidedExchange": "0x07E82faCb5C3DC4248dE531709870b035CbA3F33"
+    "Token": "0x701e60CaBd97717D45767Aa5523B4E8c26F0d244",
+    "ClaimTopicsRegistry": "0xe71AC977954b30D7dB68830d18c2e9FC2A0F37f7",
+    "TrustedIssuersRegistry": "0x284306b8cCa5ab6d751cb0c6681Ad6817A151E02",
+    "IdentityRegistryStorage": "0x7AAd89B6BCdC7589e2421f16bBB3D44EFB2a46dB",
+    "IdentityRegistry": "0x397Ae437a029dF144C10a040D96e2C6F9D826926",
+    "ModularCompliance": "0xb42B7fb3F9C61ed1f52cAdc7C58186B2b6515eE9",
+    "Identity": "0xbB5BAfd4c29f21023279AA89a64dA4DDb612bEaF",
+    "ImplementationAuthority": "0xBde92D267a2ad32786c728aeb4819016090C32De",
+    "ERC721Metadata": "0xf8d93cD1B382780B592A7acD02696A87E5CaF6e0",
+    "AuditRegistry": "0xE15C4566b0F61e6e4337eeFBEaf8521052946E2C",
+    "OneSidedExchange": "0x01e931D4387A72fD06Df675C54C4Eb668De532F5"
   },
   "factories": {
-    "IdFactory": "0x1e97aA90559456FCac5987F079A08F116A88F30e",
-    "TREXImplementationAuthority": "0x0B09937c63eeF10F3c5bA379650238891CCB5dcF",
-    "TREXFactory": "0xeb4d1Ac57477a460E91F0917F07E4E184c3c56EB",
-    "TREXGateway": "0xB7cC29ed23F18BB72FF83c18052fd25F01a3B12f",
-    "IdentityGateway": "0x7aC21633F2871419F80902cceAecBE8BB4aE7784",
-    "BuildingFactory": "0x3fFc2Eb31CebC7f25e872C060210C61d129650f4"
+    "IdFactory": "0xE3642b7dE422C13479C8bC67647D9726AcDDF511",
+    "TREXImplementationAuthority": "0xDD67dE604199248DC374Cb074826a55c2F662580",
+    "TREXFactory": "0xB1847Ce0A34b58EAA2163C1c44C37Fa5425187F1",
+    "TREXGateway": "0x3Ffd33a5f2f3c1902c3BaAb1348cea6992D5d35F",
+    "IdentityGateway": "0xa668b11D48929B4E7570b598d8Ac3AeA10D3f1d1",
+    "BuildingFactory": "0x7151c9ddF97cEf8A3eB40D3Fa43615cdF2a7E82b"
   },
   "compliance": {
-    "RequiresNFTModule": "0x070a72F626bF4aF030f890Ca1B36BCD4cB71B028",
-    "CountryAllowModule": "0x3fB441C52dFC83080C7a65282A756413cC012c33",
-    "MaxOwnershipByCountryModule": "0xA19bCBE32Fe01a62Ab658A2E03C3c7D5cbA11a3D",
-    "MaxTenPercentOwnershipModule": "0x9f02d9e3D3BcB39AA711fA22dbfDD3752721c74C",
-    "OnlyUsaModule": "0xAbb64e648447a820EDd20665ad4b422Db95DA1D9",
-    "TransferLimitOneHundredModule": "0x9395E95E503493e50D269E375cD67117b988A02C"
+    "RequiresNFTModule": "0x411b927a81a62Ea33A1a5491BfB1B3C25e2568A8",
+    "CountryAllowModule": "0xeCBe2538Cb3f67ed28d387744E400bC0e7aC829C",
+    "MaxOwnershipByCountryModule": "0x459DbB933d3A342497F5e8ba240A5A216D0Dc6C3",
+    "MaxTenPercentOwnershipModule": "0x4962da3D044D01E377D6Fe580Ec4C755B230eD68",
+    "OnlyUsaModule": "0xbCF9CAD005425900aAb79Cd1B4FA29ccC228810E",
+    "TransferLimitOneHundredModule": "0xA4EF300Ad63302A7d0462162Ad8eFd495032976A"
   },
   "vault": {
-    "VaultFactory": "0xf75F5695cDB75B4F7117C2a88E00c9e1aF2373F2"
+    "VaultFactory": "0x45250E6bA4682aF02761175E690Ec0a410bEC532"
   },
   "slice": {
-    "SliceFactory": "0x27780c9d9FFD9a9Ade09c31833f1b37b870d93b7"
+    "SliceFactory": "0x853840822d6DF0E43CAFacD6e347a33100EC2fe6"
   },
   "autoCompounder": {
     "AutoCompounderFactory": "0x0cC1EdcC0F832C9A2c7C3981C2685248EbA38310"
   },
   "asyncVault": {
-    "AsyncVaultFactory": "0x87BdC66E04D7C943816448bF8746F5a324c38c2C"
+    "AsyncVaultFactory": "0xA20b5345a307321A7287DDBEC12735461cc260B1"
   },
   "libraries": {
-    "BuildingTokenLib": "0xd39CEAeA70fD924Ec429f3cB752caD6bD3D8a5A2",
-    "BuildingGovernanceLib": "0x1318152E6499C2Ef20DF3d8E9CFAda5D6235c49D",
-    "BuildingTreasuryLib": "0xa6BC7945BC6b649C685F5Fcc88e9D851e6c6Ac82",
-    "BuildingVaultLib": "0x562B3079ba4d8096766e5f9f2F5843D38926127b",
-    "BuildingAutoCompounderLib": "0x44cDB440B9531D1C82f1B77E8fD4A221CDddcCC4"
+    "BuildingTokenLib": "0x6F5B0014C85cd9509E53014761c402065D7dbf2F",
+    "BuildingGovernanceLib": "0x05c31739E96B1C83221C886A7D234bf0eaA42F36",
+    "BuildingTreasuryLib": "0x3e65bDCaEc293D2a7bbBC055EC63B68f01cf6166",
+    "BuildingVaultLib": "0x96993cC1D40ce0D4EF1961627FA179e78A7B3816",
+    "BuildingAutoCompounderLib": "0xf4A66C090264521902cc3E8Ebb6425e839D9C47f"
   }
 }
