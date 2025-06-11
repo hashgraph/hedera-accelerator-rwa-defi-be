@@ -280,6 +280,9 @@ describe('BuildingFactory', () => {
     it('should be able to create multiple buildings', async () => {
       const { 
         owner,
+        voter1,
+        voter2,
+        voter3,
         usdcAddress,
         buildingFactory, 
       } = await loadFixture(deployFixture);
@@ -306,9 +309,11 @@ describe('BuildingFactory', () => {
         }
       }
 
-      await buildingFactory.newBuilding(newDetails('token1'));
-      await buildingFactory.newBuilding(newDetails('token2'));
-      await buildingFactory.newBuilding(newDetails('token3'));
+      await expect(await buildingFactory.connect(owner).newBuilding(newDetails('token1'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
+      await expect(await buildingFactory.connect(owner).newBuilding(newDetails('token11'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
+      await expect(await buildingFactory.connect(voter1).newBuilding(newDetails('token2'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
+      await expect(await buildingFactory.connect(voter2).newBuilding(newDetails('token3'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
+      await expect(await buildingFactory.connect(voter3).newBuilding(newDetails('token4'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
     })
   });
 

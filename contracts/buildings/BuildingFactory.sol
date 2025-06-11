@@ -186,32 +186,25 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
         IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(tmp.erc3643Token).identityRegistry());
         address[] memory controllers = getControllerAddresses(tmp);
-        IIdentity[] memory identities = new IIdentity[](controllers.length);
-        uint16[] memory countries = new uint16[](controllers.length);
 
-
-        // For indices 1…n, deploy new identities via the gateway:
         for (uint256 i = 0; i < controllers.length; i++) {
-            // enforce the need of an identity for the owner
-            address nIdentity = identityGateway.idFactory().getIdentity(controllers[i]);
+            IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(controllers[i]));
+            uint16 country = 840; // defaults to united states (ISO code)
 
-            if (nIdentity == address(0)) { // if controller does not have identity, create one
-                identities[i] = IIdentity(identityGateway.deployIdentityForWallet(controllers[i]));
-            } else {
-                identities[i] = IIdentity(nIdentity);                
+            if (identity == IIdentity(address(0))) { 
+                // if controller does not have identity, create one.
+                identity = IIdentity(identityGateway.deployIdentityForWallet(controllers[i]));
+            }
+
+            if (identityRegistry.identity(controllers[i]) == IIdentity(address(0))) {
+                // if identity is not registered, register it.
+                identityRegistry.registerIdentity(
+                    controllers[i],
+                    identity,
+                    country
+                );
             }
         }
-
-        // fill all the contries with default contry
-        for (uint256 i = 0; i < controllers.length; i++) {
-            countries[i] = 840; // DEFAULT COUNTRY 840 = United States
-        }
-
-        identityRegistry.batchRegisterIdentity(
-            controllers,
-            identities,
-            countries
-        );
 
         tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);        
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
@@ -268,6 +261,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         require(identity != address(0), "Identity for wallet not found");
 
         ir.registerIdentity(wallet, IIdentity(identity), country);
+
+        emit IdentityRegistered(wallet, identity, country);
     }
 
     /**
@@ -315,5 +310,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         IModularCompliance compliance = ITokenVotes(erc3643Token).compliance();
         compliance.addModule(module);
         compliance.callModuleFunction(callData, module);
+
+        emit ComplianceModuleAdded(building, module);
     }
 }
