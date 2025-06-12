@@ -36,7 +36,7 @@
     "SliceFactory": "0x78ADc55c4E1254FB75369D10091B2183B3d2c2A2"
   },
   "autoCompounder": {
-    "AutoCompounderFactory": "0x1d1e39ed50Bb8191c142673C502a237344003C69"
+    "AutoCompounderFactory": "0x0cC1EdcC0F832C9A2c7C3981C2685248EbA38310"
   },
   "asyncVault": {
     "AsyncVaultFactory": "0x525165F06D6CF7C4B02624E810bD0D42cEFC2f25"

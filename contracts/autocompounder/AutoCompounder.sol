@@ -114,7 +114,7 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
         address sender = _msgSender();
 
         // Calculate aToken amount to mint using exchange rate
-        amountToMint = assets.mulDivDown(PRECISION, exchangeRate());
+        amountToMint = assets.mulDivDown(exchangeRate(), PRECISION);
 
         IERC20(asset()).safeTransferFrom(sender, address(this), assets);
 
@@ -143,7 +143,7 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
         address sender = _msgSender();
 
         // Calculate underlying amount to withdraw using exchange rate
-        underlyingAmount = aTokenAmount.mulDivDown(exchangeRate(), PRECISION);
+        underlyingAmount = aTokenAmount.mulDivDown(PRECISION, exchangeRate());
 
         // Claim reward before burn
         claimExactUserReward(receiver);
