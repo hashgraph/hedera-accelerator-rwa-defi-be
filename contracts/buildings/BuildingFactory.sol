@@ -295,24 +295,4 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         controllers[4] = tmp.uniswapRouter;
         // controllers[5] = tmp.oneSidedExchange;
     }
-
-    /**
-     * Adds a compliance module to the token modular compliance and calls configuration function
-     * @param building address of the building
-     * @param module address od the modular compliance
-     * @param callData initial calldata configuration
-     */
-    function addComplianceModule(address building, address module, bytes calldata callData) external {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        address erc3643Token = $.buildingDetails[building].erc3643Token;
-        
-        require(erc3643Token != address(0), "Building token not found");
-        require(Building(erc3643Token).owner() != msg.sender, "Only building owner can add compliance");
-
-        IModularCompliance compliance = ITokenVotes(erc3643Token).compliance();
-        compliance.addModule(module);
-        compliance.callModuleFunction(callData, module);
-
-        emit ComplianceModuleAdded(building, module);
-    }
 }

@@ -483,5 +483,78 @@ describe('BuildingFactory', () => {
         // receiver should have 500 usdc balance after payment executed; 
         expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('500', 6));
     });
+
+    it('should create building, add compliance modules, transfer and trigger the compliance restriction', async () => {
+      const { buildingFactory, usdcAddress, owner, voter1, voter2 } = await loadFixture(deployFixture);
+
+      // create building
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('1000'),
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseUnits('1000', 6),
+        governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
+      }
+
+      const buildingTx = await buildingFactory.newBuilding(buildingDetails);
+      const [
+        buildingAddress, 
+        tokenAddress,
+      ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+
+      // create building token
+      const token = await ethers.getContractAt('TokenVotes', tokenAddress);
+
+      // deploy the compliance modules to be added to the token
+      // in this cas CountryAllowModule allowing only USA (840) users.
+      const complianceModule = await ethers.deployContract('CountryAllowModule');
+      await complianceModule.waitForDeployment();
+
+      const callData = new ethers.Interface(['function addAllowedCountry(uint16)'])
+        .encodeFunctionData('addAllowedCountry', [840]) // only allow contry US (840)
+
+      const modularComplianceAddress = await token.compliance();
+      const modularCompliance = await ethers.getContractAt('ModularCompliance', modularComplianceAddress);
+
+      // add the module
+      await modularCompliance.connect(owner).addModule(await complianceModule.getAddress());
+      // call module function addAllowedCountry to define which country is allowed
+      const tx = await modularCompliance.callModuleFunction(callData, await complianceModule.getAddress());
+
+      // check event and storage consistency
+      await expect(tx).to.emit(complianceModule, 'CountryAllowed').withArgs(modularComplianceAddress, 840);
+      expect(await complianceModule.isCountryAllowed(modularComplianceAddress, 840)).to.be.true;
+
+      // deploy identities for users
+      await buildingFactory.connect(voter1).deployIdentityForWallet(voter1.address);
+      await buildingFactory.connect(voter2).deployIdentityForWallet(voter2.address);
+
+      // register user identities, one US user and one with another nationality
+      await buildingFactory.connect(owner).registerIdentity(buildingAddress, voter1.address, 840); // 840 = US
+      await buildingFactory.connect(owner).registerIdentity(buildingAddress, voter2.address, 48); // 48 != US 
+
+      // mint token to owner just to transfer it 
+      const mintAmount = ethers.parseEther('2000');
+      await token.mint(owner.address, mintAmount);
+
+      // transfer tokens to allowed US user
+      await token.transfer(voter1.address, ethers.parseEther('1000'));
+      expect(await token.balanceOf(voter1.address)).to.be.equal(ethers.parseEther('1000'));
+
+      // transfer to non US user should revert;
+      await expect(token.transfer(voter2.address, ethers.parseEther('1000'))).to.be.revertedWith('Transfer not possible'); 
+  });
   });
 });
