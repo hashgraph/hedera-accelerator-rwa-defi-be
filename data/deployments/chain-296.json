@@ -1,50 +1,50 @@
 {
   "implementations": {
-    "Token": "0x701e60CaBd97717D45767Aa5523B4E8c26F0d244",
-    "ClaimTopicsRegistry": "0xe71AC977954b30D7dB68830d18c2e9FC2A0F37f7",
-    "TrustedIssuersRegistry": "0x284306b8cCa5ab6d751cb0c6681Ad6817A151E02",
-    "IdentityRegistryStorage": "0x7AAd89B6BCdC7589e2421f16bBB3D44EFB2a46dB",
-    "IdentityRegistry": "0x397Ae437a029dF144C10a040D96e2C6F9D826926",
-    "ModularCompliance": "0xb42B7fb3F9C61ed1f52cAdc7C58186B2b6515eE9",
-    "Identity": "0xbB5BAfd4c29f21023279AA89a64dA4DDb612bEaF",
-    "ImplementationAuthority": "0xBde92D267a2ad32786c728aeb4819016090C32De",
-    "ERC721Metadata": "0xf8d93cD1B382780B592A7acD02696A87E5CaF6e0",
-    "AuditRegistry": "0xE15C4566b0F61e6e4337eeFBEaf8521052946E2C",
-    "OneSidedExchange": "0x01e931D4387A72fD06Df675C54C4Eb668De532F5"
+    "Token": "0x858CDf09D677D3CEEA30B1D28D87B44975870873",
+    "ClaimTopicsRegistry": "0xa967A40b3E581d886f0feeF7c4a18e24D0c5ec46",
+    "TrustedIssuersRegistry": "0xc7B0F412818BD0F18DE2C8aDea6aC76c1Bb87737",
+    "IdentityRegistryStorage": "0x9ed373f83c734c81425185bA0E3eE4ba658A82B1",
+    "IdentityRegistry": "0xD77b6b7f92F2159c4746451D5274b745b7061bf6",
+    "ModularCompliance": "0x5af44C85d0e51aFE926f8A488178634986885c50",
+    "Identity": "0x803F9fD025f602a62DC9dE86084F1eBEc40286CF",
+    "ImplementationAuthority": "0x5630d2629c197653cD416a83531A8bcdB6703880",
+    "ERC721Metadata": "0xcc0197eCd5bDe296E4B498cA0b52CF277E7fdacA",
+    "AuditRegistry": "0xd539E3e854fD9a5F1D76Cb77a349fc2a4503E02f",
+    "OneSidedExchange": "0xfB1BbfF37C30B847aac3133e7ebA3A43bCA79739"
   },
   "factories": {
-    "IdFactory": "0xE3642b7dE422C13479C8bC67647D9726AcDDF511",
-    "TREXImplementationAuthority": "0xDD67dE604199248DC374Cb074826a55c2F662580",
-    "TREXFactory": "0xB1847Ce0A34b58EAA2163C1c44C37Fa5425187F1",
-    "TREXGateway": "0x3Ffd33a5f2f3c1902c3BaAb1348cea6992D5d35F",
-    "IdentityGateway": "0xa668b11D48929B4E7570b598d8Ac3AeA10D3f1d1",
-    "BuildingFactory": "0x7151c9ddF97cEf8A3eB40D3Fa43615cdF2a7E82b"
+    "IdFactory": "0xA4ebb6119aF139b1b78C9DC2dC43938f2B446A87",
+    "TREXImplementationAuthority": "0xEa0E48a52Aa8A963763eAB896f2a794178330EBB",
+    "TREXFactory": "0x5232fF9b6724535C5721C59a3E8442ba36a9307A",
+    "TREXGateway": "0x43889ac55BdA1387765423B0ed9Eb0E38078893a",
+    "IdentityGateway": "0x21d98FDfe26f4168b2E933DE93CaF40F377192Dc",
+    "BuildingFactory": "0x5F4Cf03EfC2eD218f43E286aDA91314309C0A1d7"
   },
   "compliance": {
-    "RequiresNFTModule": "0x411b927a81a62Ea33A1a5491BfB1B3C25e2568A8",
-    "CountryAllowModule": "0xeCBe2538Cb3f67ed28d387744E400bC0e7aC829C",
-    "MaxOwnershipByCountryModule": "0x459DbB933d3A342497F5e8ba240A5A216D0Dc6C3",
-    "MaxTenPercentOwnershipModule": "0x4962da3D044D01E377D6Fe580Ec4C755B230eD68",
-    "OnlyUsaModule": "0xbCF9CAD005425900aAb79Cd1B4FA29ccC228810E",
-    "TransferLimitOneHundredModule": "0xA4EF300Ad63302A7d0462162Ad8eFd495032976A"
+    "RequiresNFTModule": "0x5e75B3249e3EF9EAe1d2e0c99e1ED1847a044c62",
+    "CountryAllowModule": "0xc35b0d09d922f24F437B75148B11b773B977dDCA",
+    "MaxOwnershipByCountryModule": "0x2846eB86DDcF8530CB76F4Bc95aE4720F0C42FEd",
+    "MaxTenPercentOwnershipModule": "0xC6c2a79b64438BCF2d2C980aFB4eC06E41A1468D",
+    "OnlyUsaModule": "0x2672b58E0B3BeE2f6Eb285E5446beD2DF1B5520C",
+    "TransferLimitOneHundredModule": "0x5a32C7E735196Fb180598c3F4bb15e1cD54acEa7"
   },
   "vault": {
-    "VaultFactory": "0x45250E6bA4682aF02761175E690Ec0a410bEC532"
+    "VaultFactory": "0xabAf60250fA48939962E6D9699718914f9A96518"
   },
   "slice": {
-    "SliceFactory": "0x853840822d6DF0E43CAFacD6e347a33100EC2fe6"
+    "SliceFactory": "0x2590caF7E591668dbC7820018e8443b3d54Fa5dF"
   },
   "autoCompounder": {
-    "AutoCompounderFactory": "0x0cC1EdcC0F832C9A2c7C3981C2685248EbA38310"
+    "AutoCompounderFactory": "0x68CADd232b2A0BCD84411027D08670972bC94776"
   },
   "asyncVault": {
-    "AsyncVaultFactory": "0xA20b5345a307321A7287DDBEC12735461cc260B1"
+    "AsyncVaultFactory": "0x4EBA59766654608Ec40f69A5c73fa53920cbC2Cd"
   },
   "libraries": {
-    "BuildingTokenLib": "0x6F5B0014C85cd9509E53014761c402065D7dbf2F",
-    "BuildingGovernanceLib": "0x05c31739E96B1C83221C886A7D234bf0eaA42F36",
-    "BuildingTreasuryLib": "0x3e65bDCaEc293D2a7bbBC055EC63B68f01cf6166",
-    "BuildingVaultLib": "0x96993cC1D40ce0D4EF1961627FA179e78A7B3816",
-    "BuildingAutoCompounderLib": "0xf4A66C090264521902cc3E8Ebb6425e839D9C47f"
+    "BuildingTokenLib": "0x651A42d142FBfD8dFF85FE1fd0ae45DAdb3807f2",
+    "BuildingGovernanceLib": "0x6a979D3A25D18d1f32B8856D680192Bc1Fc368e0",
+    "BuildingTreasuryLib": "0xF7f9EC94D54AE48294D21d655f6AD2312D18CbD2",
+    "BuildingVaultLib": "0x0Aca4729aAf3b8c428B544D15B17c0480f464F15",
+    "BuildingAutoCompounderLib": "0xc9e77F338082Fc41DfB9a8470410B44F0cD0b8f6"
   }
 }
