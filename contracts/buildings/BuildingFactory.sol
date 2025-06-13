@@ -13,12 +13,18 @@ import {BuildingGovernanceLib, GovernanceDetails} from "./library/BuildingGovern
 import {BuildingTreasuryLib, TreasuryDetails} from "./library/BuildingTreasury.sol";
 import {BuildingTokenLib, TokenDetails} from "./library/BuildingToken.sol";
 import {BuildingAutoCompounderLib, AutoCompounderDetails} from "./library/BuildingAutoCompounder.sol";
+import {IIdFactory} from "../onchainid/factory/IIdFactory.sol";
+import {IIdentity} from "../onchainid/interface/IIdentity.sol";
+import {IIdentityRegistry} from "../erc3643/registry/interface/IIdentityRegistry.sol";
+import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
+import {IModularCompliance} from "../erc3643/compliance/modular/IModularCompliance.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
 }
 
 interface IIdentityGateway {
+    function idFactory() external view returns (IIdFactory);
     function deployIdentityForWallet(address wallet) external returns (address);
 }
 
@@ -95,6 +101,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address vault;
         address governance;
         address autoCompounder;
+        address uniswapRouter;
     }
 
     /**
@@ -105,25 +112,26 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         
         Tmp memory tmp; // temp var to avoid stack too deep errors
+        tmp.initialOwner = msg.sender; // initial owner is sender
+        tmp.uniswapRouter = $.uniswapRouter;
 
         tmp.building = address(new BeaconProxy(
             $.buildingBeacon,
-            abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, msg.sender)
+            abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, tmp.initialOwner)
         ));
 
-        // deploy new token
-        tmp.initialOwner = msg.sender;
-        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);
-        tmp.identity = IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(tmp.building);
+        // deploy trex token and suite
         tmp.erc3643Token = BuildingTokenLib.detployERC3643Token(
             TokenDetails(
+                tmp.initialOwner, 
                 $.trexGateway, 
-                tmp.building, 
                 details.tokenName, 
                 details.tokenSymbol, 
                 details.tokenDecimals
             )
         );
+        
+        // deploy treasury
         tmp.treasury = BuildingTreasuryLib.deployTreasury(
             TreasuryDetails(
                 $.treasuryBeacon, 
@@ -135,7 +143,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 address(this) // building factory
             )
         );
-
+        
+        // deploy vault
         tmp.vault = BuildingVaultLib.deployVault(
             VaultDetails(
                 tmp.erc3643Token,
@@ -150,6 +159,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 details.vaultUnlockDuration
             )
         );        
+
+        // deploy governance
         tmp.governance = BuildingGovernanceLib.deployGovernance(
             GovernanceDetails(
                 $.governanceBeacon, 
@@ -160,6 +171,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             )
         );
 
+        // deploy autocompounder
         tmp.autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
             AutoCompounderDetails (
                 $.uniswapRouter,
@@ -171,12 +183,37 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             )
         );
 
+        IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
+        IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(tmp.erc3643Token).identityRegistry());
+        address[] memory controllers = getControllerAddresses(tmp);
+
+        for (uint256 i = 0; i < controllers.length; i++) {
+            IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(controllers[i]));
+            uint16 country = 840; // defaults to united states (ISO code)
+
+            if (identity == IIdentity(address(0))) { 
+                // if controller does not have identity, create one.
+                identity = IIdentity(identityGateway.deployIdentityForWallet(controllers[i]));
+            }
+
+            if (identityRegistry.identity(controllers[i]) == IIdentity(address(0))) {
+                // if identity is not registered, register it.
+                identityRegistry.registerIdentity(
+                    controllers[i],
+                    identity,
+                    country
+                );
+
+                emit IdentityRegistered(tmp.building, controllers[i], address(identity), country);
+            }
+        }
+
+        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);        
         ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
         ITreasury(tmp.treasury).addVault(tmp.vault); 
         IAccessControl(tmp.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), tmp.treasury);// grant reward controller role to treasury
         IOwnable(tmp.vault).transferOwnership(tmp.initialOwner);
         IERC20(tmp.erc3643Token).mint(tmp.initialOwner, details.tokenMintAmount);
-        IOwnable(tmp.erc3643Token).transferOwnership(tmp.initialOwner);
         IOwnable(tmp.autoCompounder).transferOwnership(tmp.initialOwner);
 
         buildingDetails = BuildingDetails(
@@ -195,5 +232,67 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         $.buildingsList.push(buildingDetails);
 
         emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner, tmp.autoCompounder);
+    }
+
+    /**
+     *  deployIdentityForWallet 
+     * @param wallet address to deploy the identity to
+     * @return identity address
+     */
+    function deployIdentityForWallet(address wallet) external returns (address) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        return IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(wallet);
+    }
+
+    /**
+     * registerIdentity 
+     * Register the identity in the Identity Registry
+     * @param buildingAddress address
+     * @param wallet wallet address
+     * @param country uint26 country code
+     */
+    function registerIdentity(address buildingAddress, address wallet, uint16 country) external {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+
+        BuildingDetails memory building = $.buildingDetails[buildingAddress];
+        ITokenVotes token = ITokenVotes(building.erc3643Token);
+        IIdFactory idFactory = IIdentityGateway($.onchainIdGateway).idFactory();
+        IIdentityRegistry ir = token.identityRegistry();
+        address identity = idFactory.getIdentity(wallet);
+
+        require(identity != address(0), "Identity for wallet not found");
+
+        ir.registerIdentity(wallet, IIdentity(identity), country);
+
+        emit IdentityRegistered(buildingAddress, wallet, identity, country);
+    }
+
+    /**
+     * getIdentity
+     * @param wallet wallet address
+     * @return IIdentity identity of the wallet if any
+     */
+    function getIdentity(address wallet) external view returns (IIdentity) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        IIdFactory idFactory = IIdentityGateway($.onchainIdGateway).idFactory();
+
+        return IIdentity(idFactory.getIdentity(wallet));
+    }
+
+    /**
+     * return an arreay of addresses that might interacto with the erc3643 token;
+     * erc3643 tokens might be sent to them, so they need to have identities registered
+     * @param tmp temporary state variable
+     */
+    function getControllerAddresses(Tmp memory tmp) private pure returns (address[] memory controllers) {
+        uint8 NUM_CONTROLLERS = 5;
+        controllers = new address[](NUM_CONTROLLERS);
+
+        controllers[0] = tmp.initialOwner;
+        controllers[1] = tmp.vault;
+        controllers[2] = tmp.autoCompounder;
+        controllers[3] = tmp.building;
+        controllers[4] = tmp.uniswapRouter;
+        // controllers[5] = tmp.oneSidedExchange;
     }
 }

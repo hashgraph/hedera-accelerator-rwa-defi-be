@@ -26,7 +26,8 @@ async function deployERC3643(contracts: Record<string, any>): Promise<Record<str
   const identityRegistryStorageImplementation = await ethers.deployContract('IdentityRegistryStorage', deployer);
   const identityRegistryImplementation = await ethers.deployContract('IdentityRegistry', deployer);
   const modularComplianceImplementation = await ethers.deployContract('ModularCompliance', deployer);
-  const tokenImplementation = await ethers.deployContract('Token', deployer);
+  const tokenImplementation = await ethers.deployContract('TokenVotes', deployer);
+  tokenImplementation.waitForDeployment();
   const identityImplementation = await ethers.deployContract('Identity', [deployer.address, true], deployer);
   const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], deployer);
   const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], deployer);
@@ -196,6 +197,7 @@ async function deployAutoCompounderFactory(contracts: Record<string, any>): Prom
 
 // deploy NFT metadata collection
 async function deployERC721Metadata(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying ERC721Metadata ...');
   const nftCollectionFactory = await ethers.getContractFactory('ERC721Metadata');
   const ERC721Metadata = await nftCollectionFactory.deploy("Buildings R Us", "BRUS",);
   await ERC721Metadata.waitForDeployment();
@@ -212,6 +214,7 @@ async function deployERC721Metadata(contracts: Record<string, any>): Promise<Rec
 
 // deploy upgradeable BuildingFactory
 async function deployBuildingFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying BuildingFactory ...');
   const buildingFact = await ethers.getContractFactory('Building');
   const buildingBeacon = await upgrades.deployBeacon(buildingFact);
   await buildingBeacon.waitForDeployment();
@@ -284,6 +287,7 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
 }
 
 async function deployAudit(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying Audit ...');
   const AuditRegistry = await ethers.getContractFactory('AuditRegistry');
   const auditRegistry = await AuditRegistry.deploy();
   await auditRegistry.waitForDeployment();
@@ -299,6 +303,7 @@ async function deployAudit(contracts: Record<string, any>): Promise<Record<strin
 }
 
 async function deployExchange(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying Exchange ...');
   const oneSidedExchangeImplementation = await ethers.deployContract('OneSidedExchange');
   const exchangeAddress = await oneSidedExchangeImplementation.getAddress();
 
@@ -312,6 +317,7 @@ async function deployExchange(contracts: Record<string, any>): Promise<Record<st
 }
 
 async function deployLibraries(contracts: Record<string, any>): Promise<Record<string, any>> { 
+  console.log(' - Deploying Libraries ...');
   const libraries = {
     "BuildingTokenLib" : await (await (await ethers.deployContract("BuildingTokenLib")).waitForDeployment()).getAddress(),
     "BuildingGovernanceLib" : await (await (await ethers.deployContract("BuildingGovernanceLib")).waitForDeployment()).getAddress(),
