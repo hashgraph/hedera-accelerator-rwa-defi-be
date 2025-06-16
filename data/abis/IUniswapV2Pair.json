@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IUniswapV2Pair",
-  "sourceName": "contracts/buildings/interface/UniswapInterface.sol",
+  "sourceName": "contracts/uniswap/v2-core/interfaces/IUniswapV2Pair.sol",
   "abi": [
     {
       "anonymous": false,
@@ -160,19 +160,6 @@
     },
     {
       "inputs": [],
-      "name": "createFungible",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "payable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
       "name": "factory",
       "outputs": [
         {
@@ -227,12 +214,12 @@
     },
     {
       "inputs": [],
-      "name": "lpToken",
+      "name": "kLast",
       "outputs": [
         {
-          "internalType": "address",
+          "internalType": "uint256",
           "name": "",
-          "type": "address"
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
