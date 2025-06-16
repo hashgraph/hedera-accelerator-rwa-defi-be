@@ -1,4 +1,4 @@
-import { Contract, LogDescription, Result, } from 'ethers';
+import { LogDescription, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
@@ -7,10 +7,14 @@ import { BuildingFactory, BuildingGovernance } from '../../typechain-types';
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
 
-  const uniswapRouter = await ethers.deployContract('UniswapRouterMock', []);
-  const uniswapRouterAddress = await uniswapRouter.getAddress();
-  const uniswapFactory = await ethers.deployContract('UniswapFactoryMock', []);
+  const weth = await ethers.deployContract('WETH9');
+  const wethAddress = await weth.getAddress();
+  const uniswapFactory = await ethers.deployContract('UniswapV2Factory', [notOwner]);
+  await uniswapFactory.waitForDeployment();
   const uniswapFactoryAddress = await uniswapFactory.getAddress();
+  const uniswapRouter = await ethers.deployContract('UniswapV2Router02', [uniswapFactoryAddress, wethAddress]);
+  await uniswapRouter.waitForDeployment();
+  const uniswapRouterAddress = await uniswapRouter.getAddress();
 
   const tokenA = await ethers.deployContract('ERC20Mock', ["Token A", "TKA", 18]);
   const usdc = await ethers.deployContract('ERC20Mock', ["Token B", "TkB", 6]); // USDC
@@ -249,8 +253,6 @@ describe('BuildingFactory', () => {
       expect(await building.getAddress()).to.be.properAddress;
       expect(await nftCollection.ownerOf(0)).to.be.equal(await building.getAddress());
       expect(await nftCollection.tokenURI(0)).to.be.equal(buildingDetails.tokenURI);
-      expect(await building.getUniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
-      expect(await building.getUniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
       
       const [firstBuilding] = await buildingFactory.getBuildingList();
       
@@ -555,6 +557,88 @@ describe('BuildingFactory', () => {
 
       // transfer to non US user should revert;
       await expect(token.transfer(voter2.address, ethers.parseEther('1000'))).to.be.revertedWith('Transfer not possible'); 
-  });
+    });
+
+    it('should create building, add liquidity', async () => {      
+      const { 
+        owner,
+        buildingFactory,
+        usdc,
+        usdcAddress,
+        uniswapRouterAddress,
+        uniswapFactoryAddress
+      } = await loadFixture(deployFixture);
+
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('1000'),
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseUnits('1000', 6),
+        governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
+      }
+
+      const buildingTx = await buildingFactory.newBuilding(buildingDetails);
+      const [
+        buildingAddress, 
+        tokenAddress,
+      ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+
+      // create building token
+      const building = await ethers.getContractAt('Building', buildingAddress);
+      const token = await ethers.getContractAt('TokenVotes', tokenAddress);
+      const router = await ethers.getContractAt('UniswapV2Router02', uniswapRouterAddress);
+      const factory = await ethers.getContractAt('UniswapV2Factory', uniswapFactoryAddress);
+
+      const tokenAmount = ethers.parseEther('1000');
+      const usdcAmount = ethers.parseUnits('1000', 6);
+
+      await token.mint(owner.address, tokenAmount);
+      await usdc.mint(owner.address, usdcAmount);
+
+      await token.approve(uniswapRouterAddress, tokenAmount);
+      await usdc.approve(uniswapRouterAddress, usdcAmount);
+
+      const amountTokenMin = tokenAmount * 95n / 100n; // 5% slippage
+      const amountUsdcMin = usdcAmount * 95n / 100n;  // 5% slippage
+      const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+
+      const tx = await router.addLiquidity(
+        tokenAddress,
+        usdcAddress,
+        tokenAmount,
+        usdcAmount,
+        amountTokenMin,
+        amountUsdcMin,
+        owner.address,
+        deadline
+      );
+
+      await tx.wait(); 
+
+      const pairAddress = await factory.getPair(tokenAddress, usdcAddress);
+
+      const pairCode = await ethers.provider.getCode(pairAddress);
+      expect(pairCode).to.not.equal("0x", "Pair should be deployed");
+
+      const pair = await ethers.getContractAt("UniswapV2Pair", pairAddress);
+      const lpBalance = await pair.balanceOf(owner.address);
+      expect(lpBalance).to.be.gt(0, "Owner should have received LP tokens");
+
+      const reserves = await pair.getReserves();
+      expect(reserves[0]).to.be.oneOf([tokenAmount, usdcAmount]);
+      expect(reserves[1]).to.be.oneOf([tokenAmount, usdcAmount]);
+    });
   });
 });

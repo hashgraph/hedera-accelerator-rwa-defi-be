@@ -18,6 +18,7 @@ import {IIdentity} from "../onchainid/interface/IIdentity.sol";
 import {IIdentityRegistry} from "../erc3643/registry/interface/IIdentityRegistry.sol";
 import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
 import {IModularCompliance} from "../erc3643/compliance/modular/IModularCompliance.sol";
+import {UniswapV2Library} from "../uniswap/v2-periphery/libraries/UniswapV2Library.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -101,7 +102,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address vault;
         address governance;
         address autoCompounder;
-        address liquidityPair;
     }
 
     /**
@@ -116,7 +116,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
 
         tmp.building = address(new BeaconProxy(
             $.buildingBeacon,
-            abi.encodeWithSelector(Building.initialize.selector, $.uniswapRouter, $.uniswapFactory, tmp.initialOwner)
+            abi.encodeWithSelector(Building.initialize.selector, tmp.initialOwner)
         ));
 
         // deploy trex token and suite
@@ -130,9 +130,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
             )
         );
 
-        // creates the liquidity pair 
-        tmp.liquidityPair = Building(tmp.building).createLiquidityPair(tmp.erc3643Token, $.usdc);
-        
         // deploy treasury
         tmp.treasury = BuildingTreasuryLib.deployTreasury(
             TreasuryDetails(
@@ -289,15 +286,19 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
     function getControllerAddresses(Tmp memory tmp) private view returns (address[] memory controllers) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
 
-        uint8 NUM_CONTROLLERS = 6;
+        uint8 NUM_CONTROLLERS = 7;
         controllers = new address[](NUM_CONTROLLERS);
+
+        // compute the CREATE2 address from the liquidity pair 
+        address liquidityPair = UniswapV2Library.pairFor($.uniswapFactory, tmp.erc3643Token, $.usdc);
 
         controllers[0] = tmp.initialOwner;
         controllers[1] = tmp.vault;
         controllers[2] = tmp.autoCompounder;
         controllers[3] = tmp.building;
         controllers[4] = $.uniswapRouter;
-        controllers[5] = tmp.liquidityPair;
+        controllers[5] = address(this);
+        controllers[6] = liquidityPair;
         // controllers[5] = tmp.oneSidedExchange;
     }
 }
