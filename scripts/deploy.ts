@@ -227,7 +227,7 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
   const identityGateway = await ethers.getContractAt('IdentityGateway', contracts.factories.IdentityGateway);
   const identityGatewayAddress = await identityGateway.getAddress();
 
-  const uniswapRouter = await ethers.getContractAt('UniswapRouterMock', uniswapRouterAddress);
+  const uniswapRouter = await ethers.getContractAt('UniswapV2Router02', uniswapRouterAddress);
   const uniswapFactoryAddress = await uniswapRouter.factory();
 
   const trexGatewayAddress = contracts.factories.TREXGateway;

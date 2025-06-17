@@ -16,7 +16,7 @@ import {IERC7540} from "../erc7540/interfaces/IERC7540.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
-import {IUniswapV2Router02} from "../uniswap/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Router02} from "../uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
 
 import {IAutoCompounder} from "./interfaces/IAutoCompounder.sol";
 import {IRewards} from "../erc4626/interfaces/IRewards.sol";

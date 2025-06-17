@@ -1,11 +1,7 @@
 import { anyValue, ethers, expect } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { ZeroAddress } from "ethers";
-import { AutoCompounderFactory, BasicVault, VaultToken, UniswapRouterMock } from "../../typechain-types";
-
-import factoryAbi from "@uniswap/v2-core/build/UniswapV2Factory.json";
-import routerAbi from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
-import wethAbi from "@uniswap/v2-periphery/build/WETH9.json";
+import { AutoCompounderFactory, BasicVault, VaultToken } from "../../typechain-types";
 
 // constants
 const salt = "testSalt";
@@ -41,21 +37,21 @@ describe("AutoCompounderFactory", function () {
         );
 
         // Uniswap
-        const UniswapV2Factory = await ethers.getContractFactory(factoryAbi.abi, factoryAbi.bytecode, owner);
+        const UniswapV2Factory = await ethers.getContractFactory('UniswapV2Factory', owner);
         const uniswapV2Factory = await UniswapV2Factory.deploy(
             owner.address,
         );
         await uniswapV2Factory.waitForDeployment();
 
-        const WETH = await ethers.getContractFactory(wethAbi.abi, wethAbi.bytecode, owner);
+        const WETH = await ethers.getContractFactory('WETH9', owner);
         const weth = await WETH.deploy();
         await weth.waitForDeployment();
 
-        const UniswapV2Router02 = await ethers.getContractFactory(routerAbi.abi, routerAbi.bytecode, owner);
+        const UniswapV2Router02 = await ethers.getContractFactory('UniswapV2Router02', owner);
         const uniswapV2Router02 = await UniswapV2Router02.deploy(
             uniswapV2Factory.target,
             weth.target
-        ) as UniswapRouterMock;
+        );
         await uniswapV2Router02.waitForDeployment();
 
         // Vault

@@ -2,6 +2,7 @@ import { ethers } from 'hardhat';
 import Deployments from '../../../data/deployments/chain-296.json';
 import { LogDescription } from 'ethers';
 import { BuildingFactory } from '../../../typechain-types';
+import {uniswapFactoryAddress, uniswapRouterAddress, usdcAddress} from "../../../constants";
 
 async function getDeployedBuilding(buildingFactory: BuildingFactory, blockNumber: number): Promise<unknown[]> {
   // Decode the event using queryFilter
@@ -26,17 +27,21 @@ async function createBuilding(): Promise<string> {
     tokenName: 'MyToken', 
     tokenSymbol: 'MYT', 
     tokenDecimals: 18n,
+    tokenMintAmount: ethers.parseEther('1000'),
     treasuryNPercent: 2000n, 
     treasuryReserveAmount: ethers.parseUnits('1000', 6),
     governanceName : 'MyGovernance',
-    vaultShareTokenName: 'Token Name',
-    vaultShareTokenSymbol: 'Token Symbol',
-    vaultFeeReceiver: owner.address,
-    vaultFeeToken: ethers.Wallet.createRandom().address,
-    vaultFeePercentage: 2_00n,
+    vaultShareTokenName: 'Vault Token Name',
+    vaultShareTokenSymbol: 'VTS',
+    vaultFeeReceiver: owner,
+    vaultFeeToken: usdcAddress,
+    vaultFeePercentage: 2000,
     vaultCliff: 0n,
-    vaultUnlockDuration: 0n
+    vaultUnlockDuration: 0n,
+    aTokenName: "AutoCompounder Token Name",
+    aTokenSymbol: "ACTS"
   }
+  
   const tx = await buildingFactory.newBuilding(buildingDetails, { gasLimit: 6_000_000});  
   await tx.wait();
 
@@ -58,30 +63,58 @@ async function addLiquidity(buildingAddress: string) {
   const [owner] = await ethers.getSigners();
   const buildingFactory = await ethers.getContractAt('BuildingFactory', Deployments.factories.BuildingFactory);
 
-  const building = await ethers.getContractAt('Building', buildingAddress);
   const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
 
-  const buildingTokenAddress = buildingDetails.erc3643Token;
-  const buildingToken = await ethers.getContractAt('BuildingERC20', buildingTokenAddress);
-  const buildingTokenAmount = ethers.parseEther('1000');
+  const tokenAddress = buildingDetails.erc3643Token;
+  const token = await ethers.getContractAt('TokenVotes', tokenAddress);
+  const usdc = await ethers.getContractAt('ERC20Mock', usdcAddress);
+  const router = await ethers.getContractAt('UniswapV2Router02', uniswapRouterAddress);
+  const factory = await ethers.getContractAt('UniswapV2Factory', uniswapFactoryAddress);
 
-  const usdc = await ethers.deployContract('BuildingERC20', ["USDC", "USDC", 6]);
-  const usdcAmount = ethers.parseUnits('1', 6);
-  const usdcAddress = await usdc.getAddress();
+  const pairPre = await factory.getPair(tokenAddress, usdcAddress);
   
-  const mintTx = await buildingToken.mint(owner.address, buildingTokenAmount, { gasLimit: 6000000 });
-  await mintTx.wait()
+  if (pairPre === ethers.ZeroAddress) {
+    const createPairTx = await factory.createPair(tokenAddress, usdcAddress);
+    await createPairTx.wait();
+  }
 
-  const usdcMintTx = await usdc.mint(owner.address, usdcAmount, { gasLimit: 6000000 });
-  await usdcMintTx.wait()
+  const pairAddress = await factory.getPair(tokenAddress, usdcAddress);
 
-  const appr1Tx = await buildingToken.approve(buildingAddress, buildingTokenAmount, { gasLimit: 6000000 });
-  await appr1Tx.wait();
-  const appr2Tx = await usdc.approve(buildingAddress, usdcAmount, { gasLimit: 6000000 });
-  await appr2Tx.wait();
+  // 2. Deploy identity for the pair
+  if (await buildingFactory.getIdentity(pairAddress) === ethers.ZeroAddress){
+    const identityTx = await buildingFactory.deployIdentityForWallet(pairAddress);
+    await identityTx.wait();
+      
+    // 3. Register the identity
+    const countryCode = 840; // USA
+    await buildingFactory.registerIdentity(buildingAddress, pairAddress, countryCode);
+  }
   
-  const tx = await building.addLiquidity(buildingTokenAddress, buildingTokenAmount, usdcAddress, usdcAmount, { gasLimit: 6000000 });
-  await tx.wait();
+  const tokenAmount = ethers.parseEther('1000');
+  const usdcAmount = ethers.parseUnits('1000', 6);
+
+  await token.mint(owner.address, tokenAmount);
+  await usdc.mint(owner.address, usdcAmount);
+
+  await token.approve(uniswapRouterAddress, tokenAmount);
+  await usdc.approve(uniswapRouterAddress, usdcAmount);
+
+  const amountTokenMin = tokenAmount * 95n / 100n; // 5% slippage
+  const amountUsdcMin = usdcAmount * 95n / 100n;  // 5% slippage
+  const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+
+  const tx = await router.addLiquidity(
+    tokenAddress,
+    usdcAddress,
+    tokenAmount,
+    usdcAmount,
+    amountTokenMin,
+    amountUsdcMin,
+    owner.address,
+    deadline
+  );
+
+  await tx.wait(); 
 
   console.log('- liquidity added ', tx.hash);
 }
@@ -89,7 +122,7 @@ async function addLiquidity(buildingAddress: string) {
 async function mintAndDelegateTokens(tokenAddress: string) {
   const [voter1, voter2, voter3] = await ethers.getSigners();
 
-  const token = await ethers.getContractAt('BuildingERC20', tokenAddress);
+  const token = await ethers.getContractAt('TokenVotes', tokenAddress);
   const mintAmount = ethers.parseEther('1000');
 
   const a = await token.mint(voter1.address, mintAmount, { gasLimit: 6000000 });

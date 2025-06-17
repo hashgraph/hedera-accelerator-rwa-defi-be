@@ -4,10 +4,25 @@ import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 async function deployFixture() {
   const [owner, notOwner] = await ethers.getSigners();
 
-  const uniswapRouter = await ethers.deployContract('UniswapRouterMock', []);
-  const uniswapRouterAddress = await uniswapRouter.getAddress();
-  const uniswapFactory = await ethers.deployContract('UniswapFactoryMock', []);
+  // Uniswap
+  const UniswapV2Factory = await ethers.getContractFactory('UniswapV2Factory', owner);
+  const uniswapFactory = await UniswapV2Factory.deploy(
+      owner.address,
+  );
+  await uniswapFactory.waitForDeployment();
   const uniswapFactoryAddress = await uniswapFactory.getAddress();
+
+  const WETH = await ethers.getContractFactory('WETH9', owner);
+  const weth = await WETH.deploy();
+  await weth.waitForDeployment();
+
+  const UniswapV2Router02 = await ethers.getContractFactory('UniswapV2Router02', owner);
+  const uniswapRouter = await UniswapV2Router02.deploy(
+    uniswapFactoryAddress,
+    weth.target
+  );
+  await uniswapRouter.waitForDeployment();
+  const uniswapRouterAddress = await uniswapRouter.getAddress();
 
   const tokenA = await ethers.deployContract('ERC20Mock', ["Token A", "TKA", 18]);
   const tokenB = await ethers.deployContract('ERC20Mock', ["Token B", "TkB", 6]); // USDC
@@ -32,14 +47,8 @@ async function deployFixture() {
   const building = await upgrades.deployBeaconProxy(
     await buildingBeacon.getAddress(), 
     buildingFactory,
-    [
-      uniswapRouterAddress, 
-      uniswapFactoryAddress, 
-      owner.address
-    ], 
-    { 
-      initializer: 'initialize'
-    }
+    [owner.address], 
+    { initializer: 'initialize'}
   );
 
 
@@ -83,66 +92,11 @@ describe('Building', () => {
     it('should deploy new Building', async () => {
       const { 
         owner,
-        uniswapRouterAddress, 
-        uniswapFactoryAddress,
         building,
        } = await loadFixture(deployFixture);
 
-      expect(await building.getUniswapFactory()).to.be.hexEqual(uniswapFactoryAddress);
-      expect(await building.getUniswapRouter()).to.be.hexEqual(uniswapRouterAddress);
       expect(await building.getAuditRegistry()).to.be.properAddress;
       expect(await building.owner()).to.be.hexEqual(owner.address);
-      
-    });
-
-    
-    it('should add liquidity', async () => {
-      const { 
-        owner,
-        uniswapRouterAddress, 
-        uniswapFactoryAddress,
-        tokenA,
-        tokenAAddress,
-        tokenB,
-        tokenBAddress,
-       } = await loadFixture(deployFixture);
-
-      const buildingFactory = await ethers.getContractFactory('BuildingMock');
-      const building = await upgrades.deployProxy(
-        buildingFactory, 
-        [
-          uniswapRouterAddress, 
-          uniswapFactoryAddress, 
-          owner.address
-        ], 
-        { 
-          initializer: 'initialize'
-        }
-      );
-
-      const buildingAddress = await building.getAddress();
-
-      const tokenAAmount = ethers.parseEther('100');
-      const tokenBAmount = ethers.parseUnits('1', 6);
-
-      await tokenA.mint(owner.address, tokenAAmount);
-      await tokenB.mint(owner.address, tokenBAmount);
-
-      await tokenA.approve(buildingAddress, tokenAAmount);
-      await tokenB.approve(buildingAddress, tokenBAmount);
-
-       await building.addLiquidity(
-        tokenAAddress, 
-        tokenAAmount, 
-        tokenBAddress, 
-        tokenBAmount, 
-      );      
-
-      expect(await building.amountA()).to.be.equal(tokenAAmount);
-      expect(await building.amountB()).to.be.equal(tokenBAmount);
-      expect(await building.liquidity()).to.be.equal(tokenAAmount);
-      expect(await building.pair()).to.be.properAddress;
-      expect(await building.owner()).to.be.equal(owner.address);
       
     });
   });

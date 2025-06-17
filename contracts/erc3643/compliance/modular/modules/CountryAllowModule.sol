@@ -69,6 +69,7 @@ import "./AbstractModule.sol";
 contract CountryAllowModule is AbstractModule {
     /// Mapping between country and their allowance status per compliance contract
     mapping(address => mapping(uint16 => bool)) private _allowedCountries;
+    mapping(address => uint16[]) private _allowedCountriesList;
 
     /// events
 
@@ -103,6 +104,7 @@ contract CountryAllowModule is AbstractModule {
     function batchAllowCountries(uint16[] calldata _countries) external onlyComplianceCall {
         for (uint256 i = 0; i < _countries.length; i++) {
             (_allowedCountries[msg.sender])[_countries[i]] = true;
+            _listCountry(msg.sender, _countries[i]);
             emit CountryAllowed(msg.sender, _countries[i]);
         }
     }
@@ -118,6 +120,7 @@ contract CountryAllowModule is AbstractModule {
     function batchDisallowCountries(uint16[] calldata _countries) external onlyComplianceCall {
         for (uint256 i = 0; i < _countries.length; i++) {
             (_allowedCountries[msg.sender])[_countries[i]] = false;
+            _unlistCountry(msg.sender, _countries[i]);
             emit CountryUnallowed(msg.sender, _countries[i]);
         }
     }
@@ -132,6 +135,7 @@ contract CountryAllowModule is AbstractModule {
     function addAllowedCountry(uint16 _country) external onlyComplianceCall {
         if ((_allowedCountries[msg.sender])[_country] == true) revert CountryAlreadyAllowed(msg.sender, _country);
         (_allowedCountries[msg.sender])[_country] = true;
+        _listCountry(msg.sender, _country);
         emit CountryAllowed(msg.sender, _country);
     }
 
@@ -146,6 +150,7 @@ contract CountryAllowModule is AbstractModule {
     function removeAllowedCountry(uint16 _country) external onlyComplianceCall {
         if ((_allowedCountries[msg.sender])[_country] == false) revert CountryNotAllowed(msg.sender, _country);
         (_allowedCountries[msg.sender])[_country] = false;
+        _unlistCountry(msg.sender, _country);
         emit CountryUnallowed(msg.sender, _country);
     }
 
@@ -224,5 +229,39 @@ contract CountryAllowModule is AbstractModule {
      */
     function _getCountry(address _compliance, address _userAddress) internal view returns (uint16) {
         return IToken(IModularCompliance(_compliance).getTokenBound()).identityRegistry().investorCountry(_userAddress);
+    }
+
+    /**
+     * add country to the allowed list
+     * @param compliance the compliance contract address for which the country verification is required
+     * @param country Country to be allowed, should be expressed by following numeric ISO 3166-1 standard
+     */
+    function _listCountry(address compliance, uint16 country) internal {
+        _allowedCountriesList[compliance].push(country);
+    }
+
+    /**
+     * Remove country from the allowed list
+     * @param compliance the compliance contract address for which the country verification is required
+     * @param country Country to be allowed, should be expressed by following numeric ISO 3166-1 standard
+     */
+    function _unlistCountry(address compliance, uint16 country) internal {
+        uint16[] storage list = _allowedCountriesList[compliance];
+
+        for (uint i = 0; i < list.length; i++) {
+            if (list[i] == country){
+                list[i] = list[list.length - 1]; // overwrite with last
+                list.pop(); 
+                break;
+            }
+        }
+    }
+
+    /**
+     * Get list of allowed countries
+     * @param compliance the compliance contract address for which the country verification is required
+     */
+    function getAllowedCountries(address compliance) external view returns (uint16[] memory) {
+        return _allowedCountriesList[compliance];
     }
 }

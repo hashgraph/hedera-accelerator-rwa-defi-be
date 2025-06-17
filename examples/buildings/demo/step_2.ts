@@ -44,7 +44,6 @@ async function castVotes(governanceAddress: string, proposalId: bigint): Promise
 
 async function logProposalState(governanceAddress: string, proposalId: bigint) {
   const governance = await ethers.getContractAt('BuildingGovernance', governanceAddress);
-  const token = await ethers.getContractAt('BuildingERC20', await governance.token());
   console.log(
     `\n\n` + 
     `clock: ${await governance.clock()}\n` +

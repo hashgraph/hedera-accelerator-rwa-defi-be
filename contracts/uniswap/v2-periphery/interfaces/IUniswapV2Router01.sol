@@ -1,10 +1,9 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.6.2;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
 
 interface IUniswapV2Router01 {
-    function factory() external pure returns (address);
-    function WHBAR() external pure returns (address);
-    function whbar() external pure returns (address);
+    function factory() external view returns (address);
+    function WETH() external view returns (address);
 
     function addLiquidity(
         address tokenA,
@@ -24,27 +23,6 @@ interface IUniswapV2Router01 {
         address to,
         uint deadline
     ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
-
-    function addLiquidityNewPool(
-        address tokenA,
-        address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-    ) external payable returns (uint amountA, uint amountB, uint liquidity);
-    
-    function addLiquidityETHNewPool(
-        address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
-
     function removeLiquidity(
         address tokenA,
         address tokenB,
@@ -62,7 +40,25 @@ interface IUniswapV2Router01 {
         address to,
         uint deadline
     ) external returns (uint amountToken, uint amountETH);
-
+    function removeLiquidityWithPermit(
+        address tokenA,
+        address tokenB,
+        uint liquidity,
+        uint amountAMin,
+        uint amountBMin,
+        address to,
+        uint deadline,
+        bool approveMax, uint8 v, bytes32 r, bytes32 s
+    ) external returns (uint amountA, uint amountB);
+    function removeLiquidityETHWithPermit(
+        address token,
+        uint liquidity,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline,
+        bool approveMax, uint8 v, bytes32 r, bytes32 s
+    ) external returns (uint amountToken, uint amountETH);
     function swapExactTokensForTokens(
         uint amountIn,
         uint amountOutMin,

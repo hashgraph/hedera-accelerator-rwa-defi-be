@@ -11,7 +11,7 @@ async function deployFixture() {
     buildingGovernanceFactory, 
   );
 
-  const governanceToken = await ethers.deployContract('BuildingERC20', ['test', 'test', 18]);
+  const governanceToken = await ethers.deployContract('ERC20Mock', ['test', 'test', 18]);
   const governanceTokenAddress = await governanceToken.getAddress();
   const governanceName = "Governance";
   const initialOwner = owner.address;
