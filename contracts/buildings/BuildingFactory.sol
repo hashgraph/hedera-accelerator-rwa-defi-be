@@ -19,6 +19,7 @@ import {IIdentityRegistry} from "../erc3643/registry/interface/IIdentityRegistry
 import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
 import {IModularCompliance} from "../erc3643/compliance/modular/IModularCompliance.sol";
 import {UniswapV2Library} from "../uniswap/v2-periphery/libraries/UniswapV2Library.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -36,7 +37,7 @@ interface IERC20 {
  * @title BuildingFactory
  * @author Hashgraph
  */
-contract BuildingFactory is BuildingFactoryStorage, Initializable {
+contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -60,7 +61,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         address _buildingBeacon,
         address _treasuryBeacon,
         address _governanceBeacon
-    ) public virtual initializer {
+    ) public virtual initializer  {
+        __Ownable_init(msg.sender);
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         $.nft = _nft;
         $.uniswapRouter = _uniswapRouter;
@@ -126,7 +128,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
                 $.trexGateway, 
                 details.tokenName, 
                 details.tokenSymbol, 
-                details.tokenDecimals
+                details.tokenDecimals,
+                irAgents(),
+                tokenAgents()
             )
         );
 
@@ -300,5 +304,87 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable {
         controllers[5] = address(this);
         controllers[6] = liquidityPair;
         // controllers[5] = tmp.oneSidedExchange;
+    }
+
+    /**
+     * add addresses as agents on IR
+     * @param agents addresses to be added as IR agents
+     */
+    function addRegistryAgents(address[] memory agents) public onlyOwner {
+        require(agents.length <= 30, "max agents is 30");
+
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        
+        for (uint i = 0; i < agents.length; i++) {
+            require(agents[i] != address(0), "Invalid agent address");
+            $.registryAgents.push(agents[i]);            
+        }
+
+        emit RegistryAgentsAdded(agents);
+    }
+
+    /**
+     * add addresses as agents on IR
+     * @param agent addresses to be added as IR agents
+     */
+    function removeRegistryAgent(address agent) public onlyOwner {
+        require(agent != address(0), "Invalid agent address");
+        
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        address[] storage list = $.registryAgents;
+
+        for (uint i = 0; i < list.length; i++) {
+            if (list[i] == agent){
+                list[i] = list[list.length - 1]; // overwrite with last
+                list.pop(); 
+
+                emit RegistryAgentRemoved(agent);
+
+                break;
+            }
+        }
+    }
+
+    /**
+     * get registry agents added
+     */
+    function getRegistryAgents() external view returns (address[] memory) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        return $.registryAgents;
+    }
+
+    /**
+     * build array with identiry registry agents
+     */
+    function irAgents () private view returns (address[] memory) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        address[] memory agents = new address[]($.registryAgents.length + 2);
+
+        for (uint i = 0; i < $.registryAgents.length; i++) {
+            agents[i] = $.registryAgents[i];
+        }
+
+        agents[agents.length -1] = address(this);
+        agents[agents.length -2] = msg.sender;
+
+
+        return agents;
+    }
+
+    /**
+     * build array with token agents
+     */
+    function tokenAgents () private view returns (address[] memory) {
+         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+         address[] memory agents = new address[]($.tokenAgents.length + 2);
+
+        for (uint i = 0; i < $.tokenAgents.length; i++) {
+            agents[i] = $.tokenAgents[i];
+        }
+
+        agents[agents.length -1] = address(this);
+        agents[agents.length -2] = msg.sender;
+
+        return agents;
     }
 }

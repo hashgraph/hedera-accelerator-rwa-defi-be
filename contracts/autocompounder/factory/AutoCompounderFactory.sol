@@ -3,11 +3,14 @@ pragma solidity 0.8.24;
 
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
 import {IOwnable} from "../../common/interfaces/IOwnable.sol";
-
 import {IAutoCompounderFactory} from "./interfaces/IAutoCompounderFactory.sol";
 import {AutoCompounder} from "../AutoCompounder.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {ITokenVotes} from "../../erc3643/token/ITokenVotes.sol";
+import {IIdentityRegistry} from "../../erc3643/registry/interface/IIdentityRegistry.sol";
+import {IIdentity} from "../../onchainid/interface/IIdentity.sol";
+import {IdentityGateway} from "../../onchainid/gateway/Gateway.sol";
 
 /**
  * @title AutoCompounder Factory
@@ -20,10 +23,14 @@ contract AutoCompounderFactory is IAutoCompounderFactory, Ownable, ERC165 {
     // Used salt => deployed AutoCompounder
     mapping(string => address) public autoCompounderDeployed;
 
+    IdentityGateway private idGateway;
+
     /**
      * @dev Initializes contract with passed parameters.
      */
-    constructor() Ownable(msg.sender) {}
+    constructor(address _idGateway) Ownable(msg.sender) {
+        idGateway = IdentityGateway(_idGateway);
+    }
 
     /**
      * @dev Deploys an AutoCompounder using CREATE2 opcode.
@@ -48,6 +55,17 @@ contract AutoCompounderFactory is IAutoCompounderFactory, Ownable, ERC165 {
         autoCompounder = _deployAutoCompounder(salt, autoCompounderDetails);
 
         autoCompounderDeployed[salt] = autoCompounder;
+
+        IERC4626 vault = IERC4626(autoCompounderDetails.vault);
+        ITokenVotes erc3643Token = ITokenVotes(vault.asset());
+        
+        // check if asset is an erc3643 token and register identity for the ac
+        try erc3643Token.identityRegistry() returns (IIdentityRegistry registry) {
+            IIdentity identity = IIdentity(idGateway.deployIdentityForWallet(autoCompounder));
+            registry.registerIdentity(autoCompounder, identity, 840);
+        } catch  {
+            // do nothing
+        }
 
         IOwnable(autoCompounder).transferOwnership(msg.sender);
 

@@ -36,6 +36,12 @@ describe("AutoCompounderFactory", function () {
             operatorPrKey
         );
 
+        const identityImplementation = await ethers.deployContract('Identity', [owner.address, true], owner);
+        const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], owner);
+        const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
+        const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
+        const identityGatewayAddress = await identityGateway.getAddress();
+
         // Uniswap
         const UniswapV2Factory = await ethers.getContractFactory('UniswapV2Factory', owner);
         const uniswapV2Factory = await UniswapV2Factory.deploy(
@@ -77,7 +83,7 @@ describe("AutoCompounderFactory", function () {
         const AutoCompounderFactory = await ethers.getContractFactory(
             "AutoCompounderFactory"
         );
-        const autoCompounderFactory = await AutoCompounderFactory.deploy() as AutoCompounderFactory;
+        const autoCompounderFactory = await AutoCompounderFactory.deploy(identityGatewayAddress) as AutoCompounderFactory;
         await autoCompounderFactory.waitForDeployment();
 
         return {
@@ -87,6 +93,8 @@ describe("AutoCompounderFactory", function () {
             uniswapV2Router02,
             client,
             owner,
+            identityGateway,
+            identityGatewayAddress
         };
     }
 
