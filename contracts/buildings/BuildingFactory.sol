@@ -92,19 +92,6 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         return $.buildingDetails[buildingAddress];
     }
 
-    // Temporary struct to handle new building variables
-    // used to avoid stack too deep error.
-    struct Tmp {
-        address initialOwner;
-        address building;
-        uint256 nftId;
-        address identity;
-        address erc3643Token;
-        address treasury;
-        address vault;
-        address governance;
-        address autoCompounder;
-    }
 
     /**
      * newBuilding Creates new building with create2, mints NFT and store it.
@@ -113,18 +100,16 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     function newBuilding(NewBuildingDetails calldata details) public virtual returns (BuildingDetails memory buildingDetails){
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         
-        Tmp memory tmp; // temp var to avoid stack too deep errors
-        tmp.initialOwner = msg.sender; // initial owner is sender
+        address initialOwner = msg.sender; // initial owner is sender
 
-        tmp.building = address(new BeaconProxy(
+        address building = address(new BeaconProxy(
             $.buildingBeacon,
-            abi.encodeWithSelector(Building.initialize.selector, tmp.initialOwner)
+            abi.encodeWithSelector(Building.initialize.selector, initialOwner)
         ));
 
-        // deploy trex token and suite
-        tmp.erc3643Token = BuildingTokenLib.detployERC3643Token(
+        address erc3643Token = BuildingTokenLib.detployERC3643Token(
             TokenDetails(
-                tmp.initialOwner, 
+                initialOwner, 
                 $.trexGateway, 
                 details.tokenName, 
                 details.tokenSymbol, 
@@ -134,107 +119,90 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             )
         );
 
-        // deploy treasury
-        tmp.treasury = BuildingTreasuryLib.deployTreasury(
+        address treasury = BuildingTreasuryLib.deployTreasury(
             TreasuryDetails(
                 $.treasuryBeacon, 
-                tmp.initialOwner, 
+                initialOwner, 
                 details.treasuryReserveAmount, 
                 details.treasuryNPercent, 
-                tmp.initialOwner, // business address
+                initialOwner, // business address
                 $.usdc,
                 address(this) // building factory
             )
         );
-        
-        // deploy vault
-        tmp.vault = BuildingVaultLib.deployVault(
+
+        address vault = BuildingVaultLib.deployVault(
             VaultDetails(
-                tmp.erc3643Token,
+                erc3643Token,
                 details.vaultShareTokenName, 
                 details.vaultShareTokenSymbol, 
                 details.vaultFeeReceiver, 
                 details.vaultFeeToken, 
                 details.vaultFeePercentage,
-                tmp.initialOwner, // rewardController
-                tmp.initialOwner, // feeConfigController
+                initialOwner, // rewardController
+                initialOwner, // feeConfigController
                 details.vaultCliff, 
                 details.vaultUnlockDuration
             )
         );        
 
-        // deploy governance
-        tmp.governance = BuildingGovernanceLib.deployGovernance(
+        address governance = BuildingGovernanceLib.deployGovernance(
             GovernanceDetails(
                 $.governanceBeacon, 
-                tmp.erc3643Token, 
+                erc3643Token, 
                 details.governanceName, 
-                tmp.treasury, 
-                tmp.initialOwner
+                treasury, 
+                initialOwner
             )
         );
 
-        // deploy autocompounder
-        tmp.autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
+        address autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
             AutoCompounderDetails (
                 $.uniswapRouter,
-                tmp.vault,
+                vault,
                 $.usdc,
                 details.aTokenName,
                 details.aTokenSymbol,
-                tmp.initialOwner // operator
+                initialOwner // operator
             )
         );
 
-        IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
-        IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(tmp.erc3643Token).identityRegistry());
-        address[] memory controllers = getControllerAddresses(tmp);
+        uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);        
 
-        for (uint256 i = 0; i < controllers.length; i++) {
-            IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(controllers[i]));
-            uint16 country = 840; // defaults to united states (ISO code)
+        // special addresses that interact with the token
+        // they act as a normal user inside the registry so we deploy and register identities for them
+        address[] memory specialWallets = new address[](5);
+        specialWallets[0] = (initialOwner);
+        specialWallets[1] = ($.uniswapRouter);
+        specialWallets[2] = (vault);
+        specialWallets[3] = (autoCompounder);
+        specialWallets[4] = (UniswapV2Library.pairFor($.uniswapFactory, erc3643Token, $.usdc));
 
-            if (identity == IIdentity(address(0))) { 
-                // if controller does not have identity, create one.
-                identity = IIdentity(identityGateway.deployIdentityForWallet(controllers[i]));
-            }
+        registeridentityForWallets(building, erc3643Token, specialWallets);
 
-            if (identityRegistry.identity(controllers[i]) == IIdentity(address(0))) {
-                // if identity is not registered, register it.
-                identityRegistry.registerIdentity(
-                    controllers[i],
-                    identity,
-                    country
-                );
-
-                emit IdentityRegistered(tmp.building, controllers[i], address(identity), country);
-            }
-        }
-
-        tmp.nftId = IERC721Metadata($.nft).mint(tmp.building, details.tokenURI);        
-        ITreasury(tmp.treasury).grantGovernanceRole(tmp.governance);
-        ITreasury(tmp.treasury).addVault(tmp.vault); 
-        IAccessControl(tmp.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), tmp.treasury);// grant reward controller role to treasury
-        IOwnable(tmp.vault).transferOwnership(tmp.initialOwner);
-        IERC20(tmp.erc3643Token).mint(tmp.initialOwner, details.tokenMintAmount);
-        IOwnable(tmp.autoCompounder).transferOwnership(tmp.initialOwner);
+        ITreasury(treasury).grantGovernanceRole(governance);
+        ITreasury(treasury).addVault(vault); 
+        IAccessControl(vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), treasury);// grant reward controller role to treasury
+        IERC20(erc3643Token).mint(initialOwner, details.tokenMintAmount);
+        IOwnable(vault).transferOwnership(initialOwner);
+        IOwnable(autoCompounder).transferOwnership(initialOwner);
 
         buildingDetails = BuildingDetails(
-            tmp.building,
-            tmp.nftId,
+            building,
+            nftId,
             details.tokenURI,
-            tmp.identity,
-            tmp.erc3643Token,
-            tmp.treasury, 
-            tmp.governance,
-            tmp.vault,
-            tmp.autoCompounder
+            address(0), // deprecated
+            erc3643Token,
+            treasury, 
+            governance,
+            vault,
+            autoCompounder
         );
 
-        $.buildingDetails[tmp.building] = buildingDetails;
+        $.buildingDetails[building] = buildingDetails;
         $.buildingsList.push(buildingDetails);
 
-        emit NewBuilding(tmp.building, tmp.erc3643Token, tmp.treasury, tmp.vault, tmp.governance, tmp.initialOwner, tmp.autoCompounder);
+        emit NewBuilding(building, erc3643Token, treasury, vault, governance, initialOwner, autoCompounder);
     }
 
     /**
@@ -283,27 +251,37 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     }
 
     /**
-     * return an arreay of addresses that might interacto with the erc3643 token;
+     * Deploy identity and register addresses in identity registry
      * erc3643 tokens might be sent to them, so they need to have identities registered
-     * @param tmp temporary state variable
+     * @param building building address
+     * @param token token address
+     * @param wallets addresses to be registered
      */
-    function getControllerAddresses(Tmp memory tmp) private view returns (address[] memory controllers) {
+    function registeridentityForWallets(address building, address token, address[] memory wallets) private {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
+        IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(token).identityRegistry());
 
-        uint8 NUM_CONTROLLERS = 7;
-        controllers = new address[](NUM_CONTROLLERS);
+        for (uint256 i = 0; i < wallets.length; i++) {
+            IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(wallets[i]));
+            uint16 country = 840; // defaults to united states (ISO code)
 
-        // compute the CREATE2 address from the liquidity pair 
-        address liquidityPair = UniswapV2Library.pairFor($.uniswapFactory, tmp.erc3643Token, $.usdc);
+            if (identity == IIdentity(address(0))) { 
+                // if controller does not have identity, create one.
+                identity = IIdentity(identityGateway.deployIdentityForWallet(wallets[i]));
+            }
 
-        controllers[0] = tmp.initialOwner;
-        controllers[1] = tmp.vault;
-        controllers[2] = tmp.autoCompounder;
-        controllers[3] = tmp.building;
-        controllers[4] = $.uniswapRouter;
-        controllers[5] = address(this);
-        controllers[6] = liquidityPair;
-        // controllers[5] = tmp.oneSidedExchange;
+            if (identityRegistry.identity(wallets[i]) == IIdentity(address(0))) {
+                // if identity is not registered, register it.
+                identityRegistry.registerIdentity(
+                    wallets[i],
+                    identity,
+                    country
+                );
+
+                emit IdentityRegistered(building, wallets[i], address(identity), country);
+            }
+        }
     }
 
     /**
