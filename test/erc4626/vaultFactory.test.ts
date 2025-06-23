@@ -25,6 +25,12 @@ describe("VaultFactory", function () {
             operatorPrKey
         );
 
+        const identityImplementation = await ethers.deployContract('Identity', [owner.address, true], owner);
+        const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], owner);
+        const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
+        const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
+        const identityGatewayAddress = await identityGateway.getAddress();
+
         // Staking Token
         const VaultToken = await ethers.getContractFactory("VaultToken");
         const stakingToken = await VaultToken.deploy(
@@ -33,7 +39,7 @@ describe("VaultFactory", function () {
         await stakingToken.waitForDeployment();
 
         const VaultFactory = await ethers.getContractFactory("VaultFactory");
-        const vaultFactory = await VaultFactory.deploy() as VaultFactory;
+        const vaultFactory = await VaultFactory.deploy(identityGatewayAddress) as VaultFactory;
         await vaultFactory.waitForDeployment();
 
         return {

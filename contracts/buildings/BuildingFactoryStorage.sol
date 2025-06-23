@@ -13,6 +13,8 @@ abstract contract BuildingFactoryStorage {
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;
+        address[] registryAgents;
+        address[] tokenAgents;
         BuildingDetails[] buildingsList;
         mapping (address => BuildingDetails) buildingDetails;
     }
@@ -61,4 +63,6 @@ abstract contract BuildingFactoryStorage {
     event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner, address autoCompounder);
     event IdentityRegistered(address building, address wallet, address identity, uint16 country);
     event ComplianceModuleAdded(address building, address module);
+    event RegistryAgentsAdded(address[] agents);
+    event RegistryAgentRemoved(address agent);
 }

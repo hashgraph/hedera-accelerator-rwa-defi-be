@@ -131,7 +131,7 @@ async function deployVaultFactory(contracts: Record<string, any>): Promise<Recor
   const [deployer] = await ethers.getSigners();
 
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
-  const vaultFactory = await VaultFactory.deploy({ from: deployer.address });
+  const vaultFactory = await VaultFactory.deploy(contracts.factories.IdentityGateway, { from: deployer.address });
   await vaultFactory.waitForDeployment();
 
   return {
@@ -150,6 +150,7 @@ async function deployAsyncVaultFactory(contracts: Record<string, any>): Promise<
 
   const AsyncVaultFactory = await ethers.getContractFactory("AsyncVaultFactory");
   const asyncVaultFactory = await AsyncVaultFactory.deploy(
+    contracts.factories.IdentityGateway,
     { from: deployer.address, gasLimit: 15000000 }
   );
   await asyncVaultFactory.waitForDeployment();
@@ -184,7 +185,7 @@ async function deployAutoCompounderFactory(contracts: Record<string, any>): Prom
   console.log(' - Deploying AutoCompounder Factory...');
 
   const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
-  const autoCompounderFactory = await AutoCompounderFactory.deploy();
+  const autoCompounderFactory = await AutoCompounderFactory.deploy(contracts.factories.IdentityGateway);
   await autoCompounderFactory.waitForDeployment();
 
   return {
@@ -272,6 +273,13 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
 
   await buildingFactory.waitForDeployment();
   const buildingFactoryAddress = await buildingFactory.getAddress()
+
+  // age identity registry agents to be able to register identities for the erc3643 tokens
+  await buildingFactory.addRegistryAgents([
+    contracts.vault.VaultFactory,
+    contracts.autoCompounder.AutoCompounderFactory,
+    contracts.asyncVault.AsyncVaultFactory
+  ]);
 
   const nftCollection = await ethers.getContractAt('ERC721Metadata', contracts.implementations.ERC721Metadata);
   await nftCollection.transferOwnership(buildingFactoryAddress);

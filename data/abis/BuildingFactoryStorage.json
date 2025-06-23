@@ -101,6 +101,32 @@
       ],
       "name": "NewBuilding",
       "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        }
+      ],
+      "name": "RegistryAgentRemoved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "agents",
+          "type": "address[]"
+        }
+      ],
+      "name": "RegistryAgentsAdded",
+      "type": "event"
     }
   ],
   "bytecode": "0x",

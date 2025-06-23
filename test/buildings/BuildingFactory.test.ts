@@ -2,7 +2,7 @@ import { LogDescription, } from 'ethers';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
-import { BuildingFactory, BuildingGovernance } from '../../typechain-types';
+import { BuildingFactory, BuildingGovernance, FeeConfiguration, IAutoCompounderFactory, IVaultFactory } from '../../typechain-types';
 
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
@@ -36,6 +36,16 @@ async function deployFixture() {
   const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
   const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
   const identityGatewayAddress = await identityGateway.getAddress();
+
+  // vault factory
+  const VaultFactory = await ethers.getContractFactory("VaultFactory");
+  const vaultFactory = await VaultFactory.deploy(identityGatewayAddress);
+  await vaultFactory.waitForDeployment();
+
+  // autocompounder factory
+  const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
+  const autoCompounderFactory = await AutoCompounderFactory.deploy(identityGatewayAddress);
+  await autoCompounderFactory.waitForDeployment();
 
   // Beacon Upgradable Patter for Building
   const buildingImplementation = await ethers.deployContract('Building');
@@ -111,7 +121,7 @@ async function deployFixture() {
 
   // ------------------------------------------------------
 
-  // identityGateway must be the Owner of the IdFactory
+  // identityGateway must be the Owner of the IdFactory 
   await identityFactory.transferOwnership(identityGatewayAddress);
 
   const bf = await upgrades.deployBeaconProxy(
@@ -137,6 +147,12 @@ async function deployFixture() {
   const buildingFactoryAddress = await bf.getAddress()
   const buildingFactory = await ethers.getContractAt('BuildingFactory', buildingFactoryAddress);
 
+  // add identiriry registry agents when deploy new erc3643 tokens
+  await buildingFactory.addRegistryAgents([
+    await vaultFactory.getAddress(),
+    await autoCompounderFactory.getAddress()
+  ]);
+
   await nftCollection.transferOwnership(buildingFactoryAddress);
   await trexGateway.addDeployer(buildingFactoryAddress);
 
@@ -161,6 +177,8 @@ async function deployFixture() {
     voter2,
     voter3,
     libraries,
+    vaultFactory,
+    autoCompounderFactory,
   }
 }
 
@@ -217,10 +235,7 @@ describe('BuildingFactory', () => {
         owner,
         usdcAddress,
         buildingFactory, 
-        uniswapFactoryAddress, 
-        uniswapRouterAddress, 
         nftCollection,
-        identityFactory
       } = await loadFixture(deployFixture);
 
       const buildingDetails = {
@@ -268,11 +283,7 @@ describe('BuildingFactory', () => {
       expect(firstBuildingDetails[2]).to.be.equal(buildingDetails.tokenURI);
       expect(firstBuildingDetails[3]).to.be.equal(firstBuilding[3]);
 
-      const detailsBuildingAddress = firstBuilding[0];
-      const detailsIdentityAddress = firstBuilding[3];
       const detailsTokenAddress = firstBuilding[4];
-      
-      // await expect(tx).to.emit(identityFactory, 'WalletLinked').withArgs(owner.address, detailsIdentityAddress);
 
       // make sure tokens were minted to the sender
       const buildingToken = await ethers.getContractAt('@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20', detailsTokenAddress);
@@ -375,6 +386,99 @@ describe('BuildingFactory', () => {
 
           expect(metadata[3][0]).to.be.equal('city')
           expect(metadata[3][1]).to.be.equal('denver')
+        });
+      });
+    });
+  });
+
+  describe('.addRegistryAgents', () => {
+    describe('when sender is not owner', () => {
+      it('should revert', async () => {
+        const { 
+          notOwner,
+          buildingFactory, 
+        } = await loadFixture(deployFixture);
+  
+        const tx = buildingFactory.connect(notOwner).addRegistryAgents([ethers.ZeroAddress]);
+  
+        await expect(tx).to.be.rejectedWith('OwnableUnauthorizedAccount');
+      });
+    });
+
+    describe('when address is invalid', () => {
+      it('should revert', async () => {
+        const { 
+          owner,
+          buildingFactory, 
+        } = await loadFixture(deployFixture);
+  
+        const tx = buildingFactory.connect(owner).addRegistryAgents([ethers.ZeroAddress]);
+  
+        await expect(tx).to.be.revertedWith('Invalid agent address');
+      });
+    });
+
+    describe('when sender is owner', () => {
+      describe('when address is valid', () => {
+        it('should add registry agents', async () => {
+          const { 
+            owner,
+            buildingFactory, 
+          } = await loadFixture(deployFixture);
+    
+          const random = ethers.Wallet.createRandom();
+          const random1 = ethers.Wallet.createRandom();
+          const random2 = ethers.Wallet.createRandom();
+    
+          const tx = await buildingFactory.connect(owner).addRegistryAgents([random.address, random1.address, random2.address]);
+    
+          await expect(tx).to.emit(buildingFactory, 'RegistryAgentsAdded').withArgs([random.address, random1.address, random2.address]);
+        });
+      });
+    });
+  });
+
+  describe('.removeRegistryAgents', () => {
+    describe('when sender is not owner', () => {
+      it('should revert', async () => {
+        const { 
+          notOwner,
+          buildingFactory, 
+        } = await loadFixture(deployFixture);
+  
+        const tx = buildingFactory.connect(notOwner).removeRegistryAgent(ethers.ZeroAddress);
+  
+        await expect(tx).to.be.rejectedWith('OwnableUnauthorizedAccount');
+      });
+    });
+
+    describe('when address is invalid', () => {
+      it('should revert', async () => {
+        const { 
+          owner,
+          buildingFactory, 
+        } = await loadFixture(deployFixture);
+  
+        const tx = buildingFactory.connect(owner).removeRegistryAgent(ethers.ZeroAddress);
+  
+        await expect(tx).to.be.revertedWith('Invalid agent address');
+      });
+    });
+
+    describe('when sender is owner', () => {
+      describe('when address is valid', () => {
+        it('should add registry agents', async () => {
+          const { 
+            owner,
+            buildingFactory, 
+          } = await loadFixture(deployFixture);
+    
+          const random = ethers.Wallet.createRandom();
+    
+          await buildingFactory.connect(owner).addRegistryAgents([random.address]);
+          const tx = await buildingFactory.connect(owner).removeRegistryAgent(random.address);
+    
+          await expect(tx).to.emit(buildingFactory, 'RegistryAgentRemoved').withArgs(random.address);
         });
       });
     });
@@ -640,5 +744,93 @@ describe('BuildingFactory', () => {
       expect(reserves[0]).to.be.oneOf([tokenAmount, usdcAmount]);
       expect(reserves[1]).to.be.oneOf([tokenAmount, usdcAmount]);
     });
+
+    it('should create building, create vault and stake, autocompounder and stake', async () => {      
+      const { 
+        owner,
+        buildingFactory,
+        vaultFactory,
+        autoCompounderFactory,
+        usdcAddress,
+        uniswapRouterAddress
+      } = await loadFixture(deployFixture);
+
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('2000'),
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseUnits('1000', 6),
+        governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
+      }
+
+      const buildingTx = await buildingFactory.newBuilding(buildingDetails);
+      const [
+        buildingAddress, 
+        tokenAddress,
+      ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+
+      // get building token
+      const token = await ethers.getContractAt('TokenVotes', tokenAddress);
+
+      // deploy vault
+      const vaultDetails: IVaultFactory.VaultDetailsStruct = {
+        cliff: 0,
+        feeConfigController: owner.address,
+        shareTokenName: 'Share Token',
+        shareTokenSymbol: 'ST',
+        stakingToken: tokenAddress,
+        unlockDuration: 0,
+        vaultRewardController: owner.address
+      }
+
+      const feeConfig: FeeConfiguration.FeeConfigStruct = {
+        feePercentage: 0,
+        receiver: owner.address,
+        token: usdcAddress
+      }
+
+      await vaultFactory.deployVault("new_vault", vaultDetails, feeConfig);
+      const newVaultAddress = await vaultFactory.vaultDeployed("new_vault");
+      const newVault = await ethers.getContractAt('BasicVault', newVaultAddress);
+
+      const stakeAmount = ethers.parseEther('1000');
+
+      await token.approve(newVaultAddress, stakeAmount);
+      const vaultDeposit = newVault.deposit(stakeAmount, owner.address);      
+
+      await expect(vaultDeposit).not.to.be.rejected;
+
+      // deploy auto compounder
+      const acDetails: IAutoCompounderFactory.AutoCompounderDetailsStruct = {
+        aTokenName: 'A Token Name',
+        aTokenSymbol: 'ATS',
+        operator: owner.address,
+        uniswapV2Router: uniswapRouterAddress,
+        usdc: usdcAddress,
+        vault: newVault
+      }
+
+      await autoCompounderFactory.deployAutoCompounder("new_autocompounder", acDetails);
+      const newAcAddress = await autoCompounderFactory.autoCompounderDeployed("new_autocompounder");
+      const newAc = await ethers.getContractAt('AutoCompounder', newAcAddress);
+
+      await token.approve(newAcAddress, stakeAmount);
+      const autoCompounderDeposit = newAc.deposit(stakeAmount, owner.address);
+
+      await expect(autoCompounderDeposit).not.to.be.rejected;
+    });
+
   });
 });

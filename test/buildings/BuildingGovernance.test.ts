@@ -16,6 +16,12 @@ async function deployFixture() {
   const governanceName = "Governance";
   const initialOwner = owner.address;
 
+  const identityImplementation = await ethers.deployContract('Identity', [owner.address, true], owner);
+  const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], owner);
+  const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
+  const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
+  const identityGatewayAddress = await identityGateway.getAddress();
+
   // mint and delegate tokens
   const mintAmount = ethers.parseEther('1000');
   await governanceToken.mint(owner.address, mintAmount);
@@ -68,7 +74,7 @@ async function deployFixture() {
   await treasury.grantFactoryRole(owner.address);
 
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
-  const vaultFactory = await VaultFactory.deploy({ from: owner.address });
+  const vaultFactory = await VaultFactory.deploy(identityGatewayAddress, { from: owner.address });
   await vaultFactory.waitForDeployment();
 
   // create Vault
