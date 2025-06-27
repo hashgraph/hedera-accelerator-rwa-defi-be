@@ -2,8 +2,9 @@ import { ethers, expect, time } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { AddressLike, ZeroAddress } from "ethers";
 import { VaultToken, Slice, BasicVault, AsyncVault, AutoCompounder } from "../../typechain-types";
-
 import { VaultType, deployBasicVault, deployAsyncVault } from "../erc4626/helper";
+import { SignHelper } from "../signHelper";
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 
 async function deployVaultWithType(
     vaultType: VaultType,
@@ -173,6 +174,14 @@ describe("Slice", function () {
         };
     }
 
+    async function deployFixtureBasicBasic() {
+      return deployFixture(VaultType.Basic, VaultType.Basic);
+    }
+
+    async function deployFixtureBasicAsync() {
+      return deployFixture(VaultType.Basic, VaultType.Async);
+    }
+
     describe("rebalance", function () {
         it("Should distribute tokens close to the provided allocation Autocompounders with fully unlocked tokens", async function () {
             const {
@@ -188,7 +197,7 @@ describe("Slice", function () {
                 stakingToken1,
                 stakingToken2,
                 rewardToken,
-            } = await deployFixture(VaultType.Basic, VaultType.Async);
+            } = await loadFixture(deployFixtureBasicAsync);
             const allocationPercentage1 = 4000;
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
@@ -427,16 +436,18 @@ describe("Slice", function () {
             await stakingToken1.connect(staker).approve(vault1.target, amountToDeposit);
             await stakingToken2.connect(staker).approve(vault2.target, amountToDeposit);
 
-            await vault1.connect(staker).deposit(
+            const basicVault = vault1 as BasicVault;
+            await basicVault.connect(staker).deposit(
                 amountToDeposit / 2n,
                 staker.address
             );
-            await vault2.connect(staker).requestDeposit(
+            const asyncVault = vault2 as AsyncVault;
+            await asyncVault.connect(staker).requestDeposit(
                 amountToDeposit / 2n,
                 staker.address,
                 staker.address
             );
-            await vault2.connect(staker).deposit(
+            await asyncVault.connect(staker)["deposit(uint256,address)"](
                 amountToDeposit / 2n,
                 staker.address
             );
@@ -537,7 +548,7 @@ describe("Slice", function () {
                 autoCompounder1,
                 mockV3Aggregator,
                 stakingToken1,
-            } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
 
@@ -569,7 +580,7 @@ describe("Slice", function () {
             const {
                 slice,
                 autoCompounder1,
-            } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            } = await loadFixture(deployFixtureBasicBasic);
             const amountToDeposit = 0;
 
             await expect(
@@ -580,7 +591,7 @@ describe("Slice", function () {
         it("Should revert if allocation for the deposited token doesn't exist", async function () {
             const {
                 slice,
-            } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            } = await loadFixture(deployFixtureBasicBasic);
             const amountToDeposit = ethers.parseUnits("50", 12);
 
             await expect(
@@ -588,6 +599,132 @@ describe("Slice", function () {
             ).to.be.revertedWithCustomError(slice, 'AllocationNotFound')
                 .withArgs(ZeroAddress);
         });
+    });
+
+    describe("depositWithSignature", () => {
+      it("Should deposit to AutoCompounder and get aToken", async function () {
+        const {
+          slice,
+          owner,
+          autoCompounder1,
+          mockV3Aggregator,
+        } = await loadFixture(deployFixtureBasicBasic);
+
+        const allocationPercentage1 = 4000;
+        const amountToDeposit = ethers.parseUnits("50", 12);
+
+        // Add tracking tokens
+        await slice.addAllocation(
+            autoCompounder1.target,
+            mockV3Aggregator.target,
+            allocationPercentage1
+        );
+
+        const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
+        const spender = await slice.getAddress();
+        const currentTime = (await ethers.provider.getBlock('latest'))?.timestamp as number;
+        const deadline = currentTime + 3600;
+        
+        console.log({currentTime, deadline, isValid: deadline >= currentTime});
+        const {v, r, s} = await new SignHelper().SignPermitTypedData(owner, spender, asset1, amountToDeposit, deadline);
+
+        const tx = await slice.depositWithSignature(autoCompounder1.target, amountToDeposit, deadline, v, r, s);
+
+        await expect(tx)
+          .to.emit(slice, "Deposit").withArgs(autoCompounder1, owner.address, amountToDeposit);
+
+        const exchangeRate = await autoCompounder1.exchangeRate();
+
+        // Check user received sTokens
+        await expect(tx)
+          .to.changeTokenBalance(slice, owner.address, amountToDeposit * ethers.parseUnits("1", 18) / exchangeRate);
+      });
+    });
+
+    describe("depositBatchWithSignatures", () => {
+      it("Should deposit to AutoCompounder and get aToken", async function () {
+        const {
+          slice,
+          owner,
+          autoCompounder1,
+          autoCompounder2,
+          mockV3Aggregator,
+        } = await loadFixture(deployFixtureBasicBasic);
+
+        const allocationPercentage1 = 4000;
+        const allocationPercentage2 = 6000;
+        const amountToDeposit = ethers.parseUnits("50", 12);
+
+        // Add tracking tokens
+        await slice.addAllocation(
+            autoCompounder1.target,
+            mockV3Aggregator.target,
+            allocationPercentage1
+        );
+
+        await slice.addAllocation(
+          autoCompounder2.target,
+          mockV3Aggregator.target,
+          allocationPercentage2
+        );
+
+        const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
+        const asset2 = await autoCompounder2.asset(); // This is the token implementing permit()
+        const spender = await slice.getAddress();
+
+        // create a list with the ac tokens to sign the permit
+        const signatureList = [
+          { signer: owner, spender, autocompunder: autoCompounder1.target , asset: asset1, amount: amountToDeposit },
+          { signer: owner, spender, autocompunder: autoCompounder2.target, asset: asset2, amount: amountToDeposit },
+        ];
+
+        const collectSignaturesFor = async (list: typeof signatureList) => {
+          const signatures = await Promise.all(
+            list.map(async ({ signer, spender, autocompunder, asset, amount }) => {
+              // set permit deadline
+              const currentTime = (await ethers.provider.getBlock('latest'))?.timestamp as number;
+              const deadline = currentTime + 3600;
+              // sign the permit for the underlying token
+              const {v, r, s} = await new SignHelper().SignPermitTypedData(signer, spender, asset, amount, deadline);
+              
+              return {
+                autocompunder,
+                amount,
+                deadline,
+                v, r, s
+              }
+            })
+          );
+
+          const aTokens = signatures.map(s => s.autocompunder);
+          const amounts = signatures.map(s => s.amount);
+          const deadlines = signatures.map(s => s.deadline);
+          const v = signatures.map(s => s.v);
+          const r = signatures.map(s => s.r);
+          const s = signatures.map(s => s.s);
+
+          return {
+            aTokens,
+            amounts,
+            deadlines,
+            v, r, s
+          }
+        }
+      
+        const {aTokens, amounts, deadlines, v, r, s } = await collectSignaturesFor(signatureList);
+
+        const tx = await slice.depositBatchWithSignatures(aTokens, amounts, deadlines, v, r, s);
+
+        await expect(tx)
+          .to.emit(slice, "Deposit").withArgs(autoCompounder1, owner.address, amountToDeposit)
+          .to.emit(slice, "Deposit").withArgs(autoCompounder2, owner.address, amountToDeposit);
+
+        const exchangeRate = await autoCompounder1.exchangeRate();
+
+        // Check user received sTokens
+        await expect(tx)
+          .to.changeTokenBalance(slice, owner.address, (amountToDeposit * 2n) * ethers.parseUnits("1", 18) / exchangeRate);
+      });
     });
 
     describe("withdraw", function () {
@@ -598,7 +735,7 @@ describe("Slice", function () {
                 autoCompounder1,
                 mockV3Aggregator,
                 stakingToken1,
-            } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const amountToWithdraw = ethers.parseUnits("25", 12);
@@ -636,7 +773,7 @@ describe("Slice", function () {
                 autoCompounder1,
                 mockV3Aggregator,
                 stakingToken1,
-            } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const amountToWithdraw = 0;
@@ -660,7 +797,7 @@ describe("Slice", function () {
 
     describe("addAllocation", function () {
         it("Should add token allocation", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
 
             const tx = await slice.addAllocation(
@@ -679,7 +816,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if zero token address", async function () {
-            const { slice, mockV3Aggregator } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
 
             await expect(
@@ -692,7 +829,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if invalid price id", async function () {
-            const { slice, autoCompounder1 } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
 
             await expect(
@@ -705,7 +842,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if invalid percentage", async function () {
-            const { slice, autoCompounder1, mockV3Aggregator } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 0;
 
             await expect(
@@ -718,7 +855,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if token already added", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
 
             const tx = await slice.addAllocation(
@@ -741,7 +878,7 @@ describe("Slice", function () {
 
     describe("setAllocationPercentage", function () {
         it("Should change allocation percentage", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
             const newAllocationPercentage = 5000;
 
@@ -770,7 +907,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if token doesn't exist", async function () {
-            const { slice, autoCompounder1 } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 4000;
 
             await expect(
@@ -783,7 +920,7 @@ describe("Slice", function () {
         });
 
         it("Should revert if invalid percentage", async function () {
-            const { slice, autoCompounder1 } = await deployFixture(VaultType.Basic, VaultType.Basic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
             const allocationPercentage = 0;
 
             await expect(

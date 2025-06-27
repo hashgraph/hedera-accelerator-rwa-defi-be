@@ -4,6 +4,16 @@ import { ethers } from 'hardhat';
 
 import { deployFullSuiteFixture } from '../fixtures/deploy-full-suite.fixture';
 
+async function deployTrexFactory (trexImplementationAuthority: string, identityFactory: string) {
+  const trexlibraries = {
+    "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
+  }
+  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries: trexlibraries });
+  const trexFactory = await TREXFactory.deploy(trexImplementationAuthority, identityFactory);
+
+  return trexFactory;
+}
+
 describe('TrexImplementationAuthority', () => {
   describe('.setTREXFactory()', () => {
     describe('When not called by the owner', () => {
@@ -48,11 +58,7 @@ describe('TrexImplementationAuthority', () => {
             };
             await otherTrexImplementationAuthority.connect(deployer).addAndUseTREXVersion(versionStruct, contractsStruct);
 
-            const trexFactory = await ethers.deployContract(
-              'TREXFactory',
-              [await otherTrexImplementationAuthority.getAddress(), await identityFactory.getAddress()],
-              deployer,
-            );
+            const trexFactory = await deployTrexFactory(await otherTrexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             await expect(trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress())).to.be.revertedWith('only reference contract can call');
           });
@@ -66,7 +72,7 @@ describe('TrexImplementationAuthority', () => {
               factories: { identityFactory },
             } = await loadFixture(deployFullSuiteFixture);
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             const tx = await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());
             await expect(tx).to.emit(trexImplementationAuthority, 'TREXFactorySet').withArgs(await trexFactory.getAddress());
@@ -99,7 +105,7 @@ describe('TrexImplementationAuthority', () => {
               factories: { identityFactory },
             } = await loadFixture(deployFullSuiteFixture);
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
             await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());
 
             const implementationAuthorityFactory = await ethers.deployContract(
@@ -141,7 +147,7 @@ describe('TrexImplementationAuthority', () => {
           factories: { identityFactory },
         } = await loadFixture(deployFullSuiteFixture);
 
-        const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+        const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
         const otherTrexImplementationAuthority = await ethers.deployContract(
           'TREXImplementationAuthority',
@@ -169,7 +175,7 @@ describe('TrexImplementationAuthority', () => {
           factories: { identityFactory },
         } = await loadFixture(deployFullSuiteFixture);
 
-        const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+        const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
         const otherTrexImplementationAuthority = await ethers.deployContract(
           'TREXImplementationAuthority',
@@ -226,7 +232,7 @@ describe('TrexImplementationAuthority', () => {
             implementations,
           } = await loadFixture(deployFullSuiteFixture);
 
-          const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+          const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
           const otherTrexImplementationAuthority = await ethers.deployContract(
             'TREXImplementationAuthority',
@@ -387,7 +393,7 @@ describe('TrexImplementationAuthority', () => {
             suite: { token },
           } = await loadFixture(deployFullSuiteFixture);
 
-          const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+          const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
           const otherTrexImplementationAuthority = await ethers.deployContract(
             'TREXImplementationAuthority',
@@ -428,7 +434,7 @@ describe('TrexImplementationAuthority', () => {
             const compliance = await ethers.deployContract('ModularComplianceProxy', [await trexImplementationAuthority.getAddress()], deployer);
             await token.setCompliance(await compliance.getAddress());
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             const implementationAuthorityFactory = await ethers.deployContract('IAFactory', [await trexFactory.getAddress()], deployer);
             await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());
@@ -456,7 +462,7 @@ describe('TrexImplementationAuthority', () => {
             const compliance = await ethers.deployContract('ModularComplianceProxy', [await trexImplementationAuthority.getAddress()], deployer);
             await token.setCompliance(await compliance.getAddress());
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             const implementationAuthorityFactory = await ethers.deployContract('IAFactory', [await trexFactory.getAddress()], deployer);
             await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());
@@ -498,7 +504,7 @@ describe('TrexImplementationAuthority', () => {
             const compliance = await ethers.deployContract('ModularComplianceProxy', [await trexImplementationAuthority.getAddress()], deployer);
             await token.setCompliance(await compliance.getAddress());
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             const implementationAuthorityFactory = await ethers.deployContract('IAFactory', [await trexFactory.getAddress()], deployer);
             await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());
@@ -539,7 +545,7 @@ describe('TrexImplementationAuthority', () => {
             const compliance = await ethers.deployContract('ModularComplianceProxy', [await trexImplementationAuthority.getAddress()], deployer);
             await token.setCompliance(await compliance.getAddress());
 
-            const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+            const trexFactory = await deployTrexFactory(await trexImplementationAuthority.getAddress(), await identityFactory.getAddress());            
 
             const implementationAuthorityFactory = await ethers.deployContract('IAFactory', [await trexFactory.getAddress()], deployer);
             await trexImplementationAuthority.setTREXFactory(await trexFactory.getAddress());

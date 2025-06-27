@@ -5,8 +5,8 @@ import {IUniswapV2Router02} from "../uniswap/v2-periphery/interfaces/IUniswapV2R
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20Permit, ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -32,7 +32,7 @@ import {IRewards} from "../erc4626/interfaces/IRewards.sol";
  * The main contract responsibility is to rebalance the asset portfolio (utilising USD prices)
  * and maintain predefined allocation of the stored assets.
  */
-contract Slice is ISlice, ERC20, Ownable, ERC165 {
+contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -88,7 +88,7 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
         string memory name_,
         string memory symbol_,
         string memory metadataUri_
-    ) ERC20(name_, symbol_) Ownable(msg.sender) {
+    ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(msg.sender) {
         require(uniswapRouter_ != address(0), "Slice: Invalid Uniswap router address");
         require(baseToken_ != address(0), "Slice: Invalid USDC token address");
         require(bytes(metadataUri_).length != 0, "Slice: Invalid metadata URI");
@@ -114,8 +114,100 @@ contract Slice is ISlice, ERC20, Ownable, ERC165 {
         // Check allocation exists
         if (_asset == address(0)) revert AllocationNotFound(aToken);
 
+        return _deposit(msg.sender, aToken, _asset, amount);
+    }
+
+    /**
+     * Deposit tokens using permit from ERC-2612
+     * @param aToken auto compounder token address
+     * @param amount amount to deposit
+     * @param deadline limit date the permit signature is valid
+     * @param v // signature v
+     * @param r // signature r
+     * @param s // signature s
+     */
+    function depositWithSignature(address aToken, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external returns (uint256 aTokenAmount) {
+        require(amount > 0, "Slice: Invalid amount");
+        require(aToken != address(0), "Slice: Invalid aToken address");
+        require(deadline >= block.timestamp, "Slice: Invalid deadline");
+
+        address _asset = getTokenAllocation(aToken).asset;
+
+        // Check allocation exists
+        if (_asset == address(0)) revert AllocationNotFound(aToken);
+
         address _sender = msg.sender;
 
+        IERC20Permit(_asset).permit(
+            _sender,
+            address(this),
+            amount,
+            deadline,
+            v, r, s
+        );
+
+        return _deposit(_sender, aToken, _asset, amount);
+    }
+    
+    /**
+     * Batch deposit to slice using Permit from ERC-2612
+     * @param aTokens list of autocompunder tokens
+     * @param amounts list of amounts to deposit
+     * @param deadlines list of limit date the permit signature is valid
+     * @param v list of v sig
+     * @param r list of r sig
+     * @param s list of s sig
+     */
+    function depositBatchWithSignatures(
+        address[] memory aTokens, 
+        uint256[] memory amounts, 
+        uint256[] memory deadlines, 
+        uint8[] memory v, 
+        bytes32[] memory r, 
+        bytes32[] memory  s
+    ) external returns (uint256[] memory) {
+        // require same length
+        require(
+            aTokens.length == amounts.length &&
+            aTokens.length == deadlines.length &&
+            aTokens.length == v.length &&
+            aTokens.length == r.length &&
+            aTokens.length == s.length , "Slice: different array lengths");
+        
+
+        address _sender = msg.sender;
+        uint256[] memory aTokenAmount = new uint256[](aTokens.length);
+
+        for (uint i = 0; i < aTokens.length; i++) {
+            require(amounts[i] > 0, "Slice: Invalid amount");
+            require(aTokens[i] != address(0), "Slice: Invalid aToken address");
+            require(deadlines[i] >= block.timestamp, "Slice: Invalid deadline");
+            address _asset = getTokenAllocation(aTokens[i]).asset;
+            
+            if (_asset == address(0)) revert AllocationNotFound(aTokens[i]);
+
+            IERC20Permit(_asset).permit(
+                _sender,
+                address(this),
+                amounts[i],
+                deadlines[i],
+                v[i], r[i], s[i]
+            );
+
+            aTokenAmount[i] = _deposit(_sender, aTokens[i], _asset, amounts[i]);
+        }
+
+        return aTokenAmount;
+    }
+
+    /**
+     * Make the actual transfer of tokens
+     * @param _sender address of sender
+     * @param aToken address of autocoumpounder token
+     * @param _asset address of the underlying asset
+     * @param amount amount to be deposit
+     */
+    function _deposit(address _sender, address aToken, address _asset, uint256 amount) internal returns (uint256 aTokenAmount) {
         // Transfer underlying token from user to contract
         IERC20(_asset).safeTransferFrom(_sender, address(this), amount);
 

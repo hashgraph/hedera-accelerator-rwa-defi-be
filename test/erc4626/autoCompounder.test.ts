@@ -3,6 +3,7 @@ import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { ZeroAddress } from "ethers";
 import { VaultToken, BasicVault, AsyncVault, AutoCompounder } from "../../typechain-types";
 import { VaultType, deployBasicVault, deployAsyncVault } from "./helper";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 // Zero fee
 const feeConfig = {
@@ -95,9 +96,16 @@ describe("AutoCompounder", function () {
         };
     }
 
+    async function deployFixtureBasic() {
+      return deployFixture(VaultType.Basic);
+    }
+    async function deployFixtureAsync() {
+      return deployFixture(VaultType.Async);
+    }
+
     describe("deposit", function () {
         it("Should deposit tokens and return shares", async function () {
-            const { autoCompounder, stakingToken, owner, vault } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, stakingToken, owner, vault } = await loadFixture(deployFixtureBasic);
             const amountToDeposit = ethers.parseUnits("170", 18);
 
             await stakingToken.approve(autoCompounder.target, amountToDeposit);
@@ -137,7 +145,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should deposit to Async Vault tokens and return shares", async function () {
-            const { autoCompounder, stakingToken, owner, vault } = await deployFixture(VaultType.Async);
+            const { autoCompounder, stakingToken, owner, vault } = await loadFixture(deployFixtureAsync);
             const amountToDeposit = ethers.parseUnits("170", 18);
 
             await stakingToken.approve(autoCompounder.target, amountToDeposit);
@@ -182,7 +190,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should revert in case of zero assets", async function () {
-            const { autoCompounder, owner } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, owner } = await loadFixture(deployFixtureBasic);
             const amountToDeposit = 0;
 
             await expect(
@@ -194,7 +202,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should revert if invalid receiver", async function () {
-            const { autoCompounder } = await deployFixture(VaultType.Basic);
+            const { autoCompounder } = await loadFixture(deployFixtureBasic);
             const amountToDeposit = 170;
 
             await expect(
@@ -208,7 +216,7 @@ describe("AutoCompounder", function () {
 
     describe("withdraw", function () {
         it("Should withdraw tokens", async function () {
-            const { autoCompounder, vault, stakingToken, rewardToken, owner } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, vault, stakingToken, rewardToken, owner } = await loadFixture(deployFixtureBasic);
             const amountToWithdraw = ethers.parseUnits("10", 1);
             const rewardAmount = ethers.parseUnits("5000000", 18);
             const amountToDeposit = 170;
@@ -266,7 +274,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should withdraw tokens from Async Vault", async function () {
-            const { autoCompounder, vault, stakingToken, rewardToken, owner } = await deployFixture(VaultType.Async);
+            const { autoCompounder, vault, stakingToken, rewardToken, owner } = await loadFixture(deployFixtureAsync);
             const amountToWithdraw = ethers.parseUnits("10", 1);
             const rewardAmount = ethers.parseUnits("5000000", 18);
             const amountToDeposit = 170;
@@ -282,19 +290,21 @@ describe("AutoCompounder", function () {
                 { from: owner.address, gasLimit: 3000000 }
             );
 
+            const asyncVault = vault as AsyncVault;
+
             // Add reward to the Vault
-            await rewardToken.approve(vault.target, rewardAmount);
-            await vault.addReward(rewardToken.target, rewardAmount);
+            await rewardToken.approve(asyncVault.target, rewardAmount);
+            await asyncVault.addReward(rewardToken.target, rewardAmount);
 
             await autoCompounder.approve(autoCompounder.target, 100);
-            await vault.approve(autoCompounder.target, 1000);
+            await asyncVault.approve(autoCompounder.target, 1000);
 
             // Warp time
             await time.increase(1000);
 
             console.log('amountToWithdraw', amountToWithdraw);
 
-            await vault.requestRedeem(amountToWithdraw, autoCompounder.target, autoCompounder.target);
+            await asyncVault.requestRedeem(amountToWithdraw, autoCompounder.target, autoCompounder.target);
 
             const tx = await autoCompounder.withdraw(
                 amountToWithdraw,
@@ -328,7 +338,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should revert in case of zero amount of aToken", async function () {
-            const { autoCompounder } = await deployFixture(VaultType.Basic);
+            const { autoCompounder } = await loadFixture(deployFixtureBasic);
             const amountToWithdraw = 0;
 
             await expect(
@@ -340,7 +350,7 @@ describe("AutoCompounder", function () {
         });
 
         it("Should revert if invalid receiver", async function () {
-            const { autoCompounder } = await deployFixture(VaultType.Basic);
+            const { autoCompounder } = await loadFixture(deployFixtureBasic);
             const amountToWithdraw = 170;
 
             await expect(
@@ -354,7 +364,7 @@ describe("AutoCompounder", function () {
 
     describe("claim", function () {
         it("Should claim reward and reinvest", async function () {
-            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner } = await loadFixture(deployFixtureBasic);
             const amountToDeposit = 112412;
             const rewardAmount = ethers.parseUnits("5000000", 18);
 
@@ -406,7 +416,7 @@ describe("AutoCompounder", function () {
         });
 
         it("2 deposits, 2 reinvests", async function () {
-            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner, staker } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner, staker } = await loadFixture(deployFixtureBasic);
             const ownerAmountToDeposit = ethers.parseUnits("10", 18);
             const stakerAmountToDeposit = 112412;
             const rewardAmount = ethers.parseUnits("5000000", 18);
@@ -478,7 +488,7 @@ describe("AutoCompounder", function () {
         });
 
         it("2 deposits, 1 reward claim, reinvest what's left", async function () {
-            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner, staker } = await deployFixture(VaultType.Basic);
+            const { autoCompounder, vault, uniswapV2Router02, stakingToken, rewardToken, owner, staker } = await loadFixture(deployFixtureBasic);
             const ownerAmountToDeposit = ethers.parseUnits("10", 18);
             const stakerAmountToDeposit = 112412;
             const rewardAmount = ethers.parseUnits("5000000", 18);
@@ -486,9 +496,11 @@ describe("AutoCompounder", function () {
             const latestBlock = await ethers.provider.getBlock("latest");
             const timestamp = latestBlock?.timestamp;
 
+            const vaultBasic = vault as BasicVault;
+
             // Initial deposit
-            await stakingToken.approve(vault.target, ethers.parseUnits("2", 18));
-            await vault.deposit(ethers.parseUnits("2", 18), owner.address);
+            await stakingToken.approve(vaultBasic.target, ethers.parseUnits("2", 18));
+            await vaultBasic.deposit(ethers.parseUnits("2", 18), owner.address);
 
             // Add Liquidity
             await rewardToken.approve(uniswapV2Router02.target, ethers.parseUnits("5000000", 18));
@@ -523,8 +535,8 @@ describe("AutoCompounder", function () {
             );
 
             // Add reward to the Vault
-            await rewardToken.approve(vault.target, rewardAmount);
-            await vault.addReward(rewardToken.target, rewardAmount);
+            await rewardToken.approve(vaultBasic.target, rewardAmount);
+            await vaultBasic.addReward(rewardToken.target, rewardAmount);
 
             const ownerPendingReward = await autoCompounder.getPendingReward(owner.address);
             const stakerPendingReward = await autoCompounder.getPendingReward(staker.address);
@@ -559,16 +571,16 @@ describe("AutoCompounder", function () {
                 0
             );
 
-            console.log("AC Reward after staker claim: ", await vault.getUserReward(autoCompounder.target, rewardToken.target));
+            console.log("AC Reward after staker claim: ", await vaultBasic.getUserReward(autoCompounder.target, rewardToken.target));
 
             const ownerClaimReinvestTx = await autoCompounder.claim();
 
             console.log("Claim Tx", ownerClaimReinvestTx.hash);
 
-            await rewardToken.approve(vault.target, rewardAmount);
-            await vault.addReward(rewardToken.target, rewardAmount);
+            await rewardToken.approve(vaultBasic.target, rewardAmount);
+            await vaultBasic.addReward(rewardToken.target, rewardAmount);
 
-            console.log("AC Reward after reinvest: ", await vault.getUserReward(autoCompounder.target, rewardToken.target));
+            console.log("AC Reward after reinvest: ", await vaultBasic.getUserReward(autoCompounder.target, rewardToken.target));
 
             await expect(
                 ownerClaimReinvestTx

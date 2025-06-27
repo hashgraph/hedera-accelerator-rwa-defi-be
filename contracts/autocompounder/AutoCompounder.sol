@@ -4,8 +4,8 @@ pragma abicoder v2;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {FixedPointMathLib} from "../math/FixedPointMathLib.sol";
@@ -27,7 +27,7 @@ import {IRewards} from "../erc4626/interfaces/IRewards.sol";
  *
  * The contract represents a simple AutoCompounder, that allows to reinvest vault rewards.
  */
-contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
+contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -75,7 +75,7 @@ contract AutoCompounder is IAutoCompounder, ERC20, Ownable, ERC165 {
         string memory name_,
         string memory symbol_,
         address operator_
-    ) payable ERC20(name_, symbol_) Ownable(msg.sender) {
+    ) payable ERC20(name_, symbol_) ERC20Permit(name_) Ownable(msg.sender) {
         require(uniswapV2Router_ != address(0), "AutoCompounder: Invalid Uniswap Router address");
         require(vault_ != address(0), "AutoCompounder: Invalid Vault address");
         require(usdc_ != address(0), "AutoCompounder: Invalid USDC token address");

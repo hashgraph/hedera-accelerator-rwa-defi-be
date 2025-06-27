@@ -2,6 +2,7 @@ import { anyValue, ethers, expect } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { ZeroAddress } from "ethers";
 import { VaultFactory, VaultToken } from "../../typechain-types";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 // constants
 const salt = "testSalt";
@@ -52,7 +53,7 @@ describe("VaultFactory", function () {
 
     describe("deployVault", function () {
         it("Should deploy Vault", async function () {
-            const { vaultFactory, stakingToken, owner } = await deployFixture();
+            const { vaultFactory, stakingToken, owner } = await loadFixture(deployFixture);
             const vaultDetails = {
                 stakingToken: stakingToken.target,
                 shareTokenName: "TST",
@@ -72,9 +73,9 @@ describe("VaultFactory", function () {
             const tx = await vaultFactory.deployVault(
                 salt,
                 vaultDetails,
-                feeConfig,
-                { from: owner.address, gasLimit: 3000000 }
+                feeConfig
             );
+            await tx.wait();
 
             console.log(tx.hash);
 

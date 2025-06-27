@@ -1,10 +1,9 @@
-import { anyValue, ethers, expect, time } from "../setup";
+import { ethers, expect, time } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { BigNumberish, Wallet, ZeroAddress } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { VaultToken, AsyncVault } from "../../typechain-types";
-
-import hre from "hardhat";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 async function requestDeposit(vault: AsyncVault, address: string, amount: BigNumberish, staker: Wallet | HardhatEthersSigner) {
     const token = await ethers.getContractAt(
@@ -81,7 +80,7 @@ describe("AsyncVault", function () {
 
     describe("requestDeposit", function () {
         it("Should stake the staking token and claim deposit", async function () {
-            const { asyncVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const rewardAmount = 5000000000;
 
@@ -143,7 +142,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if max deposit request", async function () {
-            const { asyncVault, owner, stakingToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToClaimDeposit = 180;
 
@@ -163,7 +162,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if zero shares", async function () {
-            const { asyncVault, owner } = await deployFixture();
+            const { asyncVault, owner } = await loadFixture(deployFixture);
             const amountToDeposit = 0;
 
             await expect(
@@ -172,7 +171,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if invalid controller or owner", async function () {
-            const { asyncVault, owner, stakingToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
 
             await stakingToken.approve(asyncVault.target, amountToDeposit);
@@ -189,7 +188,7 @@ describe("AsyncVault", function () {
 
     describe("requestRedeem", function () {
         it("Should redeem tokens, return assets and claim reward", async function () {
-            const { asyncVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToRedeem = 170;
             const amountToDeposit = 170;
             const rewardAmount = 5000000000;
@@ -272,7 +271,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if max redeem request exceeded", async function () {
-            const { asyncVault, owner, stakingToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToRedeem = 180;
 
@@ -294,7 +293,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if zero shares", async function () {
-            const { asyncVault, owner } = await deployFixture();
+            const { asyncVault, owner } = await loadFixture(deployFixture);
             const amountToRedeem = 0;
 
             await expect(
@@ -303,7 +302,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if invalid controller or owner", async function () {
-            const { asyncVault, owner } = await deployFixture();
+            const { asyncVault, owner } = await loadFixture(deployFixture);
             const amountToRedeem = 10;
 
             await expect(
@@ -318,7 +317,7 @@ describe("AsyncVault", function () {
 
     describe("withdraw", function () {
         it("Should stake the staking token, claim deposit and withdraw", async function () {
-            const { asyncVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToWithdraw = 170;
             const rewardAmount = 5000000000;
@@ -410,7 +409,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if max redeem request for withdraw exceeded", async function () {
-            const { asyncVault, owner, stakingToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToRedeem = 180;
 
@@ -434,7 +433,7 @@ describe("AsyncVault", function () {
 
     describe("addReward", function () {
         it("Should add reward to the Vault", async function () {
-            const { asyncVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { asyncVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 100;
             const rewardAmount = 100000;
 
@@ -482,7 +481,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if amount is zero", async function () {
-            const { asyncVault, rewardToken } = await deployFixture();
+            const { asyncVault, rewardToken } = await loadFixture(deployFixture);
             const rewardAmount = 0;
 
             await expect(
@@ -495,7 +494,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if reward token is staking token", async function () {
-            const { asyncVault, stakingToken } = await deployFixture();
+            const { asyncVault, stakingToken } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(
@@ -508,7 +507,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if no token staked yet", async function () {
-            const { asyncVault, rewardToken } = await deployFixture();
+            const { asyncVault, rewardToken } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(
@@ -521,7 +520,7 @@ describe("AsyncVault", function () {
         });
 
         it("Should revert if invalid reward token", async function () {
-            const { asyncVault } = await deployFixture();
+            const { asyncVault } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(

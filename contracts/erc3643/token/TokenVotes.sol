@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {ERC20PausableUpgradeable, PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import {ERC20VotesUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -18,6 +19,7 @@ import {TokenVotesStorage} from "./TokenVotesStorage.sol";
 contract TokenVotes is
     Initializable,
     ERC20Upgradeable,
+    ERC20PermitUpgradeable,
     ERC20PausableUpgradeable,
     ERC20VotesUpgradeable,
     ITokenVotes,
@@ -49,6 +51,7 @@ contract TokenVotes is
         require(0 <= _tokenDecimals && _tokenDecimals <= 18, "decimals between 0 and 18");
 
         __ERC20_init(_tokenName, _tokenSymbol);
+        __ERC20Permit_init(_tokenName);
         __ERC20Votes_init();
         __ERC20Pausable_init();
         __Ownable_init(msg.sender);
@@ -72,7 +75,7 @@ contract TokenVotes is
         return "mode=timestamp";
     }
 
-    function nonces(address owner) public view override(NoncesUpgradeable) returns (uint256) {
+    function nonces(address owner) public view override(NoncesUpgradeable, ERC20PermitUpgradeable) returns (uint256) {
         return super.nonces(owner);
     }
 

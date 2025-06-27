@@ -109,8 +109,15 @@ async function deployFixture() {
   };
 
   await trexImplementationAuthority.connect(owner).addAndUseTREXVersion(versionStruct, contractsStruct);
-
-  const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], owner);
+  
+  const trexlibraries = {
+    "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
+  }
+  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries: trexlibraries });
+  const trexFactory = await TREXFactory.deploy(
+    await trexImplementationAuthority.getAddress(),
+    await identityFactory.getAddress(),
+  );
   
   await identityFactory.connect(owner).addTokenFactory(await trexFactory.getAddress());
   const trexGateway = await ethers.deployContract('TREXGateway', [await trexFactory.getAddress(), true], owner);

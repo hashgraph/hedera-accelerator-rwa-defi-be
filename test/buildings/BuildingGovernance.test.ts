@@ -99,8 +99,7 @@ async function deployFixture() {
   const tx = await vaultFactory.deployVault(
     salt,
     vaultDetails,
-    feeConfig,
-    { from: owner.address, gasLimit: 3000000, value: ethers.parseEther("23") }
+    feeConfig
   );
 
   await tx.wait();

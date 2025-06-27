@@ -7,6 +7,7 @@ import {
     usdcAddress,
     uniswapRouterAddress
 } from "../../constants";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 // constants
 const salt = "testSalt";
@@ -44,7 +45,7 @@ describe("SliceFactory", function () {
 
     describe("deploySlice", function () {
         it("Should deploy Slice and compare slice group", async function () {
-            const { sliceFactory, owner } = await deployFixture();
+            const { sliceFactory, owner } = await loadFixture(deployFixture);
             const sliceDetails = {
                 uniswapRouter: uniswapRouterAddress,
                 usdc: usdcAddress,
@@ -56,9 +57,10 @@ describe("SliceFactory", function () {
             // Deploy Slice
             const tx = await sliceFactory.deploySlice(
                 salt,
-                sliceDetails,
-                { from: owner.address, gasLimit: 3000000 }
+                sliceDetails
             );
+
+            await tx.wait();
 
             console.log(tx.hash);
 
@@ -68,7 +70,7 @@ describe("SliceFactory", function () {
         });
 
         it("Should revert if uniswap router zero address", async function () {
-            const { sliceFactory } = await deployFixture();
+            const { sliceFactory } = await loadFixture(deployFixture);
             const sliceDetails = {
                 uniswapRouter: ZeroAddress,
                 usdc: usdcAddress,
@@ -86,7 +88,7 @@ describe("SliceFactory", function () {
         });
 
         it("Should revert if USDC zero address", async function () {
-            const { sliceFactory } = await deployFixture();
+            const { sliceFactory } = await loadFixture(deployFixture);
             const sliceDetails = {
                 uniswapRouter: uniswapRouterAddress,
                 usdc: ZeroAddress,
@@ -104,7 +106,7 @@ describe("SliceFactory", function () {
         });
 
         it("Should revert if metadata URI wasn't provided", async function () {
-            const { sliceFactory } = await deployFixture();
+            const { sliceFactory } = await loadFixture(deployFixture);
             const sliceDetails = {
                 uniswapRouter: uniswapRouterAddress,
                 usdc: usdcAddress,

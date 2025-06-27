@@ -57,12 +57,13 @@ async function deployERC3643(contracts: Record<string, any>): Promise<Record<str
 
   await trexImplementationAuthorityContract.addAndUseTREXVersion(versionStruct, contractsStruct, { gasLimit: 15000000 });
 
-
-  const TREXFactory = await ethers.getContractFactory('TREXFactory');
+  const libraries = {
+    "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
+  }
+  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries });
   const trexFactory = await TREXFactory.deploy(
     await trexImplementationAuthority.getAddress(),
     await identityFactory.getAddress(),
-    { gasLimit: 15000000 }
   );
   await trexFactory.waitForDeployment();
 
@@ -71,8 +72,7 @@ async function deployERC3643(contracts: Record<string, any>): Promise<Record<str
   const TREXGateway = await ethers.getContractFactory('TREXGateway');
   const trexGateway = await TREXGateway.deploy(
     await trexFactory.getAddress(),
-    true,
-    { gasLimit: 15000000 }
+    true
   );
   await trexGateway.waitForDeployment();
 
