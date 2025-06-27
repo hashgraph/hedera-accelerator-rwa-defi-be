@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -13,7 +13,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-import {ERC7540} from "./ERC7540.sol";
+import {ERC7540, ERC4626} from "./ERC7540.sol";
 import {IERC7540} from "./interfaces/IERC7540.sol";
 import {ERC7540_FilledRequest, ERC7540_Request} from "./types/ERC7540Types.sol";
 
@@ -25,7 +25,7 @@ import {FeeConfiguration} from "../common/FeeConfiguration.sol";
  *
  * The contract which represents a custom Vault with async deposit/redeem support.
  */
-contract AsyncVault is ERC7540, ERC165, FeeConfiguration, Ownable {
+contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -50,7 +50,7 @@ contract AsyncVault is ERC7540, ERC165, FeeConfiguration, Ownable {
         address feeConfigController_,
         uint32 cliff_,
         uint32 unlockDuration_
-    ) payable ERC7540(underlying_) ERC20(name_, symbol_) Ownable(msg.sender) {
+    ) payable ERC7540(underlying_) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(msg.sender) {
         __FeeConfiguration_init(feeConfig_, vaultRewardController_, feeConfigController_);
 
         AsyncVaultData storage $ = _getAsyncVaultStorage();
@@ -510,5 +510,12 @@ contract AsyncVault is ERC7540, ERC165, FeeConfiguration, Ownable {
      */
     function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ERC165) returns (bool) {
         return interfaceId == type(IERC7540).interfaceId || super.supportsInterface(interfaceId);
+    }
+    
+    /**
+     * necessary override
+     */
+    function decimals() public view override(ERC20, ERC4626) returns (uint8) {
+        return super.decimals();
     }
 }

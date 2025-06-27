@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -29,7 +29,7 @@ import {BasicVaultStorage} from "./BasicVaultStorage.sol";
  *
  * The contract which represents a custom Vault.
  */
-contract BasicVault is BasicVaultStorage, ERC4626, ERC165, FeeConfiguration, Ownable, ReentrancyGuard {
+contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfiguration, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -54,7 +54,7 @@ contract BasicVault is BasicVaultStorage, ERC4626, ERC165, FeeConfiguration, Own
         address feeConfigController_,
         uint32 cliff_,
         uint32 unlockDuration_
-    ) payable ERC20(name_, symbol_) ERC4626(underlying_) Ownable(msg.sender) {
+    ) payable ERC20(name_, symbol_) ERC20Permit(name_) ERC4626(underlying_) Ownable(msg.sender) {
         BasicVaultData storage $ = _getBasicVaultStorage();
 
         __FeeConfiguration_init(feeConfig_, vaultRewardController_, feeConfigController_);
@@ -524,5 +524,12 @@ contract BasicVault is BasicVaultStorage, ERC4626, ERC165, FeeConfiguration, Own
      */
     function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * necessary override
+     */
+    function decimals() public view override(ERC20, ERC4626) returns (uint8) {
+        return super.decimals();
     }
 }
