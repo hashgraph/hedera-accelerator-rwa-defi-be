@@ -46,7 +46,17 @@ export async function deployFullSuiteFixture() {
   };
   await trexImplementationAuthority.connect(deployer).addAndUseTREXVersion(versionStruct, contractsStruct);
 
-  const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+  // const trexFactory = await ethers.deployContract('TREXFactory', [await trexImplementationAuthority.getAddress(), await identityFactory.getAddress()], deployer);
+
+  const trexlibraries = {
+    "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
+  }
+  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries: trexlibraries });
+  const trexFactory = await TREXFactory.deploy(
+    await trexImplementationAuthority.getAddress(),
+    await identityFactory.getAddress(),
+  );
+
   await identityFactory.connect(deployer).addTokenFactory(await trexFactory.getAddress());
 
   const claimTopicsRegistry = await ethers
@@ -75,7 +85,7 @@ export async function deployFullSuiteFixture() {
   const tokenName = 'TREXDINO';
   const tokenSymbol = 'TREX';
   const tokenDecimals = 0n;
-  const token = await ethers
+  const tokenDeployment = await ethers
     .deployContract(
       'TokenProxy',
       [
@@ -90,6 +100,7 @@ export async function deployFullSuiteFixture() {
       deployer,
     )
     .then(async (proxy) => ethers.getContractAt('TokenDLT', await proxy.getAddress()));
+
 
   const agentManager = await ethers.deployContract('AgentManager', [await token.getAddress()], tokenAgent);
 
