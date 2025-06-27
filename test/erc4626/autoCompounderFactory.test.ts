@@ -2,6 +2,7 @@ import { anyValue, ethers, expect } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { ZeroAddress } from "ethers";
 import { AutoCompounderFactory, BasicVault, VaultToken } from "../../typechain-types";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 // constants
 const salt = "testSalt";
@@ -100,7 +101,7 @@ describe("AutoCompounderFactory", function () {
 
     describe("deployAutoCompounder", function () {
         it("Should deploy AutoCompounder", async function () {
-            const { autoCompounderFactory, hederaVault, stakingToken, uniswapV2Router02, owner } = await deployFixture();
+            const { autoCompounderFactory, hederaVault, stakingToken, uniswapV2Router02, owner } = await loadFixture(deployFixture);
             const autoCompounderDetails = {
                 uniswapV2Router: uniswapV2Router02.target,
                 vault: hederaVault.target,

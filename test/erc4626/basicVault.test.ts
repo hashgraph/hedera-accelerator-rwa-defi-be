@@ -3,6 +3,7 @@ import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { BigNumberish, Wallet, ZeroAddress } from "ethers";
 import { VaultToken, BasicVault } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 async function deposit(vault: BasicVault, address: string, amount: BigNumberish, staker: Wallet | HardhatEthersSigner) {
     const token = await ethers.getContractAt(
@@ -83,7 +84,7 @@ describe("BasicVault", function () {
 
     describe("deposit", function () {
         it("Should deposit tokens and return shares", async function () {
-            const { hederaVault, owner, stakingToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
 
             console.log("Preview deposit ", await hederaVault.previewDeposit(amountToDeposit));
@@ -121,7 +122,7 @@ describe("BasicVault", function () {
         });
 
         it("Should claim rewards after deposit", async function () {
-            const { hederaVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const rewardAmount = 50000;
 
@@ -178,7 +179,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero receiver", async function () {
-            const { hederaVault } = await deployFixture();
+            const { hederaVault } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
 
             await expect(
@@ -187,7 +188,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero assets", async function () {
-            const { hederaVault, owner } = await deployFixture();
+            const { hederaVault, owner } = await loadFixture(deployFixture);
             const amountToDeposit = 0;
 
             await expect(
@@ -198,7 +199,7 @@ describe("BasicVault", function () {
 
     describe("withdraw", function () {
         it("Should withdraw tokens", async function () {
-            const { hederaVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToWithdraw = 10;
             const rewardAmount = 50000;
@@ -283,7 +284,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if invalid receiver", async function () {
-            const { hederaVault, owner } = await deployFixture();
+            const { hederaVault, owner } = await loadFixture(deployFixture);
             const amountToWithdraw = 10;
 
             await expect(
@@ -292,7 +293,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero assets", async function () {
-            const { hederaVault, owner, rewardToken, stakingToken } = await deployFixture();
+            const { hederaVault, owner, rewardToken, stakingToken } = await loadFixture(deployFixture);
             const amountToDeposit = 170;
             const amountToWithdraw = 0;
             const rewardAmount = 50000;
@@ -323,7 +324,7 @@ describe("BasicVault", function () {
 
     describe("mint", function () {
         it("Should mint tokens", async function () {
-            const { hederaVault, owner, stakingToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken } = await loadFixture(deployFixture);
             const amountOfShares = 1;
 
             const amount = await hederaVault.previewMint(amountOfShares);
@@ -354,7 +355,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero receiver", async function () {
-            const { hederaVault } = await deployFixture();
+            const { hederaVault } = await loadFixture(deployFixture);
             const amountToMint = 10;
 
             await expect(
@@ -363,7 +364,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero shares", async function () {
-            const { hederaVault, owner } = await deployFixture();
+            const { hederaVault, owner } = await loadFixture(deployFixture);
             const amountToMint = 0;
 
             await expect(
@@ -374,7 +375,7 @@ describe("BasicVault", function () {
 
     describe("redeem", function () {
         it("Should redeem tokens", async function () {
-            const { hederaVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToRedeem = 10;
             const amountToDeposit = 170;
             const rewardAmount = 50000;
@@ -460,7 +461,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if zero assets", async function () {
-            const { hederaVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToReedem = 0;
             const amountToDeposit = 170;
             const rewardAmount = 50000;
@@ -484,7 +485,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if invalid receiver", async function () {
-            const { hederaVault, owner } = await deployFixture();
+            const { hederaVault, owner } = await loadFixture(deployFixture);
             const amountToReedem = 10;
 
             await expect(
@@ -495,7 +496,7 @@ describe("BasicVault", function () {
 
     describe("addReward", function () {
         it("Should add reward to the Vault two times", async function () {
-            const { hederaVault, owner, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToDeposit = 100;
             const rewardAmount = 100000;
 
@@ -543,7 +544,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if amount is zero", async function () {
-            const { hederaVault, rewardToken } = await deployFixture();
+            const { hederaVault, rewardToken } = await loadFixture(deployFixture);
             const rewardAmount = 0;
 
             await expect(
@@ -555,7 +556,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if reward token is staking token", async function () {
-            const { hederaVault, stakingToken } = await deployFixture();
+            const { hederaVault, stakingToken } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(
@@ -567,7 +568,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if no token staked yet", async function () {
-            const { hederaVault, rewardToken } = await deployFixture();
+            const { hederaVault, rewardToken } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(
@@ -579,7 +580,7 @@ describe("BasicVault", function () {
         });
 
         it("Should revert if invalid reward token", async function () {
-            const { hederaVault } = await deployFixture();
+            const { hederaVault } = await loadFixture(deployFixture);
             const rewardAmount = 10;
 
             await expect(
@@ -593,7 +594,7 @@ describe("BasicVault", function () {
 
     describe("flow tests", function () {
         it("two people, two withdraw, add reward, all claim", async function () {
-            const { hederaVault, owner, staker, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, staker, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToWithdraw = 100;
             const amountToStake = 112412;
             const rewardToAdd = ethers.parseUnits("5000000", 18);
@@ -727,7 +728,7 @@ describe("BasicVault", function () {
         });
 
         it("two people, two type of reward, one withdraw, add two reward, all claim", async function () {
-            const { hederaVault, owner, staker, stakingToken, rewardToken } = await deployFixture();
+            const { hederaVault, owner, staker, stakingToken, rewardToken } = await loadFixture(deployFixture);
             const amountToWithdraw = 10;
             const amountToStake = 112412;
             const rewardToAdd = ethers.parseUnits("5000000", 18);
