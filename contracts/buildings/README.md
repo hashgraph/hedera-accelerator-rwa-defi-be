@@ -45,16 +45,20 @@ Each building is deployed through the `BuildingFactory`, which:
 
 > 📦 Contracts are upgradeable via Beacon Proxies for long-term modularity and maintainability.
 
+> **What is a Beacon Proxy?**  
+> A Beacon Proxy is an upgradeability pattern where many proxy contracts share a single "beacon" contract that points to the current logic (implementation) contract. When the beacon is updated to a new implementation, all proxies using that beacon are instantly upgraded. This makes it easy to upgrade multiple contracts at once, ensuring modularity and efficient maintenance.  
+> [See EIP-1967 for details.](https://eips.ethereum.org/EIPS/eip-1967)
+
 ---
 
 ## 🛡️ Compliance Layer
 
 Each `BuildingToken` integrates with the ERC3643 suite:
 
-- **IdentityRegistry**
-- **ClaimTopicsRegistry**
-- **TrustedIssuersRegistry**
-- **Compliance** module
+- **IdentityRegistry**: Manages the mapping between user addresses and their verified identities, ensuring only authorized users can hold tokens.
+- **ClaimTopicsRegistry**: Stores the list of required claim topics (such as KYC, AML) that users must satisfy to interact with the token.
+- **TrustedIssuersRegistry**: Maintains a registry of trusted third-party identity providers (issuers) who can validate user claims.
+- **Compliance** module: Enforces transfer restrictions and regulatory compliance rules, such as KYC/AML checks, on token operations.
 
 These ensure that only KYC-verified and regulatorily compliant users can hold or transfer building tokens.
 
@@ -80,6 +84,27 @@ To deploy a new building suite:
 BuildingFactory factory = BuildingFactory(factoryAddress);
 factory.newBuilding(NewBuildingDetails calldata details);
 ```
+
+### 🖥️ Deploy Factory from the CLI
+
+You can deploy a new building factory directly from the command line using Hardhat tasks or scripts. For example:
+
+```bash
+npx hardhat run scripts/deploy.ts --network <network>
+```
+
+Replace `<network>` with your target network (e.g., `testnet`, `mainnet`, or `hardhat`).
+
+---
+
+### 🧑‍💻 Demo Scripts
+
+- [Deploy Building Demo](../../examples/create-building.ts)
+
+These scripts demonstrate how to deploy and configure a complete building suite using the factory contract. Check the script comments for parameter details and customization options.
+
+---
+
 ### Parameters include:
 
 | Param                  | Purpose |
