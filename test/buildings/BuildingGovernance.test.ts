@@ -73,6 +73,12 @@ async function deployFixture() {
   const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
   await treasury.grantFactoryRole(owner.address);
 
+  // Deploy AuditRegistry
+  const AuditRegistry = await ethers.getContractFactory('AuditRegistry');
+  const auditRegistry = await AuditRegistry.deploy(owner.address);
+  await auditRegistry.waitForDeployment();
+  const auditRegistryAddress = await auditRegistry.getAddress();
+
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
   const vaultFactory = await VaultFactory.deploy(identityGatewayAddress, { from: owner.address });
   await vaultFactory.waitForDeployment();
@@ -127,7 +133,8 @@ async function deployFixture() {
       governanceTokenAddress, 
       governanceName, 
       initialOwner, 
-      treasuryAddress
+      treasuryAddress,
+      auditRegistryAddress
     ], 
     { 
       initializer: 'initialize'
@@ -135,6 +142,7 @@ async function deployFixture() {
   );
 
   await treasury.grantGovernanceRole(await buildingGovernance.getAddress());
+  await auditRegistry.grantGovernanceRole(await buildingGovernance.getAddress());
 
   const governance = await ethers.getContractAt('BuildingGovernance', await buildingGovernance.getAddress());
 
@@ -151,7 +159,8 @@ async function deployFixture() {
     governance,
     treasury,
     vault,
-    usdc
+    usdc,
+    auditRegistry
   }
 }
 
@@ -381,6 +390,120 @@ describe('BuildingGovernance', () => {
       expect(await treasury.reserve()).not.to.be.eq(oldReserve);
       expect(await treasury.reserve()).to.be.eq(amount);
 
+    });
+  });
+
+  describe('.createAddAuditorProposal()', () => {
+    it('should create add auditor proposal', async () => {
+      const { 
+        governance,
+        owner
+      } = await loadFixture(deployFixture);
+
+      const auditor = ethers.Wallet.createRandom();
+      const description = "Add new auditor to the registry";
+      const tx = await governance.createAddAuditorProposal(auditor.address, description);
+      const proposalId = getProposalId(governance, tx.blockNumber as number);
+
+      const proposalType = 3 // AddAuditor
+      const proposer = owner.address
+      const receiver = auditor.address
+
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, 0);
+    });
+
+    it('should execute add auditor proposal', async () => {
+      const { 
+        governance,
+        auditRegistry,
+        voter1, voter2, voter3
+      } = await loadFixture(deployFixture);
+
+      const auditor = ethers.Wallet.createRandom();
+      const description = "Add new auditor to the registry";
+
+      // Check auditor doesn't have role initially
+      const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
+      expect(await auditRegistry.hasRole(AUDITOR_ROLE, auditor.address)).to.be.false;
+
+      const tx1 = await governance.createAddAuditorProposal(auditor.address, description);
+      await tx1.wait();
+
+      const proposalId = await getProposalId(governance, tx1.blockNumber as number);
+
+      // cast votes
+      const votingDelay = await governance.votingDelay();
+      const votingPeriod = await governance.votingPeriod();
+      
+      await mine(votingDelay) // wait voting delay to begin casting votes
+      await governance.connect(voter1).castVote(proposalId, 1); // "for" vote.
+      await governance.connect(voter2).castVote(proposalId, 1); // "for" vote.
+      await governance.connect(voter3).castVote(proposalId, 1); // "for" vote.
+      await mine(votingPeriod); // wait for proposal voting period 
+
+      // execute proposal
+      await governance.executeAddAuditorProposal(proposalId);
+
+      // Check auditor now has role
+      expect(await auditRegistry.hasRole(AUDITOR_ROLE, auditor.address)).to.be.true;
+    });
+  });
+
+  describe('.createRemoveAuditorProposal()', () => {
+    it('should create remove auditor proposal', async () => {
+      const { 
+        governance,
+        owner
+      } = await loadFixture(deployFixture);
+
+      const auditor = ethers.Wallet.createRandom();
+      const description = "Remove auditor from the registry";
+      const tx = await governance.createRemoveAuditorProposal(auditor.address, description);
+      const proposalId = getProposalId(governance, tx.blockNumber as number);
+
+      const proposalType = 4 // RemoveAuditor
+      const proposer = owner.address
+      const receiver = auditor.address
+
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, 0);
+    });
+
+    it('should execute remove auditor proposal', async () => {
+      const { 
+        governance,
+        auditRegistry,
+        owner,
+        voter1, voter2, voter3
+      } = await loadFixture(deployFixture);
+
+      const auditor = ethers.Wallet.createRandom();
+      const description = "Remove auditor from the registry";
+
+      // First add the auditor
+      const AUDITOR_ROLE = await auditRegistry.AUDITOR_ROLE();
+      await auditRegistry.connect(owner).grantRole(AUDITOR_ROLE, auditor.address);
+      expect(await auditRegistry.hasRole(AUDITOR_ROLE, auditor.address)).to.be.true;
+
+      const tx1 = await governance.createRemoveAuditorProposal(auditor.address, description);
+      await tx1.wait();
+
+      const proposalId = await getProposalId(governance, tx1.blockNumber as number);
+
+      // cast votes
+      const votingDelay = await governance.votingDelay();
+      const votingPeriod = await governance.votingPeriod();
+      
+      await mine(votingDelay) // wait voting delay to begin casting votes
+      await governance.connect(voter1).castVote(proposalId, 1); // "for" vote.
+      await governance.connect(voter2).castVote(proposalId, 1); // "for" vote.
+      await governance.connect(voter3).castVote(proposalId, 1); // "for" vote.
+      await mine(votingPeriod); // wait for proposal voting period 
+
+      // execute proposal
+      await governance.executeRemoveAuditorProposal(proposalId);
+
+      // Check auditor no longer has role
+      expect(await auditRegistry.hasRole(AUDITOR_ROLE, auditor.address)).to.be.false;
     });
   });
 });

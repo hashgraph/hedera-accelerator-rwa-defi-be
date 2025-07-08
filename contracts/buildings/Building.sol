@@ -17,6 +17,6 @@ contract Building is BuildingBase, BuildingAudit {
      */
     function initialize (address _initialOwner) public virtual initializer {
         __Building_init(_initialOwner);
-        __Audit_init();
+        __Audit_init(msg.sender);
     }
 }

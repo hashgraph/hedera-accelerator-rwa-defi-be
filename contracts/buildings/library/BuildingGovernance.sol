@@ -9,6 +9,7 @@ struct GovernanceDetails {
     address token;
     string name;
     address treasury;
+    address auditRegistry;
     address initialOwner;
 }
 
@@ -21,7 +22,8 @@ library BuildingGovernanceLib {
                 details.token, 
                 details.name, 
                 details.initialOwner, 
-                details.treasury
+                details.treasury,
+                details.auditRegistry
             )
         ));
     }

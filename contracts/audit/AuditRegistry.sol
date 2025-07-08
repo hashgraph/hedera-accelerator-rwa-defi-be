@@ -12,6 +12,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract AuditRegistry is AccessControl {
     bytes32 public constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
     struct AuditRecord {
         address building; // EVM address of the building
@@ -88,8 +89,8 @@ contract AuditRegistry is AccessControl {
     /**
      * @dev Constructor grants DEFAULT_ADMIN_ROLE to the deployer.
      */
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address initialOwner) {
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
 
     /**
@@ -170,6 +171,34 @@ contract AuditRegistry is AccessControl {
         record.revoked = true;
 
         emit AuditRecordRevoked(_recordId, block.timestamp);
+    }
+
+    /**
+     * Add an auditor tru governance voting
+     * @param account account to be added as auditor
+     */
+    function addAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
+        require(account != address(0), "Invalid address");
+        _grantRole(AUDITOR_ROLE, account);
+    }
+
+    /**
+     * Remove an auditor tru governance voting
+     * @param account auditor account to be removed
+     */
+    function removeAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
+        require(account != address(0), "Invalid address");
+        _revokeRole(AUDITOR_ROLE, account);
+    }
+
+    /**
+     * Grant governance role to a governance contract
+     * @param governance governance contract address to be granted the role
+     */
+    function grantGovernanceRole(address governance) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(governance != address(0), "AuditRegistry: Invalid governance address");
+        _grantRole(GOVERNANCE_ROLE, governance);
+        emit AuditorAdded(governance);
     }
 
     /**
