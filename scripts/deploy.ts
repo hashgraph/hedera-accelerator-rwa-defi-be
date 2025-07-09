@@ -296,8 +296,9 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
 
 async function deployAudit(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(' - Deploying Audit ...');
+  const [owner] = await ethers.getSigners();
   const AuditRegistry = await ethers.getContractFactory('AuditRegistry');
-  const auditRegistry = await AuditRegistry.deploy();
+  const auditRegistry = await AuditRegistry.deploy(owner.address);
   await auditRegistry.waitForDeployment();
   const auditRegistryAddress = await auditRegistry.getAddress();
 

@@ -82,6 +82,14 @@ contract AuditRegistry is AccessControl {
     event AuditorRemoved(address indexed auditor);
 
     /**
+     * 
+     * @param governance The address of the governance contract that is granted the role.
+     * @dev Emitted when the admin grants the governance role to a contract.
+     * @notice This event is used to track the governance contract that can manage auditor roles.
+     */
+    event GovernanceGranted(address indexed governance);
+
+    /**
      * @dev Thrown when auditor account tries to add a new audit record with duplicate ipfs hash.
      */
     error DuplicateIpfsHash();
@@ -180,6 +188,7 @@ contract AuditRegistry is AccessControl {
     function addAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
         require(account != address(0), "Invalid address");
         _grantRole(AUDITOR_ROLE, account);
+        emit AuditorAdded(account);
     }
 
     /**
@@ -189,6 +198,7 @@ contract AuditRegistry is AccessControl {
     function removeAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
         require(account != address(0), "Invalid address");
         _revokeRole(AUDITOR_ROLE, account);
+        emit AuditorRemoved(account);
     }
 
     /**
@@ -198,7 +208,7 @@ contract AuditRegistry is AccessControl {
     function grantGovernanceRole(address governance) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(governance != address(0), "AuditRegistry: Invalid governance address");
         _grantRole(GOVERNANCE_ROLE, governance);
-        emit AuditorAdded(governance);
+        emit GovernanceGranted(governance);
     }
 
     /**
