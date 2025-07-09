@@ -21,9 +21,9 @@ abstract contract BuildingAudit is Initializable {
         }
     }
 
-    function __Audit_init() internal onlyInitializing {
+    function __Audit_init(address initialOwner) internal onlyInitializing {
         BuildingAuditStorage storage $ = _getBuildingAuditStorage();
-        $.auditRegistry = _newAuditRegistry();
+        $.auditRegistry = _newAuditRegistry(initialOwner);
     }
 
     function getAuditRegistry() public view returns(address) {
@@ -31,8 +31,8 @@ abstract contract BuildingAudit is Initializable {
         return $.auditRegistry;
     }
 
-    function _newAuditRegistry() internal returns (address _registry){
-        _registry = address(new AuditRegistry());
+    function _newAuditRegistry(address initialOwner) internal returns (address _registry){
+        _registry = address(new AuditRegistry(initialOwner));
         emit NewAuditRegistry(_registry);
     }
 }

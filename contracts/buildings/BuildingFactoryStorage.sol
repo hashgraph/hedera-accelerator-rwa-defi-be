@@ -23,7 +23,7 @@ abstract contract BuildingFactoryStorage {
         address addr; // building address
         uint256 nftId; // NFT token ID attributed to the building
         string tokenURI; // NFT metadatada location
-        address identity; // building's OnchainID identity address
+        address auditRegistry; // building's OnchainID identity address
         address erc3643Token; // TRex token
         address treasury;
         address governance;

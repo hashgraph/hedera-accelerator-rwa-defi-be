@@ -107,6 +107,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             abi.encodeWithSelector(Building.initialize.selector, initialOwner)
         ));
 
+        address auditRegistry = Building(building).getAuditRegistry();
+
         address erc3643Token = BuildingTokenLib.detployERC3643Token(
             TokenDetails(
                 initialOwner, 
@@ -152,6 +154,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
                 erc3643Token, 
                 details.governanceName, 
                 treasury, 
+                auditRegistry,
                 initialOwner
             )
         );
@@ -183,6 +186,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         ITreasury(treasury).grantGovernanceRole(governance);
         ITreasury(treasury).addVault(vault); 
         IAccessControl(vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), treasury);// grant reward controller role to treasury
+        IAccessControl(auditRegistry).grantRole(keccak256("GOVERNANCE_ROLE"), governance); // default admin role
+        IAccessControl(auditRegistry).grantRole(0x00, initialOwner); // default admin role to building owner
         IERC20(erc3643Token).mint(initialOwner, details.tokenMintAmount);
         IOwnable(vault).transferOwnership(initialOwner);
         IOwnable(autoCompounder).transferOwnership(initialOwner);
@@ -191,7 +196,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             building,
             nftId,
             details.tokenURI,
-            address(0), // deprecated
+            auditRegistry,
             erc3643Token,
             treasury, 
             governance,

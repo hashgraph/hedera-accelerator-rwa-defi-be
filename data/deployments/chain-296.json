@@ -8,8 +8,8 @@
     "ModularCompliance": "0x93f9DD3E137730BAcbDBb931004f78d26f52F5c8",
     "Identity": "0x89236D508262566DA6C47B3c27Bc67FBfC10529F",
     "ImplementationAuthority": "0xE8A406175d33447c1C1Ce894AaD8CC3b3A71cb5B",
-    "ERC721Metadata": "0xdDcd2a509A0E575929506bA8106909E692431f92",
-    "AuditRegistry": "0xD03328031617b7B170a51871EF9F6485E5Cc437F",
+    "ERC721Metadata": "0x48f8b70591381Fe8098F1c828b10d92ddb0c63Da",
+    "AuditRegistry": "0x1A72927176D775970bE9d5EBB9A5aB4C4D46a890",
     "OneSidedExchange": "0x09Da093bD14CBfcca14D5290B5217C9F5A1Db087"
   },
   "factories": {
@@ -18,7 +18,7 @@
     "TREXFactory": "0xa97FE7aEfd4e61Aa668348d96AA3E8538F54d6F9",
     "TREXGateway": "0x4448dD5270E3b1d6335e0477695f2FaF042eb559",
     "IdentityGateway": "0x9F09BE05B4E7404e3f62B03E97318907FB5545B4",
-    "BuildingFactory": "0x0fC0D7cAd13548D5B2a77bFfc97E2cEda17f4A1b"
+    "BuildingFactory": "0x0A4F001b77947889278DEc6Ac55DAcFcC87BF9e4"
   },
   "compliance": {
     "RequiresNFTModule": "0xC8a51293db2E89d3F087EdFFB4f089278698Dec5",
@@ -41,10 +41,10 @@
     "AsyncVaultFactory": "0x714dE05F204f428A81B988E9cFDb7F7acaE73eda"
   },
   "libraries": {
-    "BuildingTokenLib": "0x169d83efE7E9bd314Fc667E1A2A8F7EdD2d9B00A",
-    "BuildingGovernanceLib": "0xfA2BC758a8382D332E699c1b08ACd0330bD758dD",
-    "BuildingTreasuryLib": "0x40fCD1EB49330A58E7CB699B2cf9b17BF47EF1a4",
-    "BuildingVaultLib": "0x0ac4b3F6f19c791d60Cc3668b74CA9f5cF8376E2",
-    "BuildingAutoCompounderLib": "0xaB64cA728f7Ce5047d3E8bd7C542ca969A14bA4D"
+    "BuildingTokenLib": "0x4fA561E7fe2671390AcE3E3e1083dcfcF15373Ea",
+    "BuildingGovernanceLib": "0xe5c11170D63AF92f8097A9956F3f07F3CD86D81A",
+    "BuildingTreasuryLib": "0x3381efDCD19c566020205140ed12219C27356d90",
+    "BuildingVaultLib": "0xcE0Bbb622aB5B11EE51382E1F020FA475BeE8B9C",
+    "BuildingAutoCompounderLib": "0x07F18263B88363E1e3C234b1C1a5a5e8d85Ab176"
   }
 }
