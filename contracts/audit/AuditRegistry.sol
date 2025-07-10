@@ -31,6 +31,8 @@ contract AuditRegistry is AccessControl {
     // buildingAddress => array of record IDs
     mapping(address => uint256[]) public buildingAuditRecords;
 
+    address[] private _auditors; // List of auditors 
+
     // Events
     /**
      * @notice AuditRecordAdded event.
@@ -187,6 +189,7 @@ contract AuditRegistry is AccessControl {
      */
     function addAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
         require(account != address(0), "Invalid address");
+        _auditors.push(account);
         _grantRole(AUDITOR_ROLE, account);
         emit AuditorAdded(account);
     }
@@ -197,8 +200,31 @@ contract AuditRegistry is AccessControl {
      */
     function removeAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
         require(account != address(0), "Invalid address");
+        // Check if the account is an auditor
+        require(hasRole(AUDITOR_ROLE, account), "Account is not an auditor");
+        // Remove the auditor from the auditors list
+        for (uint256 i = 0; i < _auditors.length; i++)
+        {
+            if (_auditors[i] == account) {
+                // Shift elements to remove the auditor
+                for (uint256 j = i; j < _auditors.length - 1; j++) {
+                    _auditors[j] = _auditors[j + 1];
+                }
+                _auditors.pop(); // Remove the last element
+                break;
+            }
+        }
+        // Revoke the auditor role
         _revokeRole(AUDITOR_ROLE, account);
         emit AuditorRemoved(account);
+    }
+
+    /**
+     * Get the list of auditors
+     * @return auditors array of auditor addresses
+     */
+    function getAuditors() external view returns (address[] memory) {
+        return _auditors;
     }
 
     /**

@@ -50,12 +50,32 @@ describe('AuditRegistry', () => {
       await auditRegistry.connect(owner).grantRole(GOVERNANCE_ROLE, await governance.getAddress());
       
       // Add auditor first
-      await auditRegistry.connect(governance).addAuditor(await auditor1.getAddress());
+      const tx = await auditRegistry.connect(governance).addAuditor(await auditor1.getAddress());
       expect(await auditRegistry.hasRole(AUDITOR_ROLE, await auditor1.getAddress())).to.be.true;
+
+      // check if event was emitted
+      await expect(tx)
+        .to.emit(auditRegistry, 'AuditorAdded')
+        .withArgs(await auditor1.getAddress());
+
+      // check auditor is in the list
+      const auditors = await auditRegistry.getAuditors();
+      expect(auditors.length).to.equal(1);
+      expect(auditors).to.include(await auditor1.getAddress());
       
       // Remove auditor
-      await auditRegistry.connect(governance).removeAuditor(await auditor1.getAddress());
+      const tx1 = await auditRegistry.connect(governance).removeAuditor(await auditor1.getAddress());
       expect(await auditRegistry.hasRole(AUDITOR_ROLE, await auditor1.getAddress())).to.be.false;
+
+      // check if event was emitted
+      await expect(tx1)
+        .to.emit(auditRegistry, 'AuditorRemoved')
+        .withArgs(await auditor1.getAddress());
+
+      // check auditor is removed from the list
+      const updatedAuditors = await auditRegistry.getAuditors();
+      expect(updatedAuditors.length).to.equal(0);
+      expect(updatedAuditors).to.not.include(await auditor1.getAddress());
     });
 
     it('should not allow non-governance to add an auditor', async () => {
