@@ -30,7 +30,7 @@ async function createBuilding() {
     aTokenSymbol: "ACTS"
   }
   
-  const tx = await buildingFactory.newBuilding(buildingDetails, { gasLimit: 6_000_000});  
+  const tx = await buildingFactory.newBuilding(buildingDetails);  
   await tx.wait();
 
   const buildingList = await buildingFactory.getBuildingList();

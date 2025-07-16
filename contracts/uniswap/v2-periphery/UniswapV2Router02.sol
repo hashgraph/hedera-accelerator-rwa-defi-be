@@ -11,6 +11,20 @@ import '../weth/WETH9.sol';
 
 contract UniswapV2Router02 is IUniswapV2Router02 {
 
+    struct AddLiquidityWithPermitParams {
+        address tokenA;
+        address tokenB;
+        uint amountADesired;
+        uint amountBDesired;
+        uint amountAMin;
+        uint amountBMin;
+        address to;
+        uint deadline;
+        uint8[] v; // array of 2 elements for each token's permit
+        bytes32[] r; // array of 2 elements for each token's permit
+        bytes32[] s; // array of 2 elements for each token's permit
+    }
+
     address public immutable override factory;
     address public immutable override WETH;
 
@@ -97,6 +111,21 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         // refund dust eth, if any
         if (msg.value > amountETH) TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH);
     }
+
+
+    function addLiquidityWithPermit(AddLiquidityWithPermitParams memory params)
+        external ensure(params.deadline) returns (uint amountA, uint amountB, uint liquidity) {
+        IERC20Permit(params.tokenA).permit(msg.sender, address(this), params.amountADesired, params.deadline, params.v[0], params.r[0], params.s[0]);
+        IERC20Permit(params.tokenB).permit(msg.sender, address(this), params.amountBDesired, params.deadline, params.v[1], params.r[1], params.s[1]);
+
+        // Proceed to add liquidity normally
+        (amountA, amountB) = _addLiquidity(params.tokenA, params.tokenB, params.amountADesired, params.amountBDesired, params.amountAMin, params.amountBMin);
+        address pair = UniswapV2Library.pairFor(factory, params.tokenA, params.tokenB);
+        TransferHelper.safeTransferFrom(params.tokenA, msg.sender, pair, amountA);
+        TransferHelper.safeTransferFrom(params.tokenB, msg.sender, pair, amountB);
+        liquidity = IUniswapV2Pair(pair).mint(params.to);
+    }
+
 
     // **** REMOVE LIQUIDITY ****
     function removeLiquidity(
