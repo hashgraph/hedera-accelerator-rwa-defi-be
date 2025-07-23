@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 pragma abicoder v2;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,7 +19,6 @@ struct PriceThreshold {
     uint256 interval;
 }
 
-using SafeERC20 for ERC20;
 
 /**
  * @title One Sided Exchange
@@ -27,6 +27,7 @@ using SafeERC20 for ERC20;
  at desired prices.
  */
 contract OneSidedExchange is ReentrancyGuard, Ownable {
+    using SafeERC20 for ERC20;
     /**
      * @dev Emitted when `amount` of tokens are deposited to contract.
      *
@@ -110,10 +111,6 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         address token,
         uint256 amount
     ) public nonReentrant onlyOwner isValidAddress(token) isValidAmount(amount) {
-        if (amount == 0) {
-            revert InvalidAmount("Invalid amount", amount);
-        }
-
         _deposit(msg.sender, token, amount);
     }
 
@@ -126,6 +123,51 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         address tokenB,
         uint256 amount
     ) public nonReentrant isValidAddress(tokenA) isValidAddress(tokenB) isValidAmount(amount) {
+        _swap(msg.sender, tokenA, tokenB, amount);
+    }
+
+    /**
+     * @dev Method for deposit tokens into exchange using permit signature.
+     * 
+     * @param token Token EVM address
+     * @param amount Amount of tokens to deposit
+     * @param deadline Timestamp in seconds that indicates end time
+     * @param v signature v
+     * @param r signature r
+     * @param s signature s
+     */
+    function depositWithSignature(
+        address token,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public nonReentrant onlyOwner isValidAddress(token) isValidAmount(amount) {
+        IERC20Permit(token).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        _deposit(msg.sender, token, amount);
+    }
+
+    /**
+     * @dev Method for a swap between tokenA and tokenB with permit signature.
+     * @param tokenA First token EVM address
+     * @param tokenB Second token EVM address
+     * @param amount Amount of tokens to swap using tokens rate
+     * @param deadline Timestamp in seconds that indicates end time 
+     * @param v signature v 
+     * @param r signature r 
+     * @param s signature s 
+     */
+    function swapWithSignature(
+        address tokenA,
+        address tokenB,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public nonReentrant isValidAddress(tokenA) isValidAddress(tokenB) isValidAmount(amount) {
+        IERC20Permit(tokenA).permit(msg.sender, address(this), amount, deadline, v, r, s);
         _swap(msg.sender, tokenA, tokenB, amount);
     }
 
@@ -145,12 +187,12 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
     function _swap(address trader, address tokenA, address tokenB, uint256 amount) internal {
         (uint256 tokenAAmount, uint256 tokenBAmount) = _checkIfExchangeAllowedForPair(tokenA, tokenB, amount, trader);
 
+        _sellAmounts[tokenA] += tokenAAmount;
+        _buyAmounts[tokenB] += tokenBAmount;
+
         /// @notice Owner should give allowance for a contract to transfer n tokens amount.
         ERC20(tokenA).safeTransferFrom(trader, address(this), tokenAAmount);
         ERC20(tokenB).safeTransfer(trader, tokenBAmount);
-
-        _sellAmounts[tokenA] += tokenAAmount;
-        _buyAmounts[tokenB] += tokenBAmount;
 
         emit SwapSuccess(trader, tokenA, tokenB, tokenAAmount, tokenBAmount);
     }

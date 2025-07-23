@@ -10,7 +10,7 @@
     "ImplementationAuthority": "0xE8A406175d33447c1C1Ce894AaD8CC3b3A71cb5B",
     "ERC721Metadata": "0xc96BC2F0d4e4c99D2ADcbDe3BF6b79E747c6ea29",
     "AuditRegistry": "0x1A72927176D775970bE9d5EBB9A5aB4C4D46a890",
-    "OneSidedExchange": "0x09Da093bD14CBfcca14D5290B5217C9F5A1Db087"
+    "OneSidedExchange": "0xb5b027007CAE4606A47974c3927Fd4e55771CD66"
   },
   "factories": {
     "IdFactory": "0xb9230ca701d7097D44b464fff8173C8CC8161a2F",

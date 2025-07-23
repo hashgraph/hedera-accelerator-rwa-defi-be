@@ -1,149 +1,272 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { ExampleERC20, OneSidedExchange } from "../../typechain-types";
+import { Block, Signature } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { OneSidedExchange } from "../../typechain-types";
+import { ERC20Mock } from "../../typechain-types";
 
-async function preDeployExchange(): Promise<[OneSidedExchange, ExampleERC20, ExampleERC20]> {
-    const [deployer] = await ethers.getSigners();
-    const oneSidedExchangeImplementation = await ethers.deployContract("OneSidedExchange", deployer);
-    const tokenAImplementation = await ethers.deployContract("ExampleERC20", [100, "TokenA", "TOKA"], deployer);
-    const tokenBImplementation = await ethers.deployContract("ExampleERC20", [100, "TokenB", "TOKB"], deployer);
+describe("OneSidedExchange", function() {
+  let owner: HardhatEthersSigner;
+  let user: HardhatEthersSigner;
+  let ownerAddress: string;
+  let userAddress: string;
+  let tokenA: ERC20Mock;
+  let tokenB: ERC20Mock;
+  let exchange: OneSidedExchange;
+  const initialSupply = ethers.parseEther("1000");
 
-    return [oneSidedExchangeImplementation, tokenAImplementation, tokenBImplementation];
-}
+  beforeEach(async function() {
+    [owner, user] = await ethers.getSigners();
+    ownerAddress = await owner.getAddress();
+    userAddress = await user.getAddress();
 
-describe("OneSidedExchange", async () => {
-    let oneSidedExchangeInstance: OneSidedExchange;
-    let tokenAInstance: ExampleERC20;
-    let tokenBInstance: ExampleERC20;
-    let owner: HardhatEthersSigner;
+    // Deploy a test ERC20Permit token
+    tokenA = await ethers.deployContract("ERC20Mock", ["TokenA", "TKNA", 18]);
+    await tokenA.waitForDeployment();
 
-    before(async () => {
-        const [deployer] = await ethers.getSigners();
-        [oneSidedExchangeInstance, tokenAInstance, tokenBInstance] = await preDeployExchange();
-        owner = deployer;
-    })
+    tokenB = await ethers.deployContract("ERC20Mock", ["TokenB", "TKNB", 18]);
+    await tokenB.waitForDeployment();
 
-    it("Should successfuly swap tokenA and tokenB", async () => {
-        const exchangeAddress = await oneSidedExchangeInstance.getAddress();
-        const tokenAAddress = await tokenAInstance.getAddress();
-        const tokenADecimals = await tokenAInstance.decimals();
-        const tokenBAddress = await tokenBInstance.getAddress();
-        const tokenBDecimals = await tokenBInstance.decimals();
-        // Set days threshold to 2.
-        const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-        // Set token swap amount to 0.5.
-        const tokenASwapAmount = (10n ** (tokenADecimals / 2n));
+    // Mint tokens for testing
+    await tokenA.connect(owner).mint(userAddress, initialSupply);
+    await tokenA.connect(owner).mint(ownerAddress, initialSupply);
+    await tokenB.connect(owner).mint(ownerAddress, initialSupply);
 
-        // Set sell price for token A to 6.
-        await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfter);
-        // Set buy price for token B to 4.
-        await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfter);
-        // Approve exchange to use 5 amount of tokens.
-        await tokenAInstance.approve(exchangeAddress, (5n * (10n ** tokenADecimals)));
-        await tokenBInstance.approve(exchangeAddress, (5n * (10n ** tokenBDecimals)));
+    // Deploy the exchange
+    const Exchange = await ethers.getContractFactory("OneSidedExchange");
+    exchange = await Exchange.connect(owner).deploy();
+    await exchange.waitForDeployment();
+  });
 
-        const [_, buyAmount] = (await oneSidedExchangeInstance.estimateTokenReturns(tokenAAddress, tokenBAddress, tokenASwapAmount));
-        const exchangeTokenABalanceBeforeSwap = await tokenAInstance.balanceOf(exchangeAddress);
-        const swapperTokenBBalanceBeforeSwap = await tokenBInstance.balanceOf(owner);
+  it("should allow the owner to deposit and withdraw tokens", async function() {
+    // Approve and deposit tokenB
+    await tokenB.connect(owner).approve(await exchange.getAddress(), initialSupply);
 
-        await oneSidedExchangeInstance.deposit(tokenBAddress, buyAmount + (10n ** tokenADecimals));
-        await oneSidedExchangeInstance.swap(tokenAAddress, tokenBAddress, tokenASwapAmount);
+    await expect(exchange.connect(owner).deposit(await tokenB.getAddress(), initialSupply))
+      .to.emit(exchange, "Deposit")
+      .withArgs(await tokenB.getAddress(), initialSupply);
 
-        const exchangeTokenABalanceAfterSwap = await tokenAInstance.balanceOf(exchangeAddress);
-        const swapperTokenBBalanceAfterSwap = await tokenBInstance.balanceOf(owner);
+    expect(await tokenB.balanceOf(await exchange.getAddress())).to.equal(initialSupply);
 
-        expect(exchangeTokenABalanceBeforeSwap).to.be.equal(0n);
-        expect(exchangeTokenABalanceAfterSwap).to.be.equal(6000000000n);
-        expect(swapperTokenBBalanceBeforeSwap).to.be.equal(100000000000000000000n);
-        expect(swapperTokenBBalanceAfterSwap).to.be.equal(99000000000000000000n);
+    // Withdraw
+    await expect(exchange.connect(owner).withdraw(await tokenB.getAddress(), initialSupply))
+      .to.emit(exchange, "Withdraw")
+      .withArgs(await tokenB.getAddress(), initialSupply);
 
-        await oneSidedExchangeInstance.withdraw(tokenAAddress, (10n ** (tokenADecimals / 2n)));
-    });
+    expect(await tokenB.balanceOf(await exchange.getAddress())).to.equal(0);
+  });
 
-    it("Should fail on swap tokenA and tokenB", async () => {
-        const exchangeAddress = await oneSidedExchangeInstance.getAddress();
-        const tokenAAddress = await tokenAInstance.getAddress();
-        const tokenADecimals = await tokenAInstance.decimals();
-        const tokenBAddress = await tokenBInstance.getAddress();
-        const tokenBDecimals = await tokenBInstance.decimals();
+  it("should perform swaps at the configured prices", async function() {
+    // Owner deposits liquidity of tokenB
+    const liquidity = ethers.parseEther("50");
+    await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
+    await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
 
+    // // Configure prices: 1 tokenA => 2 tokenB
+    // const block = await ethers.provider.getBlock("latest") as Block;
+    // const interval = block.timestamp + 1000;
+
+    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 2, twoDaysAfter);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 2, twoDaysAfter);
+
+    // User approves tokenA
+    const swapAmount = ethers.parseEther("10");
+    await tokenA.connect(user).approve(await exchange.getAddress(), ethers.parseEther("20"));
+
+    // Execute swap
+    await expect(exchange.connect(user).swap(await tokenA.getAddress(), await tokenB.getAddress(), swapAmount))
+      .to.emit(exchange, "SwapSuccess");
+
+    // Verify user balances
+    // tokenASellAmount = 10 * 2 = 20
+    // tokenBBuyAmount = (20 * 2) / 2 = 20
+    expect(await tokenA.balanceOf(userAddress)).to.equal(ethers.parseEther("980"));
+    expect(await tokenB.balanceOf(userAddress)).to.equal(ethers.parseEther("20"));
+  });
+
+  it("should enforce per-token thresholds", async function() {
+    // Owner deposits liquidity
+    const liquidity = ethers.parseEther("100");
+    await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
+    await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
+
+    // Configure prices at 1:1
+    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, twoDaysAfter);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, twoDaysAfter);
+
+    // Set a max-sell threshold of 5 tokenA
+    await exchange.connect(owner).setThreshold(await tokenA.getAddress(), 5, 1000, twoDaysAfter);
+
+    // Mint and approve tokenA to user
+    await tokenA.connect(owner).mint(userAddress, ethers.parseEther("10"));
+    const swapAmount = ethers.parseEther("6");
+    await tokenA.connect(user).approve(await exchange.getAddress(), liquidity);
+
+    // await exchange.connect(user).swap(await tokenA.getAddress(), await tokenB.getAddress(), swapAmount);
+
+    // Swap should exceed threshold and revert
+    await expect(
+      exchange.connect(user).swap(await tokenA.getAddress(), await tokenB.getAddress(), swapAmount)
+    ).to.be.rejectedWith("InvalidAmount");
+  });
+
+  it("should allow deposit via ERC20Permit (depositWithSignature)", async function() {
+    const amount = ethers.parseEther("10");
+    const deadline = ethers.MaxUint256;
+
+    // Build permit signature
+    const nonce = await tokenA.nonces(ownerAddress);
+    const name = await tokenA.name();
+    const chainId = (await ethers.provider.getNetwork()).chainId;
+
+    const domain = {
+      name,
+      version: "1",
+      chainId,
+      verifyingContract: await tokenA.getAddress()
+    };
+    const types = {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" }
+      ]
+    };
+    const value = {
+      owner: ownerAddress,
+      spender: await exchange.getAddress(),
+      value: amount,
+      nonce: nonce,
+      deadline
+    };
+
+    const signature = await owner.signTypedData(domain, types, value);
+    const { v, r, s } = Signature.from(signature);
+
+    // Execute depositWithSignature
+    await expect(
+      exchange.connect(owner).depositWithSignature(await tokenA.getAddress(), amount, deadline, v, r, s)
+    ).to.emit(exchange, "Deposit").withArgs(await tokenA.getAddress(), amount);
+
+    expect(await tokenA.balanceOf(await exchange.getAddress())).to.equal(amount);
+  });
+
+  it("should allow swap via ERC20Permit (swapWithSignature)", async function() {
+    // owner deposits tokenB liquidity
+    const liquidity = ethers.parseEther("50");
+    await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
+    await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
+
+    // configure 1:1 pricing
+    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, twoDaysAfter);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, twoDaysAfter);
+
+    // amount to swap
+    const swapAmount = ethers.parseEther("5");
+
+    // build ERC20Permit signature for user
+    const nonce = await (tokenA as any).nonces(userAddress);
+    const name = await tokenA.name();
+    const chainId = (await ethers.provider.getNetwork()).chainId;
+    const domain = {
+      name,
+      version: "1",
+      chainId,
+      verifyingContract: await tokenA.getAddress()
+    };
+    const types = {
+      Permit: [
+        { name: "owner", type: "address" },
+        { name: "spender", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" }
+      ]
+    };
+    const deadline = ethers.MaxUint256;
+    const value = {
+      owner: userAddress,
+      spender: await exchange.getAddress(),
+      value: swapAmount,
+      nonce: nonce,
+      deadline
+    };
+    const signature = await user.signTypedData(domain, types, value);
+    const { v, r, s } = Signature.from(signature);
+
+    // execute swapWithSignature
+    await expect(
+      exchange.connect(user).swapWithSignature(
+        await tokenA.getAddress(), await tokenB.getAddress(),
+        swapAmount, deadline,
+        v, r, s
+      )
+    )
+      .to.emit(exchange, "SwapSuccess")
+      .withArgs(userAddress, await tokenA.getAddress(), await tokenB.getAddress(), swapAmount, swapAmount);
+
+    // check final balances
+    expect(await tokenA.balanceOf(userAddress)).to.equal(ethers.parseEther("995"));
+    expect(await tokenB.balanceOf(userAddress)).to.equal(swapAmount);
+  });
+
+  it("Should fail on zero address provided on setThreshold()", async () => {
+    try {
+        const tokenASellAmount = 16n;
+        const tokenABuyAmount = 10n;
         // Set days threshold to 2 days.
         const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-        // Set token swap amount to 2.
-        const tokenASwapAmount = 2n;
 
-        // Set sell price for token A to 6.
-        await oneSidedExchangeInstance.setSellPrice(tokenAAddress, 6, twoDaysAfterInSeconds);
-        // Set buy price for token B to 4.
-        await oneSidedExchangeInstance.setBuyPrice(tokenBAddress, 4, twoDaysAfterInSeconds);
-        // Set token A max sell amount to 16 and max buy amount 10.
-        await oneSidedExchangeInstance.setThreshold(tokenAAddress, 16n, 10n, twoDaysAfterInSeconds);
-        // Approve exchange to use 5 amount of tokens.
-        await tokenAInstance.approve(exchangeAddress, (5n * (10n ** tokenADecimals)));
-        await tokenBInstance.approve(exchangeAddress, (5n * (10n ** tokenBDecimals)));
+        await exchange.setThreshold(
+            "0x0000000000000000000000000000000000000000",
+            tokenASellAmount,
+            tokenABuyAmount,
+            twoDaysAfterInSeconds,
+        );
+    } catch (err: any) {
+        const parsedMessage = err.message?.split("InvalidAddress")[1];
 
-        try {
-            await oneSidedExchangeInstance.swap(tokenAAddress, tokenBAddress, tokenASwapAmount);
-        } catch (err: any) {
-            const parsedMessage = err.message?.split("InvalidAmount")[1];
+        expect(parsedMessage).to.be.includes("No zero address is allowed");
+    }
+  });
 
-            expect(parsedMessage).to.be.includes("Max sell amount of tokens exceeded");
-        }
-    });
+it("Should fail on zero address provided on swap()", async () => {
+  try {
+      const tokenBAddress = await tokenB.getAddress();
+      const tokenASwapAmount = 2n;
 
-    it("Should fail on zero address provided on setThreshold()", async () => {
-        try {
-            const tokenASellAmount = 16n;
-            const tokenABuyAmount = 10n;
-            // Set days threshold to 2 days.
-            const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
+      await exchange.swap(
+          "0x0000000000000000000000000000000000000000",
+          tokenBAddress,
+          tokenASwapAmount,
+      );
+  } catch (err: any) {
+      const parsedMessage = err.message?.split("InvalidAddress")[1];
 
-            await oneSidedExchangeInstance.setThreshold(
-                "0x0000000000000000000000000000000000000000",
-                tokenASellAmount,
-                tokenABuyAmount,
-                twoDaysAfterInSeconds,
-            );
-        } catch (err: any) {
-            const parsedMessage = err.message?.split("InvalidAddress")[1];
+      expect(parsedMessage).to.be.includes("No zero address is allowed");
+  }
+});
 
-            expect(parsedMessage).to.be.includes("No zero address is allowed");
-        }
-    });
+it("Should fail on zero amount provided on setThreshold()", async () => {
+  // Set days threshold to 2 days.
+  const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
 
-    it("Should fail on zero address provided on swap()", async () => {
-        try {
-            const tokenBAddress = await tokenBInstance.getAddress();
-            const tokenASwapAmount = 2n;
+  try {
+      await exchange.setThreshold(
+          "0x0000000000000000000000000000000000004567",
+          0n,
+          0n,
+          twoDaysAfterInSeconds
+      );
+  } catch (err: any) {
+      const parsedMessage = err.message?.split("InvalidAmount")[1];
 
-            await oneSidedExchangeInstance.swap(
-                "0x0000000000000000000000000000000000000000",
-                tokenBAddress,
-                tokenASwapAmount,
-            );
-        } catch (err: any) {
-            const parsedMessage = err.message?.split("InvalidAddress")[1];
-
-            expect(parsedMessage).to.be.includes("No zero address is allowed");
-        }
-    });
-
-    it("Should fail on zero amount provided on setThreshold()", async () => {
-        // Set days threshold to 2 days.
-        const twoDaysAfterInSeconds = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-
-        try {
-            await oneSidedExchangeInstance.setThreshold(
-                "0x0000000000000000000000000000000000004567",
-                0n,
-                0n,
-                twoDaysAfterInSeconds
-            );
-        } catch (err: any) {
-            const parsedMessage = err.message?.split("InvalidAmount")[1];
-
-            expect(parsedMessage).to.be.includes("Zero amount is not allowed");
-        }
-    });
-})
+      expect(parsedMessage).to.be.includes("Zero amount is not allowed");
+  }
+});
+});
