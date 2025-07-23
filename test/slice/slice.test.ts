@@ -412,6 +412,33 @@ describe("Slice", function () {
             console.log("Underlying2 balance after: ", await stakingToken2.balanceOf(slice.target));
         });
 
+        it("Should revert if total allocation percentage exceeds 100%", async function () {
+          const { slice, autoCompounder1, autoCompounder2, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
+      
+          // Add first allocation with 6000 (60%)
+          await slice.addAllocation(
+              autoCompounder1.target,
+              mockV3Aggregator.target,
+              6000
+          );
+      
+          // Add second allocation with 4000 (40%) - should succeed
+          await slice.addAllocation(
+              autoCompounder2.target,
+              mockV3Aggregator.target,
+              4000
+          );
+      
+          // Try to add another allocation with 1 (0.01%) - should fail (total would be 10001)
+          await expect(
+              slice.addAllocation(
+                  autoCompounder2.target, // can use a new mock if needed
+                  mockV3Aggregator.target,
+                  1
+              )
+          ).to.be.revertedWith("Slice: Total allocation exceeds 100%");
+      });
+
         it("Should distribute tokens close to the provided allocation Autocompounders with partially unlocked tokens", async function () {
             const {
                 slice,

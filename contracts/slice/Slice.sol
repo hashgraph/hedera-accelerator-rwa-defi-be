@@ -51,6 +51,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     // Allocations array for each aToken stored
     Allocation[] private _allocations;
 
+    // percentage allocated
+    uint256 private _allocated;
+
     // Uniswap router V2
     IUniswapV2Router02 private _uniswapRouter;
 
@@ -265,6 +268,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(priceFeed != address(0), "Slice: Invalid price feed address");
         require(percentage != 0 && percentage != BASIS_POINTS, "Slice: Invalid allocation percentage");
+        require(_allocated + percentage <= BASIS_POINTS, "Slice: Total allocation exceeds 100%");
 
         // Check there is no associated allocation
         if (getTokenAllocation(aToken).aToken != address(0)) revert AssociatedAllocationExists(aToken);
@@ -280,6 +284,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         address asset = IAutoCompounder(aToken).asset();
 
         _allocations.push(Allocation({aToken: aToken, asset: asset, targetPercentage: percentage}));
+        _allocated += percentage;
+
         _priceFeeds[asset] = AggregatorV3Interface(priceFeed);
 
         emit AllocationAdded(aToken, asset, priceFeed, percentage);
