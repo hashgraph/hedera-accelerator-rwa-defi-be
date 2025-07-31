@@ -4,7 +4,7 @@ import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 async function deployFixture() {
   const [admin, keeper, otherKeeper, notKeeper, notAdmin] = await ethers.getSigners();
 
-  const upkeeper = await ethers.deployContract('UpKeeper');
+  const upkeeper = await ethers.deployContract('UpKeeper', admin);
   await upkeeper.waitForDeployment();
   const upkeeperAddress = await upkeeper.getAddress();
 
@@ -40,23 +40,21 @@ describe('Upkeeper', () => {
       const { 
         admin,
         upkeeper,
-        keeper,
         target
        } = await loadFixture(deployFixture);
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
 
-      expect(await upkeeper.connect(admin).registerTask(keeper, target, selector))
+      expect(await upkeeper.connect(admin).registerTask(target, selector))
        .to.emit(upkeeper, 'TaskRegistered')
-       .withArgs(keeper.address, target, selector);
+       .withArgs(target, selector);
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(1);
 
       const task1 = await upkeeper.getTaskInfo(taskList[0]);
       expect(task1.target).to.equal(target);
       expect(task1.selector).to.equal(selector);
-      expect(task1.keeper).to.equal(keeper.address);
       expect(task1.executions).to.equal(0);
       expect(task1.exists).to.equal(true);
     });
@@ -64,17 +62,16 @@ describe('Upkeeper', () => {
     it('should revert when not admin', async () => {
       const { 
         upkeeper,
-        keeper,
         notAdmin,
         target
        } = await loadFixture(deployFixture);
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
 
-      await expect(upkeeper.connect(notAdmin).registerTask(keeper, target, selector))
+      await expect(upkeeper.connect(notAdmin).registerTask(target, selector))
         .to.be.rejectedWith('AccessControlUnauthorizedAccount')
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(0);
       
     });
@@ -83,46 +80,19 @@ describe('Upkeeper', () => {
       const { 
         admin,
         upkeeper,
-        keeper,
         target
        } = await loadFixture(deployFixture);
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
-      // const data = ethers.AbiCoder.defaultAbiCoder().encode(['uint256'], [42]);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
+      await upkeeper.connect(admin).registerTask(target, selector);
 
       // try to register task again      
-      await expect(upkeeper.connect(admin).registerTask(keeper, target, selector))
+      await expect(upkeeper.connect(admin).registerTask(target, selector))
         .to.be.rejectedWith('TaskAlreadyExists');
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(1);
-      
-    });
-
-    it('should revert when too many tasks for keeper', async () => {
-      const { 
-        admin,
-        upkeeper,
-        keeper,
-        target
-       } = await loadFixture(deployFixture);
-
-       
-       // register the maximum number of tasks
-       for (let i = 0; i < 100; i++) {
-        const selector = ethers.id(`mockFunction${i}()`).slice(0, 10);
-        await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      }
-
-      // try to register one more task
-      const newSelector = ethers.id(`mockFunction101()`).slice(0, 10);
-      await expect(upkeeper.connect(admin).registerTask(keeper, target, newSelector))
-        .to.be.rejectedWith('TooManyTasksForKeeper');
-
-      const taskList = await upkeeper.getTaskList(keeper.address);
-      expect(taskList.length).to.equal(100);
       
     });
 
@@ -137,16 +107,16 @@ describe('Upkeeper', () => {
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
 
-      expect(await upkeeper.connect(admin).registerTask(keeper, target, selector))
+      expect(await upkeeper.connect(admin).registerTask(target, selector))
        .to.emit(upkeeper, 'TaskRegistered')
        .withArgs(keeper.address, target, selector);
 
-      expect(await upkeeper.connect(admin).registerTask(keeper, target2, selector))
+      expect(await upkeeper.connect(admin).registerTask(target2, selector))
         .to.emit(upkeeper, 'TaskRegistered')
         .withArgs(keeper.address, target2, selector);
 
       // check that both tasks are registered
-      const tasksForKeeper = await upkeeper.getTaskList(keeper.address);
+      const tasksForKeeper = await upkeeper.getTaskList();
       expect(tasksForKeeper.length).to.equal(2);
 
       const task1 = await upkeeper.getTaskInfo(tasksForKeeper[0]);
@@ -154,11 +124,9 @@ describe('Upkeeper', () => {
 
       expect(task1.target).to.equal(target);
       expect(task1.selector).to.equal(selector);
-      expect(task1.keeper).to.equal(keeper.address);
 
       expect(task2.target).to.equal(target2);
       expect(task2.selector).to.equal(selector);
-      expect(task2.keeper).to.equal(keeper.address);
     });
   });
 
@@ -173,12 +141,12 @@ describe('Upkeeper', () => {
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      expect(await upkeeper.connect(admin).removeTask(keeper, target, selector))
+      await upkeeper.connect(admin).registerTask(target, selector);
+      expect(await upkeeper.connect(admin).removeTask(target, selector))
        .to.emit(upkeeper, 'TaskRemoved')
        .withArgs(keeper.address, target, selector);
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(0);
       
     });
@@ -193,9 +161,9 @@ describe('Upkeeper', () => {
        } = await loadFixture(deployFixture);
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
+      await upkeeper.connect(admin).registerTask(target, selector);
 
-      await expect(upkeeper.connect(notAdmin).removeTask(keeper, target, selector))
+      await expect(upkeeper.connect(notAdmin).removeTask(target, selector))
         .to.be.rejectedWith('AccessControlUnauthorizedAccount')
       
     });
@@ -210,8 +178,8 @@ describe('Upkeeper', () => {
 
       const selector = ethers.id('mockFunction()').slice(0, 10);
 
-      await expect(upkeeper.connect(admin).removeTask(keeper, target, selector))
-        .to.be.rejectedWith('TaskNofFound');
+      await expect(upkeeper.connect(admin).removeTask(target, selector))
+        .to.be.rejectedWith('TaskNotFound');
       
     });
   });
@@ -227,21 +195,20 @@ describe('Upkeeper', () => {
       
       const selector = ethers.id('mockFunction()').slice(0, 10);
       
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      const [taskId] = await upkeeper.getTaskList(keeper.address);
+      await upkeeper.connect(admin).registerTask(target, selector);
+      const [taskId] = await upkeeper.getTaskList();
 
       // execute the task
       await expect(upkeeper.connect(keeper).executeTask(taskId, '0x'))
         .to.emit(upkeeper, 'TaskExecuted')
         .withArgs(keeper.address, target, selector, 1);
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(1);
 
       const task1 = await upkeeper.getTaskInfo(taskList[0]);
       expect(task1.target).to.equal(target);
       expect(task1.selector).to.equal(selector);
-      expect(task1.keeper).to.equal(keeper.address); 
       expect(task1.executions).to.equal(1);
       expect(task1.exists).to.equal(true);
     });
@@ -257,15 +224,15 @@ describe('Upkeeper', () => {
       const selector = ethers.id('mockFunctionWithArgs(uint256,address)').slice(0, 10);
       const data = ethers.AbiCoder.defaultAbiCoder().encode(['uint256', 'address'], [42, ethers.ZeroAddress]);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      const [taskId] = await upkeeper.getTaskList(keeper.address);
+      await upkeeper.connect(admin).registerTask(target, selector);
+      const [taskId] = await upkeeper.getTaskList();
 
       // execute the task with params
       await expect(upkeeper.connect(keeper).executeTask(taskId, data))
         .to.emit(upkeeper, 'TaskExecuted')
         .withArgs(keeper.address, target, selector, 1);
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(1);
 
       const task1 = await upkeeper.getTaskInfo(taskList[0]);
@@ -282,14 +249,14 @@ describe('Upkeeper', () => {
 
       const selector = ethers.id('mockFunctionRevert()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      const [taskId] = await upkeeper.getTaskList(keeper.address);
+      await upkeeper.connect(admin).registerTask(target, selector);
+      const [taskId] = await upkeeper.getTaskList();
 
       // execute the task
       await expect(upkeeper.connect(keeper).executeTask(taskId, '0x'))
         .to.be.rejectedWith('TaskExecutionFailed');
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(1);
 
       const task1 = await upkeeper.getTaskInfo(taskList[0]);
@@ -307,7 +274,7 @@ describe('Upkeeper', () => {
 
       // execute the task without registering it
       await expect(upkeeper.connect(keeper).executeTask(taskId, '0x'))
-        .to.be.rejectedWith('TaskNofFound');
+        .to.be.rejectedWith('TaskNotFound');
     });  
 
     it.skip("should revert on reentrant execution of the same task", async () => {
@@ -324,9 +291,9 @@ describe('Upkeeper', () => {
       const selector = mockKeeperTarget.interface.getFunction("mockFunctionRevertReentrantTask").selector;
 
       // Register the task
-      await upkeeper.connect(admin).registerTask(keeper.address, target, selector);
+      await upkeeper.connect(admin).registerTask(target, selector);
 
-      const [taskId] = await upkeeper.getTaskList(keeper.address);
+      const [taskId] = await upkeeper.getTaskList();
 
       // Encode arguments: upkeeper address, taskId, data (empty for this demo)
       const args = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -339,37 +306,9 @@ describe('Upkeeper', () => {
         upkeeper.connect(keeper).executeTask(taskId, args)
       ).to.be.rejectedWith("TaskReentrancyDetected");
     });
-
-    it('should not allow a keeper to execute another keeper task', async () => {
-       const { 
-        admin,
-        upkeeper,
-        keeper,
-        otherKeeper,
-        target
-      } = await loadFixture(deployFixture);
-      
-      const selector = ethers.id('mockFunction()').slice(0, 10);
-      
-      await upkeeper.connect(admin).registerTask(keeper, target, selector);
-      const [taskId] = await upkeeper.getTaskList(keeper.address);
-
-      // execute the task
-      await expect(upkeeper.connect(otherKeeper).executeTask(taskId, '0x'))
-        .to.rejectedWith('NotTeskKeeper');
-
-      const taskList = await upkeeper.getTaskList(keeper.address);
-      expect(taskList.length).to.equal(1);
-
-      const task1 = await upkeeper.getTaskInfo(taskList[0]);
-      expect(task1.target).to.equal(target);
-      expect(task1.selector).to.equal(selector);
-      expect(task1.keeper).to.equal(keeper.address); 
-      expect(task1.executions).to.equal(0);
-    });
   });
 
-  describe('.executeKeeperTasksWithArgs()', () => {
+  describe('.executeTasksWithArgs()', () => {
     it('should execute all tasks for a keeper', async () => {
       const { 
         admin,
@@ -385,11 +324,11 @@ describe('Upkeeper', () => {
       data.push('0x'); // no params for the first selector
       data.push(ethers.AbiCoder.defaultAbiCoder().encode(['uint256', 'address'], [42, ethers.ZeroAddress]));
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasksWithArgs(keeper, data))
+      await expect(upkeeper.connect(keeper).executeTasksWithArgs(data))
         .to.emit(upkeeper, 'TaskExecuted')
         .withArgs(keeper.address, target, selector1, 1)
         .to.emit(upkeeper, 'TaskExecuted')
@@ -411,11 +350,11 @@ describe('Upkeeper', () => {
       data.push('0x'); // no params for the first selector
       data.push('0x'); // no params for the second selector
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasksWithArgs(keeper, data))
+      await expect(upkeeper.connect(keeper).executeTasksWithArgs(data))
         .to.be.rejectedWith('TaskExecutionFailed');
     });
 
@@ -430,7 +369,7 @@ describe('Upkeeper', () => {
       const data = ['0x'];
 
       // try to execute tasks as a non-keeper
-      await expect(upkeeper.connect(notKeeper).executeKeeperTasksWithArgs(notKeeper, data))
+      await expect(upkeeper.connect(notKeeper).executeTasksWithArgs(data))
         .to.be.rejectedWith('AccessControlUnauthorizedAccount');
     });
 
@@ -443,8 +382,8 @@ describe('Upkeeper', () => {
 
 
       // try to execute tasks without registering them
-      await expect(upkeeper.connect(keeper).executeKeeperTasksWithArgs(keeper, []))
-        .to.be.rejectedWith('TaskNofFound');
+      await expect(upkeeper.connect(keeper).executeTasksWithArgs([]))
+        .to.be.rejectedWith('TaskNotFound');
     });
   });
 
@@ -461,11 +400,11 @@ describe('Upkeeper', () => {
       const selector1 = ethers.id('mockFunction()').slice(0, 10);
       const selector2 = ethers.id('mockFunction2()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasks(keeper))
+      await expect(upkeeper.connect(keeper).executeTasks())
         .to.emit(upkeeper, 'TaskExecuted')
         .withArgs(keeper.address, target, selector1, 1)
         .to.emit(upkeeper, 'TaskExecuted')
@@ -473,7 +412,7 @@ describe('Upkeeper', () => {
 
       expect(await mockKeeperTarget.callCount()).to.equal(2);
 
-      const taskList = await upkeeper.getTaskList(keeper.address);
+      const taskList = await upkeeper.getTaskList();
       expect(taskList.length).to.equal(2);
 
       const task1 = await upkeeper.getTaskInfo(taskList[0]);
@@ -495,11 +434,11 @@ describe('Upkeeper', () => {
       const selector1 = ethers.id('mockFunction()').slice(0, 10);
       const selector2 = ethers.id('mockFunctionRevert()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasks(keeper))
+      await expect(upkeeper.connect(keeper).executeTasks())
         .to.be.rejectedWith('TaskExecutionFailed');
 
       expect(await mockKeeperTarget.callCount()).to.equal(0);
@@ -516,11 +455,11 @@ describe('Upkeeper', () => {
       const selector1 = ethers.id('mockFunction()').slice(0, 10);
       const selector2 = ethers.id('mockFunctionReturnFalse()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasks(keeper))
+      await expect(upkeeper.connect(keeper).executeTasks())
         .to.be.rejectedWith('TaskExecutionReturnedFalse');
     });
 
@@ -535,11 +474,11 @@ describe('Upkeeper', () => {
       const selector1 = ethers.id('mockFunction()').slice(0, 10);
       const selector2 = ethers.id('mockFunctionNoReturn()').slice(0, 10);
 
-      await upkeeper.connect(admin).registerTask(keeper, target, selector1);
-      await upkeeper.connect(admin).registerTask(keeper, target, selector2);
+      await upkeeper.connect(admin).registerTask(target, selector1);
+      await upkeeper.connect(admin).registerTask(target, selector2);
 
       // execute the tasks
-      await expect(upkeeper.connect(keeper).executeKeeperTasks(keeper))
+      await expect(upkeeper.connect(keeper).executeTasks())
         .to.emit(upkeeper, 'TaskExecuted')
         .withArgs(keeper.address, target, selector1, 1)
         .to.emit(upkeeper, 'TaskExecuted')
@@ -553,7 +492,7 @@ describe('Upkeeper', () => {
        } = await loadFixture(deployFixture);
 
       // try to execute tasks as a non-keeper
-      await expect(upkeeper.connect(notKeeper).executeKeeperTasks(notKeeper))
+      await expect(upkeeper.connect(notKeeper).executeTasks())
         .to.be.rejectedWith('AccessControlUnauthorizedAccount');
     });
 
@@ -564,8 +503,8 @@ describe('Upkeeper', () => {
        } = await loadFixture(deployFixture);
 
       // try to execute tasks without registering them
-      await expect(upkeeper.connect(keeper).executeKeeperTasks(keeper))
-        .to.be.rejectedWith('TaskNofFound');
+      await expect(upkeeper.connect(keeper).executeTasks())
+        .to.be.rejectedWith('TaskNotFound');
     });
   });
 });
