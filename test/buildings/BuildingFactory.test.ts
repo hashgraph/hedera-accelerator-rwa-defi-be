@@ -3,6 +3,7 @@ import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
 import { BuildingFactory, BuildingGovernance, FeeConfiguration, IAutoCompounderFactory, IVaultFactory } from '../../typechain-types';
+import { BuildingFactoryInitStruct, BuildingFactoryInitStructOutput } from '../../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory';
 
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
@@ -46,6 +47,9 @@ async function deployFixture() {
   const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
   const autoCompounderFactory = await AutoCompounderFactory.deploy(identityGatewayAddress);
   await autoCompounderFactory.waitForDeployment();
+
+  const upkeeper = await ethers.deployContract('UpKeeper');
+  const upkeeperAddress = await upkeeper.getAddress();
 
   // Beacon Upgradable Patter for Building
   const buildingImplementation = await ethers.deployContract('Building');
@@ -131,23 +135,24 @@ async function deployFixture() {
   // identityGateway must be the Owner of the IdFactory 
   await identityFactory.transferOwnership(identityGatewayAddress);
 
+  const buildingFactoryInit: BuildingFactoryInitStruct = {
+    nft: nftCollectionAddress, 
+    uniswapRouter: uniswapRouterAddress, 
+    uniswapFactory: uniswapFactoryAddress,
+    onchainIdGateway: identityGatewayAddress,
+    trexGateway: trexGatewayAddress,
+    usdc: usdcAddress,
+    buildingBeacon: buildingBeaconAddress,
+    treasuryBeacon: treasuryBeaconAddress,
+    governanceBeacon: governanceBeaconAddress,
+    upkeeper: upkeeperAddress,
+  }
+
   const bf = await upgrades.deployBeaconProxy(
     await buildingFactoryBeacon.getAddress(),
     buildingFactoryFactory,
-    [
-      nftCollectionAddress, 
-      uniswapRouterAddress, 
-      uniswapFactoryAddress,
-      identityGatewayAddress,
-      trexGatewayAddress,
-      usdcAddress,
-      buildingBeaconAddress,
-      treasuryBeaconAddress,
-      governanceBeaconAddress
-    ],
-    { 
-      initializer: 'initialize',
-    }, 
+    [buildingFactoryInit],
+    { initializer: 'initialize' }, 
   );
 
   await bf.waitForDeployment();
@@ -162,6 +167,9 @@ async function deployFixture() {
 
   await nftCollection.transferOwnership(buildingFactoryAddress);
   await trexGateway.addDeployer(buildingFactoryAddress);
+
+  // grant TRUSTED_REGISTRY_ROLE to building factory
+  await upkeeper.grantRole(await upkeeper.TRUSTED_REGISTRY_ROLE(), buildingFactoryAddress);
 
   return {
     owner,

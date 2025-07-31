@@ -13,6 +13,7 @@ abstract contract BuildingFactoryStorage {
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;
+        address upkeeper;
         address[] registryAgents;
         address[] tokenAgents;
         BuildingDetails[] buildingsList;

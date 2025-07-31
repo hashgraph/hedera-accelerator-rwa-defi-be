@@ -20,6 +20,8 @@ import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
 import {IModularCompliance} from "../erc3643/compliance/modular/IModularCompliance.sol";
 import {UniswapV2Library} from "../uniswap/v2-periphery/libraries/UniswapV2Library.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IUpKeeper} from "../upkeeper/interface/IUpKeeper.sol";
+import {IAutoCompounder} from "../autocompounder/interfaces/IAutoCompounder.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -33,6 +35,20 @@ interface IIdentityGateway {
 interface IERC20 {
     function mint(address to, uint256 amount) external;
 }
+
+// initialization struct of the building factory
+struct BuildingFactoryInit {
+    address nft;
+    address uniswapRouter;
+    address uniswapFactory;
+    address onchainIdGateway;
+    address trexGateway;
+    address usdc;
+    address buildingBeacon;
+    address treasuryBeacon;
+    address governanceBeacon;
+    address upkeeper;
+}
 /**
  * @title BuildingFactory
  * @author Hashgraph
@@ -45,34 +61,21 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
 
     /**
      * initialize used for upgradable contract
-     * @param _nft NFT collection address
-     * @param _uniswapRouter unsiswap router address
-     * @param _uniswapFactory unsiswap factory address
-     * @param _buildingBeacon building beacon address
-     * @param _onchainIdGateway OnchainID IdentityGateway address
+     * @param init BuildingFactoryInit config
      */
-    function initialize(
-        address _nft,
-        address _uniswapRouter,
-        address _uniswapFactory,
-        address _onchainIdGateway,
-        address _trexGateway,
-        address _usdc,
-        address _buildingBeacon,
-        address _treasuryBeacon,
-        address _governanceBeacon
-    ) public virtual initializer  {
+    function initialize(BuildingFactoryInit calldata init) public virtual initializer  {
         __Ownable_init(msg.sender);
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        $.nft = _nft;
-        $.uniswapRouter = _uniswapRouter;
-        $.uniswapFactory = _uniswapFactory;
-        $.buildingBeacon = _buildingBeacon;
-        $.onchainIdGateway = _onchainIdGateway;
-        $.trexGateway = _trexGateway;
-        $.treasuryBeacon = _treasuryBeacon;
-        $.usdc = _usdc;
-        $.governanceBeacon = _governanceBeacon;
+        $.nft = init.nft;
+        $.uniswapRouter = init.uniswapRouter;
+        $.uniswapFactory = init.uniswapFactory;
+        $.buildingBeacon = init.buildingBeacon;
+        $.onchainIdGateway = init.onchainIdGateway;
+        $.trexGateway = init.trexGateway;
+        $.treasuryBeacon = init.treasuryBeacon;
+        $.usdc = init.usdc;
+        $.governanceBeacon = init.governanceBeacon;
+        $.upkeeper = init.upkeeper;
     }
 
     /**
@@ -191,6 +194,11 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         IERC20(erc3643Token).mint(initialOwner, details.tokenMintAmount);
         IOwnable(vault).transferOwnership(initialOwner);
         IOwnable(autoCompounder).transferOwnership(initialOwner);
+
+        // Register autocompounder- claiming rewards function in the UpKeeper.
+        // This allows the upkeeper contract to register the claim function to be
+        // executed autmatically by an off-chain keeper service
+        IUpKeeper($.upkeeper).registerTask(autoCompounder, IAutoCompounder(autoCompounder).claim.selector); 
 
         buildingDetails = BuildingDetails(
             building,

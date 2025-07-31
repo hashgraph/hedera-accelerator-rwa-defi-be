@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {UpKeeper} from "../UpKeeper.sol";
+import {IUpKeeper} from "../interface/IUpKeeper.sol";
 
 
 /**
@@ -51,7 +51,7 @@ contract MockKeeperTarget{
 
     function mockFunctionRevertReentrantTask(address upkeeper, bytes32 taskId) count external returns (bool) {
         // Try to re-enter the same task (should fail)
-        UpKeeper(upkeeper).executeTask(taskId, abi.encode(upkeeper, taskId));
+        IUpKeeper(upkeeper).executeTask(taskId, abi.encode(upkeeper, taskId));
         return true;
     }
 }
