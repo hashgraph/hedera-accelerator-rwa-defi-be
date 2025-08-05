@@ -28,7 +28,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         }
     }
 
-    function initialize(IVotes _token, string memory name, address initialOwner, address treasury) public initializer {
+    function initialize(IVotes _token, string memory name, address initialOwner, address treasury, address auditRegistry) public initializer {
         __Governor_init(name);
         __GovernorCountingSimple_init();
         __GovernorVotes_init(_token);
@@ -38,6 +38,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
 
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         $.treasury = treasury;
+        $.auditRegistry = auditRegistry;
     }
 
     function createTextProposal(ProposalLevel /*level*/, string memory description) public returns(uint256 proposalId) {
@@ -118,6 +119,58 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         emit ProposalDefined(proposalId, ProposalType.ChangeReserve, msg.sender, address(0), amount);
     }
 
+    function createAddAuditorProposal(address auditor, string memory description) public returns (uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        require(auditor != address(0), "BuildingGovernance: Invalid auditor address");
+
+        address[] memory _auditRegistry = new address[](1);
+        _auditRegistry[0] = $.auditRegistry;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "addAuditor(address)",
+            auditor
+        );
+
+        proposalId = propose(_auditRegistry, _values, _calldata, description);
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.AddAuditor;
+        $.proposals[proposalId].to = auditor;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
+        
+        emit ProposalDefined(proposalId, ProposalType.AddAuditor, msg.sender, auditor, 0);
+    }
+
+    function createRemoveAuditorProposal(address auditor, string memory description) public returns (uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        require(auditor != address(0), "BuildingGovernance: Invalid auditor address");
+
+        address[] memory _auditRegistry = new address[](1);
+        _auditRegistry[0] = $.auditRegistry;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "removeAuditor(address)",
+            auditor
+        );
+
+        proposalId = propose(_auditRegistry, _values, _calldata, description);
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.RemoveAuditor;
+        $.proposals[proposalId].to = auditor;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
+        
+        emit ProposalDefined(proposalId, ProposalType.RemoveAuditor, msg.sender, auditor, 0);
+    }
+
     function executePaymentProposal(uint256 proposalId) external {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
 
@@ -176,6 +229,48 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         );
 
         execute(targets, values, calldatas, $.proposals[proposalId].descriptionHash);
+    }
+
+    function executeAddAuditorProposal(uint256 proposalId) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.AddAuditor, "BuildingGovernance: invalid proposal type");
+
+        address[] memory _auditRegistry = new address[](1);
+        _auditRegistry[0] = $.auditRegistry;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "addAuditor(address)",
+            $.proposals[proposalId].to
+        );
+
+        execute(_auditRegistry, _values, _calldata, $.proposals[proposalId].descriptionHash);
+    }
+
+    function executeRemoveAuditorProposal(uint256 proposalId) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.RemoveAuditor, "BuildingGovernance: invalid proposal type");
+
+        address[] memory _auditRegistry = new address[](1);
+        _auditRegistry[0] = $.auditRegistry;
+
+        uint256[] memory _values = new uint256[](1);
+        _values[0] = 0;
+
+        bytes[] memory _calldata = new bytes[](1);
+        _calldata[0] = abi.encodeWithSignature(
+            "removeAuditor(address)",
+            $.proposals[proposalId].to
+        );
+
+        execute(_auditRegistry, _values, _calldata, $.proposals[proposalId].descriptionHash);
     }
 
     function votingDelay() public pure override returns (uint256) {

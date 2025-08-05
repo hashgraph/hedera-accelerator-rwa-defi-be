@@ -5,6 +5,7 @@ abstract contract BuildingGovernanceStorage {
     /// @custom:storage-location erc7201:hashgraph.buildings.BuildingGovernance
     struct BuildingGovernanceData {
         address treasury;
+        address auditRegistry;
         mapping (uint256 => ProposalData) proposals;
     }
 
@@ -26,6 +27,6 @@ abstract contract BuildingGovernanceStorage {
     }    
     
     enum ProposalLevel { GovernorVote }
-    enum ProposalType { Text, Payment, ChangeReserve }
+    enum ProposalType { Text, Payment, ChangeReserve, AddAuditor, RemoveAuditor }
     event ProposalDefined(uint256 id, ProposalType proposalType, address proposer, address receiver, uint256 amount);
 }

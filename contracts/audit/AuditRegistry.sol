@@ -12,6 +12,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract AuditRegistry is AccessControl {
     bytes32 public constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
     struct AuditRecord {
         address building; // EVM address of the building
@@ -29,6 +30,8 @@ contract AuditRegistry is AccessControl {
 
     // buildingAddress => array of record IDs
     mapping(address => uint256[]) public buildingAuditRecords;
+
+    address[] private _auditors; // List of auditors 
 
     // Events
     /**
@@ -81,6 +84,14 @@ contract AuditRegistry is AccessControl {
     event AuditorRemoved(address indexed auditor);
 
     /**
+     * 
+     * @param governance The address of the governance contract that is granted the role.
+     * @dev Emitted when the admin grants the governance role to a contract.
+     * @notice This event is used to track the governance contract that can manage auditor roles.
+     */
+    event GovernanceGranted(address indexed governance);
+
+    /**
      * @dev Thrown when auditor account tries to add a new audit record with duplicate ipfs hash.
      */
     error DuplicateIpfsHash();
@@ -88,8 +99,8 @@ contract AuditRegistry is AccessControl {
     /**
      * @dev Constructor grants DEFAULT_ADMIN_ROLE to the deployer.
      */
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address initialOwner) {
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
 
     /**
@@ -170,6 +181,60 @@ contract AuditRegistry is AccessControl {
         record.revoked = true;
 
         emit AuditRecordRevoked(_recordId, block.timestamp);
+    }
+
+    /**
+     * Add an auditor tru governance voting
+     * @param account account to be added as auditor
+     */
+    function addAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
+        require(account != address(0), "Invalid address");
+        _auditors.push(account);
+        _grantRole(AUDITOR_ROLE, account);
+        emit AuditorAdded(account);
+    }
+
+    /**
+     * Remove an auditor tru governance voting
+     * @param account auditor account to be removed
+     */
+    function removeAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
+        require(account != address(0), "Invalid address");
+        // Check if the account is an auditor
+        require(hasRole(AUDITOR_ROLE, account), "Account is not an auditor");
+        // Remove the auditor from the auditors list
+        for (uint256 i = 0; i < _auditors.length; i++)
+        {
+            if (_auditors[i] == account) {
+                // Shift elements to remove the auditor
+                for (uint256 j = i; j < _auditors.length - 1; j++) {
+                    _auditors[j] = _auditors[j + 1];
+                }
+                _auditors.pop(); // Remove the last element
+                break;
+            }
+        }
+        // Revoke the auditor role
+        _revokeRole(AUDITOR_ROLE, account);
+        emit AuditorRemoved(account);
+    }
+
+    /**
+     * Get the list of auditors
+     * @return auditors array of auditor addresses
+     */
+    function getAuditors() external view returns (address[] memory) {
+        return _auditors;
+    }
+
+    /**
+     * Grant governance role to a governance contract
+     * @param governance governance contract address to be granted the role
+     */
+    function grantGovernanceRole(address governance) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(governance != address(0), "AuditRegistry: Invalid governance address");
+        _grantRole(GOVERNANCE_ROLE, governance);
+        emit GovernanceGranted(governance);
     }
 
     /**
