@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hedera Schedule Function</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hedera Functions Dashboard</h1>
+        <p>Test and manage your Hedera functions.</p>
+        
+        <button id="scheduleButton" onclick="checkSchedule()">Check & Schedule</button>
+        <button id="keeperButton" onclick="executeKeeper()">Execute Keeper</button>
+        <button id="testConfigButton" onclick="testConfig()">Test Configuration</button>
+        <button id="keyConverterButton" onclick="showKeyConverter()">Key Converter</button>
+        <button id="autoButton" onclick="toggleAutoCheck()">Start Auto Check (30s)</button>
+        
+        <div id="result"></div>
+        
+        <!-- Key Converter Modal -->
+        <div id="keyConverterModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; max-width: 600px; width: 90%;">
+                <h2>Private Key Converter</h2>
+                <p>Convert your private key to the correct format for Hedera SDK.</p>
+                
+                <div style="margin: 20px 0;">
+                    <label for="privateKeyInput">Private Key:</label><br>
+                    <textarea id="privateKeyInput" rows="4" cols="50" placeholder="Enter your private key here..."></textarea>
+                </div>
+                
+                <button onclick="convertKey()">Convert Key</button>
+                <button onclick="hideKeyConverter()" style="background-color: #6c757d;">Cancel</button>
+                
+                <div id="keyConverterResult" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoCheckInterval = null;
+
+        async function checkSchedule() {
+            const button = document.getElementById('scheduleButton');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Checking...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/schedule', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network error: ${error.message}`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Check & Schedule';
+            }
+        }
+
+        async function executeKeeper() {
+            const button = document.getElementById('keeperButton');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Executing...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/keeper', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network error: ${error.message}`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Execute Keeper';
+            }
+        }
+
+        async function testConfig() {
+            const button = document.getElementById('testConfigButton');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/test-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network error: ${error.message}`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Test Configuration';
+            }
+        }
+
+        function toggleAutoCheck() {
+            const button = document.getElementById('autoButton');
+            const resultDiv = document.getElementById('result');
+            
+            if (autoCheckInterval) {
+                clearInterval(autoCheckInterval);
+                autoCheckInterval = null;
+                button.textContent = 'Start Auto Check (30s)';
+                resultDiv.className = 'result info';
+                resultDiv.textContent = 'Auto check stopped';
+            } else {
+                button.textContent = 'Stop Auto Check';
+                resultDiv.className = 'result info';
+                resultDiv.textContent = 'Auto check started - checking every 30 seconds...';
+                
+                // Initial check
+                checkSchedule();
+                
+                // Set up interval
+                autoCheckInterval = setInterval(checkSchedule, 30000);
+            }
+        }
+
+        function showKeyConverter() {
+            document.getElementById('keyConverterModal').style.display = 'block';
+        }
+
+        function hideKeyConverter() {
+            document.getElementById('keyConverterModal').style.display = 'none';
+            document.getElementById('keyConverterResult').innerHTML = '';
+        }
+
+        async function convertKey() {
+            const privateKeyInput = document.getElementById('privateKeyInput');
+            const resultDiv = document.getElementById('keyConverterResult');
+            
+            const privateKey = privateKeyInput.value.trim();
+            
+            if (!privateKey) {
+                resultDiv.innerHTML = '<div class="result error">Please enter a private key</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/.netlify/functions/key-converter', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ privateKey })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <h3>Conversion Successful!</h3>
+                            <p><strong>Format:</strong> ${data.keyFormat}</p>
+                            <p><strong>Public Key:</strong> ${data.publicKey}</p>
+                            <p><strong>Account ID:</strong> ${data.accountId}</p>
+                            <p><strong>Converted Key Length:</strong> ${data.convertedLength}</p>
+                            <p><strong>Use this key in your environment variables:</strong></p>
+                            <textarea readonly style="width: 100%; height: 60px; font-family: monospace;">${data.publicKey}</textarea>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">Error: ${data.message || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">Network error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 

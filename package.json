@@ -7,7 +7,9 @@
     "compile": "yarn hardhat compile",
     "test": "yarn hardhat test --network hardhat",
     "deploy": "yarn hardhat run scripts/deploy.ts",
-    "deploy-suite": "yarn hardhat run scripts/deploy-suite.ts"
+    "deploy-suite": "yarn hardhat run scripts/deploy-suite.ts",
+    "build": "echo 'Build completed'",
+    "dev": "netlify dev"
   },
   "keywords": [
     "defi",
@@ -52,9 +54,12 @@
   "dependencies": {
     "@chainlink/contracts": "^1.3.0",
     "@hashgraph/hedera-local": "^2.19.1",
+    "@hashgraph/sdk": "^2.49.2",
+    "@netlify/functions": "^4.2.1",
     "@openzeppelin/contracts": "5.0.2",
     "@openzeppelin/contracts-upgradeable": "5.0.2",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.6.4",
     "uuid": "^11.1.0"
   }
 }
