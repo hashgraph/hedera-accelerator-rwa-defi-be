@@ -4,6 +4,7 @@ import {
   PrivateKey,
   AccountId,
   ContractId,
+  AccountBalanceQuery,
 } from "@hashgraph/sdk";
 import { Handler } from '@netlify/functions'
 
@@ -96,32 +97,31 @@ async function executeKeeperTransaction() {
   console.log('Private key length:', privateKey.length);
 
   const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-  const account = operatorKey.publicKey.toAccountId(0, 0); // shard 0, realm 0
-
-  console.log('Account:', account.toString());
-  const operatorId = AccountId.fromString(account.toString());
-  console.log('operatorId:', operatorId.toString());
-  const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+  const operatorId = AccountId.fromString(accountId);
+  const contractId = ContractId.fromString(accountId);
   
-  // console.log('Created operator ID:', operatorId.toString());
-  // console.log('Created contract ID:', contractId.toString());
+  console.log('Created operator ID:', operatorId.toString());
+  console.log('Created contract ID:', contractId.toString());
+  console.log('Public key:', operatorKey.publicKey.toString());
 
-  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
+  const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
 
   const contractTx = new ContractExecuteTransaction()
     .setContractId(contractId)
     .setFunction("executeTasks")
-    .setGas(100_000);
+    .setGas(100_000)
+    .freezeWith(client);
 
   console.log('Executing transaction...');
-  const execution = await contractTx.execute(client);
+  const signedTx = await contractTx.sign(operatorKey);
+  const execution = await signedTx.execute(client);
   const receipt = await execution.getReceipt(client);
   
   console.log("- transaction executed:", receipt.status.toString());
   console.log("- transaction hash:", execution.transactionHash.toString());
   
   return {
-    transactionHash: execution.transactionHash.toString(),
+    transactionHash: Buffer.from(execution.transactionHash).toString('hex'),
     status: receipt.status.toString()
   };
 }

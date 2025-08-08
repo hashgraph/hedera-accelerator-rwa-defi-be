@@ -26,7 +26,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
-            margin: 10px 0;
+            margin: 10px 5px;
         }
         button:hover {
             background-color: #0056b3;
@@ -56,14 +56,22 @@
             border: 1px solid #bee5eb;
             color: #0c5460;
         }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Hedera Keeper Function</h1>
-        <p>This function executes keeper transaction on hedera testnet.</p>
+        <h1>RWA Keeper</h1>
+        <p>This function executes as queries keeper transaction</p>
         
-        <button id="executeButton" onclick="executeKeeper()">Execute Keeper</button>
+        <div class="button-group">
+            <button id="executeButton" onclick="executeKeeper()">Execute Keeper</button>
+            <button id="queryButton" onclick="queryDummy()">Query Dummy Count</button>
+        </div>
         
         <div id="result"></div>
     </div>
@@ -74,7 +82,7 @@
             const resultDiv = document.getElementById('result');
             
             button.disabled = true;
-            button.textContent = 'Checking...';
+            button.textContent = 'Executing...';
             
             try {
                 const response = await fetch('/.netlify/functions/keeper', {
@@ -98,7 +106,40 @@
                 resultDiv.textContent = `Network error: ${error.message}`;
             } finally {
                 button.disabled = false;
-                button.textContent = 'Check & Schedule';
+                button.textContent = 'Execute Keeper';
+            }
+        }
+
+        async function queryDummy() {
+            const button = document.getElementById('queryButton');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Querying...';
+            
+            try {
+                const response = await fetch('/.netlify/functions/query-dummy', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `Dummy Contract Count: ${data.count}\n\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Network error: ${error.message}`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Query Dummy Count';
             }
         }
     </script>

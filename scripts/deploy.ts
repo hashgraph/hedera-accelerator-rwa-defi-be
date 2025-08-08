@@ -6,6 +6,7 @@ import {
   usdcAddress,
   uniswapRouterAddress
 } from "../constants";
+import { BuildingFactoryInitStruct } from '../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory';
 
 // Initial function for logs and configs
 async function init(): Promise<Record<string, any>> {
@@ -213,6 +214,20 @@ async function deployERC721Metadata(contracts: Record<string, any>): Promise<Rec
   }
 }
 
+async function deployUpkeeper(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying UpKeeper ...');
+  const [owner] = await ethers.getSigners();
+  const upkeeper = await ethers.deployContract('UpKeeper', owner);
+
+  return {
+    ...contracts, 
+    implementations: {
+      ...contracts.implementations, 
+      UpKeeper: await upkeeper.getAddress()
+    }
+  }
+}
+
 // deploy upgradeable BuildingFactory
 async function deployBuildingFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(' - Deploying BuildingFactory ...');
@@ -252,23 +267,24 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
   await governanceBeacon.waitForDeployment();
   const governanceBeaconAddress = await governanceBeacon.getAddress();
 
+  const buildingFactoryInit: BuildingFactoryInitStruct = {
+    nft: contracts.implementations.ERC721Metadata, 
+    uniswapRouter: uniswapRouterAddress, 
+    uniswapFactory: uniswapFactoryAddress,
+    onchainIdGateway: identityGatewayAddress,
+    trexGateway: trexGatewayAddress,
+    usdc: usdcAddress,
+    buildingBeacon: buildingBeaconAddress,
+    treasuryBeacon: treasuryBeaconAddress,
+    governanceBeacon: governanceBeaconAddress,
+    upkeeper: contracts.implementations.UpKeeper,
+  }
+
   const buildingFactory = await upgrades.deployBeaconProxy(
     buildingFactoryBeaconAddress,
     buildingFactoryFactory,
-    [
-      contracts.implementations.ERC721Metadata,
-      uniswapRouterAddress,
-      uniswapFactoryAddress,
-      identityGatewayAddress,
-      trexGatewayAddress,
-      usdcAddress,
-      buildingBeaconAddress,
-      treasuryBeaconAddress,
-      governanceBeaconAddress
-    ],
-    {
-      initializer: 'initialize'
-    }
+    [buildingFactoryInit],
+    {initializer: 'initialize'}
   );
 
   await buildingFactory.waitForDeployment();
@@ -284,6 +300,10 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
   const nftCollection = await ethers.getContractAt('ERC721Metadata', contracts.implementations.ERC721Metadata);
   await nftCollection.transferOwnership(buildingFactoryAddress);
   await trexGateway.addDeployer(buildingFactoryAddress);
+
+  // grant TRUSTED_REGISTRY_ROLE to building factory
+  const upkeeper = await ethers.getContractAt('UpKeeper', contracts.implementations.UpKeeper);
+  await upkeeper.grantRole(await upkeeper.TRUSTED_REGISTRY_ROLE(), buildingFactoryAddress);
 
   return {
     ...contracts,
@@ -373,6 +393,7 @@ init()
   .then(deploySliceFactory)
   .then(deployAutoCompounderFactory)
   .then(deployERC721Metadata)
+  .then(deployUpkeeper)
   .then(deployLibraries)
   .then(deployBuildingFactory)
   .then(deployAudit)
