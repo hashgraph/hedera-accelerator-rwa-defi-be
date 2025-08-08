@@ -1,16 +1,11 @@
 import {
-  Client,
   ContractExecuteTransaction,
-  PrivateKey,
-  AccountId,
-  ContractId,
   ContractCallQuery,
   ContractFunctionParameters,
 } from "@hashgraph/sdk";
 import { Handler } from '@netlify/functions'
 import { AbiCoder } from "ethers";
-import { config } from "dotenv";
-config();
+import { getClient } from "./upkeeper-execute-tasks";
 
 // Netlify Function handler
 export const handler: Handler = async (event, context) => {
@@ -88,23 +83,7 @@ export const handler: Handler = async (event, context) => {
 };
 
 async function executeKeeperTransactions() {
-  const accountId = process.env.ACCOUNT_ID;
-  const privateKey = process.env.PRIVATE_KEY;
-  const contractAddress = process.env.CONTRACT_ADDRESS;
-
-  if (!accountId || !privateKey || !contractAddress) {
-    throw new Error('Missing required environment variables');
-  }
-
-  const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-  const operatorId = AccountId.fromString(accountId);
-  const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
-  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
-
-  console.log('operatorId', operatorId.toString());
-  console.log('contractId', contractId.toString());
-  console.log('operatorKey', operatorKey.publicKey.toString());
-  console.log('client', client.toString());
+  const { client, contractId, operatorKey } = getClient();
 
   const taskIds = await getTaskList();
 
@@ -148,23 +127,7 @@ async function executeKeeperTransactions() {
 }
 
 async function getTaskList(): Promise<string[]> {
-  const accountId = process.env.ACCOUNT_ID;
-  const privateKey = process.env.PRIVATE_KEY;
-  const contractAddress = process.env.CONTRACT_ADDRESS;
-
-  if (!accountId || !privateKey || !contractAddress) {
-    throw new Error('Missing required environment variables');
-  }
-
-  const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-  const operatorId = AccountId.fromString(accountId);
-  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
-  const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
-  
-  console.log('operatorId', operatorId.toString());
-  console.log('contractId', contractId.toString());
-  console.log('operatorKey', operatorKey.publicKey.toString());
-  console.log('client', client.toString());
+  const { client, contractId } = getClient();
 
   const query = new ContractCallQuery()
     .setContractId(contractId)
@@ -174,10 +137,7 @@ async function getTaskList(): Promise<string[]> {
   const res = await query.execute(client);
   const raw = res.asBytes();
 
-  const [taskIds] = AbiCoder.defaultAbiCoder().decode([
-    "bytes32[]",
-  ], raw) as [string[]];
+  const [taskIds] = AbiCoder.defaultAbiCoder().decode(["bytes32[]"], raw);
   
-  console.log({taskIds});
   return taskIds;
 }

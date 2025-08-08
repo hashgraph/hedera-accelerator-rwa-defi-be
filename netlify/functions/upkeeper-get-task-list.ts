@@ -1,12 +1,7 @@
-import {
-  Client,
-  ContractCallQuery,
-  PrivateKey,
-  AccountId,
-  ContractId,
-} from "@hashgraph/sdk";
+import { ContractCallQuery } from "@hashgraph/sdk";
 import { Handler } from "@netlify/functions";
 import { AbiCoder } from "ethers";
+import { getClient } from "./upkeeper-execute-tasks";
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -41,10 +36,7 @@ export const handler: Handler = async (event) => {
       Number(event.queryStringParameters?.pageSize || "10")
     );
 
-    const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-    const operatorId = AccountId.fromString(accountId);
-    const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
-    const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+    const { client, contractId } = getClient();
 
     const query = new ContractCallQuery()
       .setContractId(contractId)
@@ -53,9 +45,7 @@ export const handler: Handler = async (event) => {
 
     const res = await query.execute(client);
     const raw = res.asBytes();
-    const [taskIds] = AbiCoder.defaultAbiCoder().decode([
-      "bytes32[]",
-    ], raw) as [string[]];
+    const [taskIds] = AbiCoder.defaultAbiCoder().decode(["bytes32[]"], raw);
 
     const total = taskIds.length;
     const start = (page - 1) * pageSize;

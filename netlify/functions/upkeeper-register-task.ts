@@ -1,12 +1,7 @@
-import {
-  Client,
-  ContractExecuteTransaction,
-  PrivateKey,
-  AccountId,
-  ContractId,
-} from "@hashgraph/sdk";
+import { ContractExecuteTransaction } from "@hashgraph/sdk";
 import { Handler } from "@netlify/functions";
 import { Interface } from "ethers";
+import { getClient } from "./upkeeper-execute-tasks";
 
 const iface = new Interface([
   "function registerTask(address target, bytes4 selector)",
@@ -71,11 +66,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-    const operatorId = AccountId.fromString(accountId);
-    const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
-
-    const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+    const { client, contractId, operatorKey } = getClient();
 
     const data = iface.encodeFunctionData("registerTask", [target, normSelector]);
 

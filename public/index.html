@@ -248,7 +248,7 @@
             button.textContent = 'Executing...';
             
             try {
-                const response = await fetch('/.netlify/functions/keeper', {
+                const response = await fetch('/.netlify/functions/upkeeper-execute-tasks', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

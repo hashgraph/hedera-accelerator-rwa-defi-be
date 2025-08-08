@@ -1,15 +1,10 @@
 import {
-  Client,
   ContractCallQuery,
   ContractFunctionParameters,
-  PrivateKey,
-  AccountId,
-  ContractId,
 } from "@hashgraph/sdk";
 import { Handler } from "@netlify/functions";
 import { AbiCoder } from "ethers";
-
-type TaskTuple = [bigint, string, string, boolean, boolean];
+import { getClient } from "./upkeeper-execute-tasks";
 
 export const handler: Handler = async (event) => {
   const headers = {
@@ -56,10 +51,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const operatorKey = PrivateKey.fromStringECDSA(privateKey);
-    const operatorId = AccountId.fromString(accountId);
-    const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
-    const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+    const { client, contractId } = getClient();
 
     const coder = AbiCoder.defaultAbiCoder();
 
@@ -85,10 +77,7 @@ export const handler: Handler = async (event) => {
 
       const res = await query.execute(client);
       const raw = res.asBytes();
-      const [task] = coder.decode(
-        ["(uint256,address,bytes4,bool,bool)"],
-        raw
-      ) as [TaskTuple];
+      const [task] = coder.decode(["(uint256,address,bytes4,bool,bool)"], raw);
 
       results.push({
         taskId: id,
