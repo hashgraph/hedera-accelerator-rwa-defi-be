@@ -4,9 +4,11 @@ import {
   PrivateKey,
   AccountId,
   ContractId,
-  AccountBalanceQuery,
+  ContractCallQuery,
+  ContractFunctionParameters,
 } from "@hashgraph/sdk";
 import { Handler } from '@netlify/functions'
+import { AbiCoder } from "ethers";
 
 // Netlify Function handler
 export const handler: Handler = async (event, context) => {
@@ -51,7 +53,7 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
-    const result = await executeKeeperTransaction();
+    const result = await executeKeeperTransactions();
 
     return {
       statusCode: 200,
@@ -61,7 +63,7 @@ export const handler: Handler = async (event, context) => {
       },
       body: JSON.stringify({ 
         done: true,
-        transactionHash: result.transactionHash,
+        transactions: result.transactions,
         status: result.status
       }),
     };
@@ -83,7 +85,7 @@ export const handler: Handler = async (event, context) => {
   }
 };
 
-async function executeKeeperTransaction() {
+async function executeKeeperTransactions() {
   const accountId = process.env.ACCOUNT_ID;
   const privateKey = process.env.PRIVATE_KEY;
   const contractAddress = process.env.CONTRACT_ADDRESS;
@@ -92,36 +94,80 @@ async function executeKeeperTransaction() {
     throw new Error('Missing required environment variables');
   }
 
-  console.log('Using account ID:', accountId);
-  console.log('Contract address:', contractAddress);
-  console.log('Private key length:', privateKey.length);
-
   const operatorKey = PrivateKey.fromStringECDSA(privateKey);
   const operatorId = AccountId.fromString(accountId);
   const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
-  
-  console.log('Created operator ID:', operatorId.toString());
-  console.log('Created contract ID:', contractId.toString());
-  console.log('Public key:', operatorKey.publicKey.toString());
-
   const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
 
-  const contractTx = new ContractExecuteTransaction()
-    .setContractId(contractId)
-    .setFunction("executeTasks")
-    .setGas(100_000)
-    .freezeWith(client);
+  const taskIds = await getTaskList();
 
-  console.log('Executing transaction...');
-  const signedTx = await contractTx.sign(operatorKey);
-  const execution = await signedTx.execute(client);
-  const receipt = await execution.getReceipt(client);
-  
-  console.log("- transaction executed:", receipt.status.toString());
-  console.log("- transaction hash:", execution.transactionHash.toString());
-  
+  let successfulTransactions: string[] = [];
+  let failedTransactions: string[] = [];
+
+  try {    
+    for (const taskId of taskIds) {
+
+      console.log('taskId', taskId);
+      console.log('taskIdb', Buffer.from(taskId, 'hex'));
+      const contractTx = new ContractExecuteTransaction()
+      .setContractId(contractId)
+      .setFunction("executeTask", 
+        new ContractFunctionParameters()
+        .addBytes32(Buffer.from(taskId.slice(2), 'hex'))
+        .addBytes(Buffer.from("", 'hex')))
+      .setGas(100_000)
+      .freezeWith(client);
+        
+      console.log('Executing transaction...');
+      const signedTx = await contractTx.sign(operatorKey);
+      const execution = await signedTx.execute(client);
+      const receipt = await execution.getReceipt(client);
+      
+      console.log("- transaction executed:", receipt.status.toString());
+      console.log("- transaction hash:", Buffer.from(execution.transactionHash).toString('hex'));
+
+      successfulTransactions.push(Buffer.from(execution.transactionHash).toString('hex'));
+    }
+  } catch (error) {
+    console.error('Error executing transaction:', error);
+    failedTransactions.push(error?.toString() || 'Unknown error');
+  }
+
   return {
-    transactionHash: Buffer.from(execution.transactionHash).toString('hex'),
-    status: receipt.status.toString()
-  };
+    transactions: {
+      successful: successfulTransactions,
+      failed: failedTransactions
+    },
+    status: "success"
+  }
+}
+
+async function getTaskList(): Promise<string[]> {
+  const accountId = process.env.ACCOUNT_ID;
+  const privateKey = process.env.PRIVATE_KEY;
+  const contractAddress = process.env.CONTRACT_ADDRESS;
+
+  if (!accountId || !privateKey || !contractAddress) {
+    throw new Error('Missing required environment variables');
+  }
+
+  const operatorKey = PrivateKey.fromStringECDSA(privateKey);
+  const operatorId = AccountId.fromString(accountId);
+  const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
+  const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+
+  const query = new ContractCallQuery()
+    .setContractId(contractId)
+    .setGas(300_000)
+    .setFunction("getTaskList");
+
+  const res = await query.execute(client);
+  const raw = res.asBytes();
+
+  const [taskIds] = AbiCoder.defaultAbiCoder().decode([
+    "bytes32[]",
+  ], raw) as [string[]];
+  
+  console.log({taskIds});
+  return taskIds;
 }

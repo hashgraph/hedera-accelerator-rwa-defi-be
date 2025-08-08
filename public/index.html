@@ -40,6 +40,10 @@
             padding: 15px;
             border-radius: 5px;
             white-space: pre-wrap;
+            max-height: 500px;
+            max-height: 20vh;
+            overflow-x: scroll;
+            overflow-y: scroll;
         }
         .success {
             background-color: #d4edda;
@@ -100,7 +104,6 @@
         
         <div class="button-group">
             <button id="executeButton" onclick="executeKeeper()">Execute Keeper</button>
-            <button id="queryButton" onclick="queryDummy()">Query Dummy Count</button>
         </div>
         
         <div id="result"></div>
@@ -268,39 +271,6 @@
             } finally {
                 button.disabled = false;
                 button.textContent = 'Execute Keeper';
-            }
-        }
-
-        async function queryDummy() {
-            const button = document.getElementById('queryButton');
-            const resultDiv = document.getElementById('result');
-            
-            button.disabled = true;
-            button.textContent = 'Querying...';
-            
-            try {
-                const response = await fetch('/.netlify/functions/query-dummy', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    resultDiv.className = 'result success';
-                    resultDiv.textContent = `Dummy Contract Count: ${data.count}\n\nFull Response:\n${JSON.stringify(data, null, 2)}`;
-                } else {
-                    resultDiv.className = 'result error';
-                    resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
-                }
-            } catch (error) {
-                resultDiv.className = 'result error';
-                resultDiv.textContent = `Network error: ${error.message}`;
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Query Dummy Count';
             }
         }
 
