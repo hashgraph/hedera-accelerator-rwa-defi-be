@@ -98,7 +98,7 @@ async function executeKeeperTransaction() {
 
   const operatorKey = PrivateKey.fromStringECDSA(privateKey);
   const operatorId = AccountId.fromString(accountId);
-  const contractId = ContractId.fromString(accountId);
+  const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
   
   console.log('Created operator ID:', operatorId.toString());
   console.log('Created contract ID:', contractId.toString());
