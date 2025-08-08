@@ -61,6 +61,36 @@
             gap: 10px;
             flex-wrap: wrap;
         }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #fff;
+            width: 100%;
+            max-width: 520px;
+            border-radius: 10px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            padding: 20px;
+        }
+        .modal h3 { margin-top: 0; }
+        .form-row { margin-bottom: 12px; }
+        .form-row label { display: block; font-weight: bold; margin-bottom: 6px; }
+        .form-row input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+        .note { font-size: 12px; color: #555; }
     </style>
 </head>
 <body>
@@ -74,9 +104,139 @@
         </div>
         
         <div id="result"></div>
+
+        <div style="margin-top: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Registered Tasks</h2>
+            <div class="button-group">
+              <button id="refreshButton" onclick="refreshTasks()">Refresh</button>
+              <button id="prevButton" onclick="prevPage()">Prev</button>
+              <button id="nextButton" onclick="nextPage()">Next</button>
+              <button id="registerTaskButton" onclick="openRegisterModal()">Register Task</button>
+            </div>
+          </div>
+          <div id="paginationInfo" class="info" style="padding: 8px; margin: 10px 0;"></div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding: 8px;">Task ID</th>
+                  <th style="text-align:left; padding: 8px;">Target</th>
+                  <th style="text-align:left; padding: 8px;">Selector</th>
+                  <th style="text-align:left; padding: 8px;">Executions</th>
+                  <th style="text-align:left; padding: 8px;">Exists</th>
+                  <th style="text-align:left; padding: 8px;">Executing</th>
+                </tr>
+              </thead>
+              <tbody id="tasksTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="registerModal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+          <div class="modal">
+            <h3>Register New Task</h3>
+            <div class="form-row">
+              <label for="targetInput">Target (EVM address)</label>
+              <input id="targetInput" type="text" placeholder="0x...40 hex chars" />
+            </div>
+            <div class="form-row">
+              <label for="selectorInput">Selector (4-byte function selector)</label>
+              <input id="selectorInput" type="text" placeholder="0x...8 hex chars" />
+              <div class="note">Example selector for foo(uint256): 0x2fbebd38</div>
+            </div>
+            <div id="registerError" class="result error" style="display:none;"></div>
+            <div class="modal-actions">
+              <button id="registerCancel" onclick="closeRegisterModal()" style="background:#6c757d;">Cancel</button>
+              <button id="registerSubmit" onclick="submitRegisterTask()">Register</button>
+            </div>
+          </div>
+        </div>
     </div>
 
     <script>
+        let currentPage = 1;
+        const pageSize = 10;
+        let totalTasks = 0;
+
+        function shortHex(hex, left = 10, right = 6) {
+          if (!hex || hex.length <= left + right + 2) return hex;
+          return `${hex.slice(0, left)}…${hex.slice(-right)}`;
+        }
+
+        function setPaginationState() {
+          const totalPages = Math.max(1, Math.ceil(totalTasks / pageSize));
+          document.getElementById('paginationInfo').textContent = `Page ${currentPage} of ${totalPages} (${totalTasks} tasks)`;
+          document.getElementById('prevButton').disabled = currentPage <= 1;
+          document.getElementById('nextButton').disabled = currentPage >= totalPages;
+        }
+
+        async function loadTasks(page = 1) {
+          currentPage = page;
+          const listRes = await fetch(`/.netlify/functions/upkeeper-get-task-list?page=${page}&pageSize=${pageSize}`);
+          const listData = await listRes.json();
+          if (!listRes.ok || !listData.success) {
+            renderError(`Failed to load task list: ${listData.message || 'Unknown error'}`);
+            return;
+          }
+
+          totalTasks = listData.total;
+          setPaginationState();
+
+          const ids = listData.taskIds || [];
+          renderTasksSkeleton(ids);
+
+          if (ids.length > 0) {
+            const infoRes = await fetch('/.netlify/functions/upkeeper-get-task-info', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskIds: ids }),
+            });
+            const infoData = await infoRes.json();
+            if (infoRes.ok && infoData.success) {
+              renderTasks(infoData.tasks || []);
+            } else {
+              renderError(`Failed to load task info: ${infoData.message || 'Unknown error'}`);
+            }
+          } else {
+            renderTasks([]);
+          }
+        }
+
+        function renderTasksSkeleton(ids) {
+          const tbody = document.getElementById('tasksTbody');
+          tbody.innerHTML = ids.map((id) => `
+            <tr>
+              <td><code>${shortHex(id)}</code></td>
+              <td colspan="5">Loading…</td>
+            </tr>
+          `).join('');
+        }
+
+        function renderTasks(tasks) {
+          const tbody = document.getElementById('tasksTbody');
+          if (!tasks.length) {
+            tbody.innerHTML = `<tr><td colspan="6">No tasks</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = tasks.map((t) => `
+            <tr>
+              <td><code title="${t.taskId}">${shortHex(t.taskId)}</code></td>
+              <td><code title="${t.target}">${shortHex(t.target)}</code></td>
+              <td><code>${t.selector}</code></td>
+              <td>${t.executions}</td>
+              <td>${t.exists ? 'true' : 'false'}</td>
+              <td>${t.executing ? 'true' : 'false'}</td>
+            </tr>
+          `).join('');
+        }
+
+        function renderError(msg) {
+          const resultDiv = document.getElementById('result');
+          resultDiv.className = 'result error';
+          resultDiv.textContent = msg;
+        }
+
         async function executeKeeper() {
             const button = document.getElementById('executeButton');
             const resultDiv = document.getElementById('result');
@@ -97,6 +257,7 @@
                 if (response.ok) {
                     resultDiv.className = 'result success';
                     resultDiv.textContent = JSON.stringify(data, null, 2);
+                    await loadTasks(currentPage);
                 } else {
                     resultDiv.className = 'result error';
                     resultDiv.textContent = `Error: ${data.message || 'Unknown error'}`;
@@ -141,6 +302,104 @@
                 button.disabled = false;
                 button.textContent = 'Query Dummy Count';
             }
+        }
+
+        function refreshTasks() {
+          loadTasks(currentPage);
+        }
+
+        function prevPage() {
+          if (currentPage > 1) loadTasks(currentPage - 1);
+        }
+
+        function nextPage() {
+          const totalPages = Math.max(1, Math.ceil(totalTasks / pageSize));
+          if (currentPage < totalPages) loadTasks(currentPage + 1);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+          loadTasks(1);
+        });
+
+        function openRegisterModal() {
+          const errEl = document.getElementById('registerError');
+          if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+          const targetEl = document.getElementById('targetInput');
+          const selectorEl = document.getElementById('selectorInput');
+          if (targetEl) { (targetEl).value = ''; }
+          if (selectorEl) { (selectorEl).value = ''; }
+          const modal = document.getElementById('registerModal');
+          if (modal) { modal.classList.add('open'); }
+          if (targetEl && typeof targetEl.focus === 'function') { targetEl.focus(); }
+        }
+
+        function closeRegisterModal() {
+          document.getElementById('registerModal').classList.remove('open');
+        }
+
+        function setRegisterError(message) {
+          const err = document.getElementById('registerError');
+          err.style.display = message ? 'block' : 'none';
+          err.textContent = message || '';
+        }
+
+        function isValidAddress(addr) {
+          return /^0x[a-fA-F0-9]{40}$/.test(addr || '');
+        }
+
+        function normalizeSelector(sel) {
+          if (!sel) return '';
+          const prefixed = sel.startsWith('0x') ? sel : `0x${sel}`;
+          return prefixed.toLowerCase();
+        }
+
+        function isValidSelector(sel) {
+          return /^0x[a-fA-F0-9]{8}$/.test(sel || '');
+        }
+
+        async function submitRegisterTask() {
+          const submitBtn = document.getElementById('registerSubmit');
+          const cancelBtn = document.getElementById('registerCancel');
+          const targetEl = document.getElementById('targetInput');
+          const selectorEl = document.getElementById('selectorInput');
+          const target = targetEl ? targetEl.value.trim() : '';
+          const selectorRaw = selectorEl ? selectorEl.value.trim() : '';
+          const selector = normalizeSelector(selectorRaw);
+
+          setRegisterError('');
+
+          if (!isValidAddress(target)) {
+            setRegisterError('Invalid target address. Expected 0x + 40 hex chars.');
+            return;
+          }
+          if (!isValidSelector(selector)) {
+            setRegisterError('Invalid selector. Expected 0x + 8 hex chars.');
+            return;
+          }
+
+          if (submitBtn) submitBtn.disabled = true;
+          if (cancelBtn) cancelBtn.disabled = true;
+          if (submitBtn) submitBtn.textContent = 'Registering...';
+          try {
+            const res = await fetch('/.netlify/functions/upkeeper-register-task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ target, selector }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              setRegisterError(data.message || data.error || 'Failed to register task');
+              return;
+            }
+            closeRegisterModal();
+            await loadTasks(currentPage);
+          } catch (e) {
+            setRegisterError(e instanceof Error ? e.message : 'Network error');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
+            if (submitBtn) submitBtn.textContent = 'Register';
+          }
         }
     </script>
 </body>
