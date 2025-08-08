@@ -9,6 +9,8 @@ import {
 } from "@hashgraph/sdk";
 import { Handler } from '@netlify/functions'
 import { AbiCoder } from "ethers";
+import { config } from "dotenv";
+config();
 
 // Netlify Function handler
 export const handler: Handler = async (event, context) => {
@@ -97,7 +99,12 @@ async function executeKeeperTransactions() {
   const operatorKey = PrivateKey.fromStringECDSA(privateKey);
   const operatorId = AccountId.fromString(accountId);
   const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
-  const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
+  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
+
+  console.log('operatorId', operatorId.toString());
+  console.log('contractId', contractId.toString());
+  console.log('operatorKey', operatorKey.publicKey.toString());
+  console.log('client', client.toString());
 
   const taskIds = await getTaskList();
 
@@ -107,8 +114,6 @@ async function executeKeeperTransactions() {
   try {    
     for (const taskId of taskIds) {
 
-      console.log('taskId', taskId);
-      console.log('taskIdb', Buffer.from(taskId, 'hex'));
       const contractTx = new ContractExecuteTransaction()
       .setContractId(contractId)
       .setFunction("executeTask", 
@@ -153,8 +158,13 @@ async function getTaskList(): Promise<string[]> {
 
   const operatorKey = PrivateKey.fromStringECDSA(privateKey);
   const operatorId = AccountId.fromString(accountId);
-  const client = Client.forPreviewnet().setOperator(operatorId, operatorKey);
+  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
   const contractId = ContractId.fromEvmAddress(0, 0, contractAddress);
+  
+  console.log('operatorId', operatorId.toString());
+  console.log('contractId', contractId.toString());
+  console.log('operatorKey', operatorKey.publicKey.toString());
+  console.log('client', client.toString());
 
   const query = new ContractCallQuery()
     .setContractId(contractId)
