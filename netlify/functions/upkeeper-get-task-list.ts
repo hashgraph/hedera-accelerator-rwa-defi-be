@@ -1,7 +1,7 @@
 import { ContractCallQuery } from "@hashgraph/sdk";
 import { Handler } from "@netlify/functions";
 import { AbiCoder } from "ethers";
-import { getClient } from "./upkeeper-execute-tasks";
+import { getClient } from "./helper";
 
 export const handler: Handler = async (event) => {
   const headers = {

@@ -1,7 +1,7 @@
 import { ContractExecuteTransaction } from "@hashgraph/sdk";
 import { Handler } from "@netlify/functions";
 import { Interface } from "ethers";
-import { getClient } from "./upkeeper-execute-tasks";
+import { getClient } from "./helper";
 
 const iface = new Interface([
   "function registerTask(address target, bytes4 selector)",
