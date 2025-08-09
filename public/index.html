@@ -100,10 +100,11 @@
 <body>
     <div class="container">
         <h1>RWA Keeper</h1>
-        <p>This function executes as queries keeper transaction</p>
+        <p>List of keeper transaction</p>
         
         <div class="button-group">
-            <button id="executeButton" onclick="executeKeeper()">Execute Keeper</button>
+            <button id="executeButton" onclick="executeKeeper()">Execute Tasks</button>
+            <button id="registerTaskButton" onclick="openRegisterModal()">Register Task</button>
         </div>
         
         <div id="result"></div>
@@ -115,7 +116,6 @@
               <button id="refreshButton" onclick="refreshTasks()">Refresh</button>
               <button id="prevButton" onclick="prevPage()">Prev</button>
               <button id="nextButton" onclick="nextPage()">Next</button>
-              <button id="registerTaskButton" onclick="openRegisterModal()">Register Task</button>
             </div>
           </div>
           <div id="paginationInfo" class="info" style="padding: 8px; margin: 10px 0;"></div>
@@ -129,6 +129,7 @@
                   <th style="text-align:left; padding: 8px;">Executions</th>
                   <th style="text-align:left; padding: 8px;">Exists</th>
                   <th style="text-align:left; padding: 8px;">Executing</th>
+                  <th style="text-align:left; padding: 8px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="tasksTbody"></tbody>
@@ -211,7 +212,7 @@
           tbody.innerHTML = ids.map((id) => `
             <tr>
               <td><code>${shortHex(id)}</code></td>
-              <td colspan="5">Loading…</td>
+              <td colspan="6">Loading…</td>
             </tr>
           `).join('');
         }
@@ -219,7 +220,7 @@
         function renderTasks(tasks) {
           const tbody = document.getElementById('tasksTbody');
           if (!tasks.length) {
-            tbody.innerHTML = `<tr><td colspan="6">No tasks</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7">No tasks</td></tr>`;
             return;
           }
           tbody.innerHTML = tasks.map((t) => `
@@ -230,6 +231,7 @@
               <td>${t.executions}</td>
               <td>${t.exists ? 'true' : 'false'}</td>
               <td>${t.executing ? 'true' : 'false'}</td>
+              <td><button onclick="submitRemoveTask('${t.target}','${t.selector}', this)">Remove Task</button></td>
             </tr>
           `).join('');
         }
@@ -369,6 +371,43 @@
             if (submitBtn) submitBtn.disabled = false;
             if (cancelBtn) cancelBtn.disabled = false;
             if (submitBtn) submitBtn.textContent = 'Register';
+          }
+        }
+
+        async function submitRemoveTask(target, selector, btn) {
+          const resultDiv = document.getElementById('result');
+          const normSelector = normalizeSelector(selector);
+
+          if (!isValidAddress(target)) {
+            renderError('Invalid target address');
+            return;
+          }
+          if (!isValidSelector(normSelector)) {
+            renderError('Invalid selector. Expected 0x + 8 hex chars.');
+            return;
+          }
+
+          if (btn) { btn.disabled = true; btn.textContent = 'Removing...'; }
+          try {
+            const res = await fetch('/.netlify/functions/upkeeper-remove-task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ target, selector: normSelector }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+              resultDiv.className = 'result error';
+              resultDiv.textContent = data.message || data.error || 'Failed to remove task';
+              return;
+            }
+            resultDiv.className = 'result success';
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+            await loadTasks(currentPage);
+          } catch (e) {
+            resultDiv.className = 'result error';
+            resultDiv.textContent = e instanceof Error ? e.message : 'Network error';
+          } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Remove Task'; }
           }
         }
     </script>

@@ -2,7 +2,7 @@ name: UpKeeper Cron Job
 
 on:
   schedule:
-    - cron: '1/10 * * * *' # every 10 minutes
+    - cron: '0 0 * * *' # every night at midnight
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
