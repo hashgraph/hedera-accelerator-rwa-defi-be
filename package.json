@@ -7,9 +7,7 @@
     "compile": "yarn hardhat compile",
     "test": "yarn hardhat test --network hardhat",
     "deploy": "yarn hardhat run scripts/deploy.ts",
-    "deploy-suite": "yarn hardhat run scripts/deploy-suite.ts",
-    "build": "echo 'Build completed'",
-    "dev": "netlify dev"
+    "deploy-suite": "yarn hardhat run scripts/deploy-suite.ts"
   },
   "keywords": [
     "defi",
