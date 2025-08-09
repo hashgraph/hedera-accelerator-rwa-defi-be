@@ -173,34 +173,11 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             )
         );
 
+        // mint NFT representing the building with the tokenURI metadata
         uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);        
 
-        // special addresses that interact with the token
-        // they act as a normal user inside the registry so we deploy and register identities for them
-        address[] memory specialWallets = new address[](5);
-        specialWallets[0] = (initialOwner);
-        specialWallets[1] = ($.uniswapRouter);
-        specialWallets[2] = (vault);
-        specialWallets[3] = (autoCompounder);
-        specialWallets[4] = (UniswapV2Library.pairFor($.uniswapFactory, erc3643Token, $.usdc));
-
-        registeridentityForWallets(building, erc3643Token, specialWallets);
-
-        ITreasury(treasury).grantGovernanceRole(governance);
-        ITreasury(treasury).addVault(vault); 
-        IAccessControl(vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), treasury);// grant reward controller role to treasury
-        IAccessControl(auditRegistry).grantRole(keccak256("GOVERNANCE_ROLE"), governance); // default admin role
-        IAccessControl(auditRegistry).grantRole(0x00, initialOwner); // default admin role to building owner
-        IERC20(erc3643Token).mint(initialOwner, details.tokenMintAmount);
-        IOwnable(vault).transferOwnership(initialOwner);
-        IOwnable(autoCompounder).transferOwnership(initialOwner);
-
-        // Register autocompounder- claiming rewards function in the UpKeeper.
-        // This allows the upkeeper contract to register the claim function to be
-        // executed autmatically by an off-chain keeper service
-        IUpKeeper($.upkeeper).registerTask(autoCompounder, IAutoCompounder(autoCompounder).claim.selector); 
-
-        buildingDetails = BuildingDetails(
+        // store building details
+        buildingDetails = BuildingDetails(  
             building,
             nftId,
             details.tokenURI,
@@ -209,13 +186,67 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             treasury, 
             governance,
             vault,
-            autoCompounder
+            autoCompounder,
+            initialOwner,
+            details.tokenMintAmount,
+            false // isConfigured defaults to false
         );
 
         $.buildingDetails[building] = buildingDetails;
         $.buildingsList.push(buildingDetails);
 
         emit NewBuilding(building, erc3643Token, treasury, vault, governance, initialOwner, autoCompounder);
+    }
+
+    /**
+     * configNewBuilding configures a new building
+     * @param buildingAddress address of the building contract
+     */
+    function configNewBuilding(address buildingAddress) public {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();        
+        BuildingDetails storage building = $.buildingDetails[buildingAddress];
+
+        require(building.addr != address(0), "Building not found");
+        require(!building.isConfigured, "Building already configured");
+        require(building.initialOwner == msg.sender, "Only the owner can configure the building");
+
+        // special addresses that interact with the token
+        // they act as a normal user inside the registry so we deploy and register identities for them
+        address[] memory specialWallets = new address[](5);
+        specialWallets[0] = (building.initialOwner);
+        specialWallets[1] = ($.uniswapRouter);
+        specialWallets[2] = (building.vault);
+        specialWallets[3] = (building.autoCompounder);
+        specialWallets[4] = (UniswapV2Library.pairFor($.uniswapFactory, building.erc3643Token, $.usdc));
+
+        registeridentityForWallets(buildingAddress, building.erc3643Token, specialWallets);
+
+        // mint TRex tokens to the initial owner
+        IERC20(building.erc3643Token).mint(building.initialOwner, building.tokenMintAmount);
+
+        // grant governance role to the governance contract and add vault to the treasury
+        ITreasury(building.treasury).grantGovernanceRole(building.governance);
+        ITreasury(building.treasury).addVault(building.vault); 
+        
+        // grant reward controller role to treasury
+        IAccessControl(building.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), building.treasury);
+
+        // grant governance role to the governance contract and default admin role to the initial owner
+        IAccessControl(building.auditRegistry).grantRole(keccak256("GOVERNANCE_ROLE"), building.governance); // default admin role
+        IAccessControl(building.auditRegistry).grantRole(0x00, building.initialOwner); // default admin role to building owner
+
+        // transfer ownership of the vault and autoCompounder to the initial owner
+        IOwnable(building.vault).transferOwnership(building.initialOwner);
+        IOwnable(building.autoCompounder).transferOwnership(building.initialOwner);
+
+        // Register autocompounder- claiming rewards function in the UpKeeper.
+        // This allows the upkeeper contract to register the claim function to be
+        // executed autmatically by an off-chain keeper service
+        IUpKeeper($.upkeeper).registerTask(building.autoCompounder, IAutoCompounder(building.autoCompounder).claim.selector); 
+
+        building.isConfigured = true;
+
+        emit BuildingConfigured(buildingAddress);
     }
 
     /**

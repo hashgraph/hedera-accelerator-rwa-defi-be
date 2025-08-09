@@ -3,7 +3,7 @@ import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
 import * as ERC721MetadataABI from '../../data/abis/ERC721Metadata.json';
 import { BuildingFactory, BuildingGovernance, FeeConfiguration, IAutoCompounderFactory, IVaultFactory } from '../../typechain-types';
-import { BuildingFactoryInitStruct, BuildingFactoryInitStructOutput } from '../../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory';
+import { BuildingFactoryInitStruct } from '../../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory';
 
 async function deployFixture() {
   const [owner, notOwner, voter1, voter2, voter3] = await ethers.getSigners();
@@ -275,8 +275,11 @@ describe('BuildingFactory', () => {
 
       const tx = await buildingFactory.newBuilding(buildingDetails);
       await tx.wait();
-      
+
       const [buildingAddress] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+      
+      const configTx = await buildingFactory.configNewBuilding(buildingAddress);
+      await configTx.wait();
       
       const building = await ethers.getContractAt('Building', buildingAddress);
       
@@ -343,6 +346,85 @@ describe('BuildingFactory', () => {
       await expect(await buildingFactory.connect(voter2).newBuilding(newDetails('token3'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
       await expect(await buildingFactory.connect(voter3).newBuilding(newDetails('token4'))).to.emit(buildingFactory, 'NewBuilding(address,address,address,address,address,address,address)');
     })
+  });
+
+  describe('.configNewBuilding()', () => {
+    it ('should revert if building is not found', async () => {
+      const { buildingFactory } = await loadFixture(deployFixture);
+
+      const tx = buildingFactory.configNewBuilding(ethers.ZeroAddress);
+
+      await expect(tx).to.be.revertedWith('Building not found');
+    });
+
+    it('should revert if building is already configured', async () => {
+      const { buildingFactory, owner, usdcAddress } = await loadFixture(deployFixture);
+
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('1000'),
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseEther('1000'),
+        governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
+      }
+
+      const tx = await buildingFactory.newBuilding(buildingDetails);
+      await tx.wait();
+
+      const [buildingAddress] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+
+      const configTx = await buildingFactory.connect(owner).configNewBuilding(buildingAddress);
+      await configTx.wait();
+
+      const configTx2 = buildingFactory.connect(owner).configNewBuilding(buildingAddress);
+
+      await expect(configTx2).to.be.revertedWith('Building already configured');
+    });
+
+    it('should revert if sender is not the owner', async () => {
+      const { buildingFactory, owner, notOwner, usdcAddress } = await loadFixture(deployFixture);
+
+      const buildingDetails = {
+        tokenURI: 'ipfs://bafkreifuy6zkjpyqu5ygirxhejoryt6i4orzjynn6fawbzsuzofpdgqscq', 
+        tokenName: 'MyToken', 
+        tokenSymbol: 'MYT', 
+        tokenDecimals: 18n,
+        tokenMintAmount: ethers.parseEther('1000'),
+        treasuryNPercent: 2000n, 
+        treasuryReserveAmount: ethers.parseEther('1000'),
+        governanceName : 'MyGovernance',
+        vaultShareTokenName: 'Vault Token Name',
+        vaultShareTokenSymbol: 'VTS',
+        vaultFeeReceiver: owner,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 2000,
+        vaultCliff: 0n,
+        vaultUnlockDuration: 0n,
+        aTokenName: "AutoCompounder Token Name",
+        aTokenSymbol: "ACTS"
+      }
+
+      const tx = await buildingFactory.newBuilding(buildingDetails);
+      await tx.wait();
+
+      const [buildingAddress] = await getDeployedBuilding(buildingFactory, tx.blockNumber as number);
+
+      const configTx = buildingFactory.connect(notOwner).configNewBuilding(buildingAddress);
+
+      await expect(configTx).to.be.revertedWith('Only the owner can configure the building');
+    });
   });
 
   describe('.callContract()', () => {
@@ -533,6 +615,9 @@ describe('BuildingFactory', () => {
           governanceAddress
         ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
 
+        const configTx = await buildingFactory.configNewBuilding(buildingAddress);
+        await configTx.wait();
+
         // create building token
         const token = await ethers.getContractAt('TokenVotes', tokenAddress);
         const treasury = await ethers.getContractAt('Treasury', treasuryAddress);
@@ -635,6 +720,9 @@ describe('BuildingFactory', () => {
         tokenAddress,
       ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
 
+      const configTx = await buildingFactory.configNewBuilding(buildingAddress);
+      await configTx.wait();
+
       // create building token
       const token = await ethers.getContractAt('TokenVotes', tokenAddress);
 
@@ -713,6 +801,9 @@ describe('BuildingFactory', () => {
         buildingAddress, 
         tokenAddress,
       ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+
+      const configTx = await buildingFactory.configNewBuilding(buildingAddress);
+      await configTx.wait();
 
       // create building token
       const building = await ethers.getContractAt('Building', buildingAddress);
@@ -795,6 +886,9 @@ describe('BuildingFactory', () => {
         buildingAddress, 
         tokenAddress,
       ] = await getDeployedBuilding(buildingFactory, buildingTx.blockNumber as number);
+
+      const configTx = await buildingFactory.configNewBuilding(buildingAddress);
+      await configTx.wait();
 
       // get building token
       const token = await ethers.getContractAt('TokenVotes', tokenAddress);
