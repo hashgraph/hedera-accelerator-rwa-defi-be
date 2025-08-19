@@ -428,7 +428,7 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
             if (perShareClaimedAmount > perShareAmount) perShareClaimedAmount = perShareAmount;
 
             uint256 perShareUnclaimedAmount = perShareAmount - perShareClaimedAmount;
-            uint256 currentUnclaimed = (perShareUnclaimedAmount * userStakingTokenTotal) / 1e18;
+            uint256 currentUnclaimed = perShareUnclaimedAmount.mulDivDown(userStakingTokenTotal, 1e18);
 
             // Add pending snapshot reward (from past withdrawals)
             unclaimedAmount = currentUnclaimed + rewardSnapshot;
@@ -441,6 +441,12 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
         if (feeConfig.feePercentage > 0) {
             uint256 currentFee = _calculateFee(unclaimedAmount, feeConfig.feePercentage);
             unclaimedAmount -= currentFee;
+        }
+
+        // Cap the reward at the actual vault balance
+        uint256 vaultBalance = IERC20(_rewardToken).balanceOf(address(this));
+        if (unclaimedAmount > vaultBalance) {
+            unclaimedAmount = vaultBalance;
         }
     }
 

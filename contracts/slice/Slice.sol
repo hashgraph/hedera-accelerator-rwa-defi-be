@@ -2,6 +2,9 @@
 pragma solidity 0.8.24;
 
 import {IUniswapV2Router02} from "../uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "../uniswap/v2-core/interfaces/IUniswapV2Factory.sol";
+import {UniswapV2Library} from "../uniswap/v2-periphery/libraries/UniswapV2Library.sol";
+
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
@@ -325,39 +328,31 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      */
     function _handleWithdraw(
         address aToken,
-        uint256 amountToWithdraw,
+        uint256 amountToWithdraw,  // aToken amount
         uint256 exchangeRate
     ) public returns (uint256 withdrawnAmount) {
         address vault = IAutoCompounder(aToken).vault();
         uint256 maxWithdrawAmount = IERC4626(vault).maxWithdraw(aToken);
 
-        uint256 neededUnderlying = amountToWithdraw.mulDivDown(PRECISION, exchangeRate); // Convert aToken to underlying for checks
+        uint256 neededUnderlying = amountToWithdraw.mulDivDown(exchangeRate, PRECISION); // Convert aToken to underlying
 
-        if (maxWithdrawAmount == 0) return 0; // Return 0 if tokens are locked
+        if (maxWithdrawAmount == 0) return 0;
 
         if (ERC165Checker.supportsInterface(vault, type(IERC7540).interfaceId)) {
-            IERC7540(vault).requestRedeem(neededUnderlying, aToken, aToken); // Request full needed amount to meet ideal balance in next iteration
-
-            if (maxWithdrawAmount < neededUnderlying) {
-                return
-                    IAutoCompounder(aToken).withdraw(
-                        maxWithdrawAmount.mulDivDown(exchangeRate, PRECISION),
-                        address(this)
-                    ); // Withdraw max possible amount
-            } else {
-                return IAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
-            }
-        } else {
-            if (maxWithdrawAmount < neededUnderlying) {
-                return
-                    IAutoCompounder(aToken).withdraw(
-                        maxWithdrawAmount.mulDivDown(exchangeRate, PRECISION),
-                        address(this)
-                    ); // Withdraw max possible amount
-            } else {
-                return IAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
-            }
+            IERC7540(vault).requestRedeem(neededUnderlying, aToken, aToken);
         }
+
+        // Determine how much underlying we can actually withdraw
+        uint256 actualUnderlyingToWithdraw = maxWithdrawAmount < neededUnderlying ? maxWithdrawAmount : neededUnderlying;
+        
+        // Convert back to aToken amount for the actual withdrawal
+        uint256 actualATokenToWithdraw = actualUnderlyingToWithdraw.mulDivDown(PRECISION, exchangeRate);
+
+        IAutoCompounder(aToken).withdraw(actualATokenToWithdraw, address(this));
+        _balances[aToken] -= actualATokenToWithdraw;
+        
+        // Return the actual underlying amount withdrawn
+        return actualUnderlyingToWithdraw;
     }
 
     /**
@@ -437,6 +432,19 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     }
 
     /**
+     * @dev Calculates the remaining amount needed after using withdrawn rewards.
+     *
+     * @param neededUnderlying The needed underlying amount.
+     * @param withdrawnUnderlyingAmount The withdrawn underlying amount.
+     * @return The remaining amount needed.
+     */
+    function remainingAmount(uint256 neededUnderlying, uint256 withdrawnUnderlyingAmount) internal pure returns (uint256) {
+        return neededUnderlying > withdrawnUnderlyingAmount 
+            ? neededUnderlying - withdrawnUnderlyingAmount 
+            : 0;
+    }
+
+    /**
      * @dev Makes set of swaps to reach target balances of aTokens from generated payloads.
      */
     function rebalance() external {
@@ -472,9 +480,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             neededUnderlying = difference.mulDivDown(PRECISION, currentExchangeRate);
 
             if (availableReward > 0) {
-                difference > balance
-                    ? withdrawnUnderlyingAmount = _handleWithdraw(aToken, balance, currentExchangeRate)
-                    : withdrawnUnderlyingAmount = _handleWithdraw(aToken, difference, currentExchangeRate);
+                uint256 withdrawAmount = availableReward < difference ? availableReward : difference;
+                withdrawnUnderlyingAmount = _handleWithdraw(aToken, withdrawAmount, currentExchangeRate);
             }
 
             if (withdrawnUnderlyingAmount == 0) continue; // Skip the interation due to locked tokens
@@ -483,7 +490,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             _tradeForToken(asset, baseToken(), withdrawnUnderlyingAmount);
 
             neededUsdcToSwapForUnderlying = _getQuoteAmount(
-                neededUnderlying + withdrawnUnderlyingAmount,
+                remainingAmount(neededUnderlying, withdrawnUnderlyingAmount), // Both in underlying units
                 baseToken(),
                 asset
             );
@@ -542,7 +549,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         underlyingValue = balance.mulDivDown(aTokenToUnderlyingRate, PRECISION);
 
         // Get underlying value in USD
-        currentValue = (underlyingValue * underlyingPrice) / (10 ** IERC20Metadata(aToken).decimals());
+        currentValue = underlyingValue.mulDivDown(underlyingPrice, 10 ** IERC20Metadata(aToken).decimals());
     }
 
     /**
@@ -552,20 +559,54 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param targetToken The address of token to receive.
      * @param amountIn The input amount.
      */
-    function _tradeForToken(address token, address targetToken, uint256 amountIn) internal {
+    function _tradeForToken(address token, address targetToken, uint256 amountIn) internal returns (uint256 actualAmountIn) {
+        if (amountIn == 0) return 0; // Skip if no amount to swap
+        
         address[] memory path = new address[](2);
         path[0] = token;
         path[1] = targetToken;
 
+        // Get reserves to validate the swap is possible
+        (uint256 reserveIn, uint256 reserveOut) = UniswapV2Library.getReserves(
+            _uniswapRouter.factory(),
+            token,
+            targetToken
+        );
+
+        // Check if we have sufficient liquidity
+        if (reserveIn == 0 || reserveOut == 0) {
+            return 0; // Return 0 if no liquidity available
+        }
+
+        // Calculate expected output amount
+        uint256 expectedOutput = UniswapV2Library.getAmountOut(amountIn, reserveIn, reserveOut);
+        
+        // Check if the expected output is reasonable
+        if (expectedOutput == 0) {
+            return 0; // Return 0 if swap would result in no output
+        }
+
+        // Adjust amount if it would exceed available reserves (with buffer)
+        uint256 maxOutput = (reserveOut * 99) / 100; // 99% of available reserves
+        if (expectedOutput > maxOutput) {
+            // Recalculate input amount for maximum possible output
+            amountIn = UniswapV2Library.getAmountIn(maxOutput, reserveIn, reserveOut);
+            expectedOutput = maxOutput;
+        }
+
         IERC20(path[0]).approve(uniswapV2Router(), amountIn);
 
-        _uniswapRouter.swapExactTokensForTokens(
+        try _uniswapRouter.swapExactTokensForTokens(
             amountIn,
-            0, // Minimum output (slippage tolerance could be added here)
+            expectedOutput,
             path,
             address(this),
             block.timestamp
-        );
+        ) {
+            return amountIn; // Return the actual amount swapped
+        } catch {
+            return 0; // Return 0 if swap fails
+        }
     }
 
     /**
@@ -576,12 +617,35 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param tokenOut The output token address.
      */
     function _getQuoteAmount(uint256 amountOut, address tokenIn, address tokenOut) internal view returns (uint256) {
+        if (amountOut == 0) return 0;
+    
         address[] memory path = new address[](2);
         path[0] = tokenIn;
         path[1] = tokenOut;
 
-        uint256[] memory amountsIn = _uniswapRouter.getAmountsIn(amountOut, path);
-        return amountsIn[0];
+        // Get the reserves for the pair
+        (uint256 reserveIn, uint256 reserveOut) = UniswapV2Library.getReserves(
+            _uniswapRouter.factory(),
+            tokenIn,
+            tokenOut
+        );
+
+        // Check if we have sufficient liquidity
+        if (reserveIn == 0 || reserveOut == 0) {
+            return 0; // No liquidity available
+        }
+        
+        // If requested amount exceeds available reserves, adjust to maximum available
+        // uint256 maxAvailable = reserveOut;
+        if (amountOut > reserveOut) {
+            amountOut = reserveOut;
+        }
+
+        try _uniswapRouter.getAmountsIn(amountOut, path) returns (uint256[] memory amountsIn) {
+            return amountsIn[0];
+        } catch {
+            return 0; // Return 0 if calculation fails
+        }
     }
 
     /*///////////////////////////////////////////////////////////////

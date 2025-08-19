@@ -15,14 +15,14 @@ import {VaultToken} from "../../contracts/erc4626/VaultToken.sol";
 
 import {FeeConfiguration} from "../../contracts/common/FeeConfiguration.sol";
 
-import {IUniswapV2Router02} from "../../contracts/uniswap/interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Router02} from "../../contracts/uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
 
 contract SliceTest is Test {
     string internal constant metadataURI = "ipfs://bafybeibnsoufr2renqzsh347nrx54wcubt5lgkeivez63xvivplfwhtpym/m";
 
     address internal owner = 0xf5d7D351A5511a13de1f73d4882f88032A490a27;
 
-    address internal uniswapRouter = 0x815Bf1AD6d2B1c0E393C033227df0a88C48f83Be;
+    address internal uniswapRouter = 0x3322f84A829Ed1D675DDa0df97f041A6463a921D;
     address internal priceFeed = 0x269501f5674BeE3E8fef90669d3faa17021344d0;
 
     uint32 unlockDuration1 = 300;
@@ -47,12 +47,12 @@ contract SliceTest is Test {
         vm.selectFork(forkId);
 
         vm.prank(owner);
-        underlying1 = new VaultToken();
+        underlying1 = new VaultToken(18);
         vm.prank(owner);
-        underlying2 = new VaultToken();
+        underlying2 = new VaultToken(18);
 
         vm.prank(owner);
-        rewardToken = new VaultToken();
+        rewardToken = new VaultToken(6);
 
         FeeConfiguration.FeeConfig memory zeroFeeConfig = FeeConfiguration.FeeConfig({
             receiver: address(0),

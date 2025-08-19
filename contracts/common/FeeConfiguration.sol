@@ -5,6 +5,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {FixedPointMathLib} from "../math/FixedPointMathLib.sol";
 
 /**
  * @title Fee Configuration
@@ -13,6 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  */
 abstract contract FeeConfiguration is AccessControl {
     using SafeERC20 for IERC20;
+    using FixedPointMathLib for uint256;
     /**
      * @notice FeeConfigUpdated event.
      * @dev Emitted when admin changes fee configuration.
@@ -102,7 +104,8 @@ abstract contract FeeConfiguration is AccessControl {
      * @param _feePercentage The fee percentage.
      */
     function _calculateFee(uint256 _amount, uint256 _feePercentage) internal pure returns (uint256) {
-        require(_amount * _feePercentage >= BASIS_POINTS, "FC: Too small amount to consider fee");
-        return (_amount * _feePercentage) / BASIS_POINTS;
+        if (_feePercentage == 0) return 0;
+        require(_amount >= BASIS_POINTS / _feePercentage, "FC: Too small amount to consider fee");
+        return _amount.mulDivDown(_feePercentage, BASIS_POINTS);
     }
 }
