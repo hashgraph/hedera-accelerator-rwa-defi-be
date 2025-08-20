@@ -100,3 +100,5 @@ out/
 .idea
 
 /contractAddresses.json
+# Local Netlify folder
+.netlify

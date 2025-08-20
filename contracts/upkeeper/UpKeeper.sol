@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IUpKeeper} from "./interface/IUpKeeper.sol";
 
 /**
  * @title UpKeeper
@@ -11,44 +12,26 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  * and rescheduling functionality. It provides a mechanism to track executions and manage
  * the rescheduling state of tasks.
  */
-contract UpKeeper is AccessControl, ReentrancyGuard {
-    // Define Upkeeper role
+contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
+    // Define roles
+    bytes32 public constant TRUSTED_REGISTRY_ROLE = keccak256("TRUSTED_REGISTRY_ROLE");
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
-
-    struct KeeperTask {
-        address keeper;
-        uint256 executions;
-        bool exists;
-        bool executing;
-        address target;
-        bytes4 selector;
-    }
     
-    mapping (bytes32 => KeeperTask) private tasks;
+    // define storage
+    mapping (bytes32 => Task) private tasks;
     mapping (address => bytes32[]) private keeperTasks;
-
-    error TaskAlreadyExists();
-    error TaskNofFound();
-    error TaskExecutionFailed(bytes response);
-    error TaskExecutionReturnedFalse();
-    error TooManyTasksForKeeper();
-    error Degub(address target, bytes4 selector, bytes data, bool success, bytes response);
-    error TaskReentrancyDetected();
-    error NotTeskKeeper(address notKeeper);
-
-    event TaskExecuted(address indexed keeper, address indexed target, bytes4 selector, uint256 executions);
-    event TaskRegistered(address indexed keeper, address indexed target, bytes4 selector);
-    event TaskRemoved(address indexed keeper, address indexed target, bytes4 selector);
-
+    bytes32[] private taskList;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(TRUSTED_REGISTRY_ROLE, msg.sender);
+        _grantRole(KEEPER_ROLE, msg.sender);
     }
 
     // This modifier ensures that any attempt to recursively execute the same task within the same transaction is immediately reverted, 
     // fully protecting against classic and advanced single-task reentrancy exploits.
     modifier nonReentrantTask(bytes32 taskId) {
-        KeeperTask storage task = tasks[taskId];
+        Task storage task = tasks[taskId];
 
         if (task.executing) {
             revert TaskReentrancyDetected();
@@ -60,11 +43,10 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @param keeper address of the keeper that will execute the task
      * @dev This function returns the list of tasks assigned to a specific keeper.
      */
-    function getTaskList(address keeper) external view returns (bytes32[] memory) {
-        return keeperTasks[keeper];
+    function getTaskList() external view returns (bytes32[] memory) {
+        return taskList;
     }
 
     /**
@@ -72,30 +54,23 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
      * @param taskId the unique identifier of the task
      * @dev This function returns the information of a specific task based on taskId.
      */
-    function getTaskInfo(bytes32 taskId) external view returns (KeeperTask memory) {
+    function getTaskInfo(bytes32 taskId) external view returns (Task memory) {
         return tasks[taskId];
     }
 
     /**
-     * @param keeper address of the keeper that will execute the task
      * @param target the target contract that will be called
      * @param selector the function selector of the target contract
      * @dev This function allows the admin to register a task for a keeper.
      */
-    function registerTask(address keeper, address target, bytes4 selector) external onlyRole(DEFAULT_ADMIN_ROLE) {
-         // limit the number of tasks per keeper
-        if (keeperTasks[keeper].length >= 100) {
-            revert TooManyTasksForKeeper();
-        }
-
-        bytes32 taskId = keccak256(abi.encodePacked(keeper, target, selector));
+    function registerTask(address target, bytes4 selector) external onlyRole(TRUSTED_REGISTRY_ROLE) {
+        bytes32 taskId = keccak256(abi.encodePacked(target, selector));
 
         if (tasks[taskId].exists) {
             revert TaskAlreadyExists();
         }
 
-        tasks[taskId] = KeeperTask({
-            keeper: keeper,
+        tasks[taskId] = Task({
             target: target,
             selector: selector,
             executions: 0,
@@ -103,28 +78,25 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
             exists: true
         });
 
-        keeperTasks[keeper].push(taskId);
+        taskList.push(taskId);
 
-        emit TaskRegistered(keeper, target, selector);
+        emit TaskRegistered(target, selector);
     }
 
     /**
-     * @param keeper address of the keeper that will execute the task
      * @param target the target contract that will be called
      * @param selector the function selector of the target contract
      * @dev This function allows the admin to remove a task for a keeper.
      */
-    function removeTask(address keeper, address target, bytes4 selector) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 taskId = keccak256(abi.encodePacked(keeper, target, selector));
+    function removeTask(address target, bytes4 selector) external onlyRole(TRUSTED_REGISTRY_ROLE) {
+        bytes32 taskId = keccak256(abi.encodePacked(target, selector));
 
         if (!tasks[taskId].exists) {
-            revert TaskNofFound();
+            revert TaskNotFound();
         }
 
         delete tasks[taskId];
 
-        // Remove task from keeper's task list
-        bytes32[] storage taskList = keeperTasks[keeper];
         for (uint256 i = 0; i < taskList.length; i++) {
             if (taskList[i] == taskId) {
                 taskList[i] = taskList[taskList.length - 1]; // Move last element to the current position
@@ -133,7 +105,7 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
             }
         }
 
-        emit TaskRemoved(keeper, target, selector);
+        emit TaskRemoved(target, selector);
     }
 
     /**
@@ -146,22 +118,18 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
     }
 
     /**
-     * 
-     * @param keeper address of the keeper that will execute the tasks
      * @dev This function allows a keeper to execute all tasks assigned to them.
      * It iterates through the tasks assigned to the keeper and executes them.
-     * If no tasks are found, it reverts with a TaskNofFound error.
+     * If no tasks are found, it reverts with a TaskNotFound error.
      */
-    function executeKeeperTasks(address keeper) external nonReentrant onlyRole(KEEPER_ROLE) {
-        bytes32[] storage taskList = keeperTasks[keeper];
-
+    function executeTasks() external nonReentrant onlyRole(KEEPER_ROLE) {
         if (taskList.length == 0) {
-            revert TaskNofFound();
+            revert TaskNotFound();
         }
 
         for (uint256 i = 0; i < taskList.length; i++) {
             bytes32 taskId = taskList[i];
-            KeeperTask storage task = tasks[taskId];
+            Task storage task = tasks[taskId];
             if (task.exists) {
                 _executeTask(taskId, new bytes(0));
             }
@@ -169,23 +137,19 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
     }
 
     /**
-     * 
-     * @param keeper address of the keeper that will execute the tasks
      * @param data the data to be passed to the target contract
      * @dev This function allows a keeper to execute all tasks assigned to them with specific data
      * It iterates through the tasks assigned to the keeper and executes them with the provided data.
-     * If no tasks are found, it reverts with a TaskNofFound error.
+     * If no tasks are found, it reverts with a TaskNotFound error.
      */
-    function executeKeeperTasksWithArgs(address keeper, bytes[] calldata data) external nonReentrant onlyRole(KEEPER_ROLE) {
-        bytes32[] storage taskList = keeperTasks[keeper];
-
+    function executeTasksWithArgs(bytes[] calldata data) external nonReentrant onlyRole(KEEPER_ROLE) {
         if (taskList.length == 0) {
-            revert TaskNofFound();
+            revert TaskNotFound();
         }
 
         for (uint256 i = 0; i < taskList.length; i++) {
             bytes32 taskId = taskList[i];
-            KeeperTask storage task = tasks[taskId];
+            Task storage task = tasks[taskId];
             if (task.exists) {
                 _executeTask(taskId, data[i]);
             }
@@ -199,14 +163,10 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
      * It checks if the task exists, executes it, and emits an event with execution details.
      */
     function _executeTask(bytes32 taskId, bytes memory data) internal {
-        KeeperTask storage task = tasks[taskId];
+        Task storage task = tasks[taskId];
 
         if (!task.exists) {
-            revert TaskNofFound();
-        }
-        
-        if (task.keeper != msg.sender) {
-            revert NotTeskKeeper(msg.sender);
+            revert TaskNotFound();
         }
 
         (bool success, bytes memory response) = task.target.call(abi.encodeWithSelector(task.selector, data));        
@@ -223,6 +183,6 @@ contract UpKeeper is AccessControl, ReentrancyGuard {
         }                
 
         task.executions++;
-        emit TaskExecuted(task.keeper, task.target, task.selector, task.executions);
+        emit TaskExecuted(msg.sender, task.target, task.selector, task.executions);
     }
 }

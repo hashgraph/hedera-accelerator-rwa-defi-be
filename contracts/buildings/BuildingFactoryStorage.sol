@@ -13,6 +13,7 @@ abstract contract BuildingFactoryStorage {
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;
+        address upkeeper;
         address[] registryAgents;
         address[] tokenAgents;
         BuildingDetails[] buildingsList;
@@ -29,6 +30,9 @@ abstract contract BuildingFactoryStorage {
         address governance;
         address vault;
         address autoCompounder;
+        address initialOwner;
+        uint256 tokenMintAmount;
+        bool isConfigured;
     }
 
     struct NewBuildingDetails {
@@ -65,4 +69,5 @@ abstract contract BuildingFactoryStorage {
     event ComplianceModuleAdded(address building, address module);
     event RegistryAgentsAdded(address[] agents);
     event RegistryAgentRemoved(address agent);
+    event BuildingConfigured(address buildingAddress);
 }

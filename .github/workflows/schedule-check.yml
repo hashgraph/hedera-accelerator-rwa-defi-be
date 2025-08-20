@@ -1,0 +1,27 @@
+name: UpKeeper Cron Job
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # every night at midnight
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  upkeeper-cron-job:
+    runs-on: defi-dex-linux-medium
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
+      - name: Execute Kepper Function
+        run: |
+          curl -X POST ${{ secrets.NETLIFY_FUNCTION_URL }} \
+            -H "Content-Type: application/json" \
+            -w "\nHTTP Status: %{http_code}\n"
+        
+      - name: Log Result
+        if: always()
+        run: |
+          echo "Schedule check completed at $(date)"
+          echo "Check the Netlify function logs for detailed results" 

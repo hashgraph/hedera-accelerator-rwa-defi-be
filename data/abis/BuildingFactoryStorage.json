@@ -9,6 +9,19 @@
         {
           "indexed": false,
           "internalType": "address",
+          "name": "buildingAddress",
+          "type": "address"
+        }
+      ],
+      "name": "BuildingConfigured",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
           "name": "building",
           "type": "address"
         },
