@@ -2,6 +2,7 @@ import { LogDescription } from 'ethers';
 import { BuildingGovernance, Safe } from '../../typechain-types';
 import { expect, ethers, upgrades } from '../setup';
 import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
+import { network } from 'hardhat';
 
 // Import Safe contracts from the package
 import SafeProxyFactoryArtifact from '@safe-global/safe-contracts/build/artifacts/contracts/proxies/SafeProxyFactory.sol/SafeProxyFactory.json';
@@ -10,27 +11,15 @@ import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
 
 // Helper function to create multisig signatures for testing using approved hashes
 async function createMultisigSignatures(
-  safe: any,
+  safe: Safe,
   to: string,
   value: bigint,
   data: string,
   signers: any[]
 ) {
+
   // Get the current nonce from the Safe
   const currentNonce = await safe.nonce();
-  
-  const txHash = await safe.getTransactionHash(
-    to,
-    value,
-    data,
-    0, //operation,
-    0n, //safeTxGas,
-    0n, //baseGas,
-    0n, //gasPrice,
-    ethers.ZeroAddress, //gasToken,
-    ethers.ZeroAddress, //refundReceiver,
-    currentNonce
-  );
 
   // Get the owners of the Safe to ensure we're using valid signers
   const owners = await safe.getOwners();
@@ -41,24 +30,50 @@ async function createMultisigSignatures(
   // Sort signers by address to ensure consistent ordering (Safe requirement)
   const sortedSigners = [...signers].sort((a, b) => a.address.localeCompare(b.address));
   
-  for (const signer of sortedSigners) {
+  for (const signer of sortedSigners) {            
+
     // Verify that the signer is actually an owner of the Safe
     if (!owners.includes(signer.address)) {
       throw new Error(`Signer ${signer.address} is not an owner of the Safe`);
     }
-    
-    // Approve the hash using the Safe's approveHash function
-    await safe.connect(signer).approveHash(txHash);
-    
-    // Create a signature with v=1 to indicate it's an approved hash
-    // The Safe contract expects: {bytes32 r}{bytes32 s}{uint8 v}
-    // For approved hashes, v=1 and r contains the approver's address
-    const approverAddress = signer.address;
-    const r = approverAddress.slice(2).padStart(64, '0'); // Remove 0x and pad to 32 bytes
-    const s = '0'.repeat(64); // 32 bytes of zeros
-    const v = '01'; // v=1 for approved hash
-    
-    const signature = '0x' + r + s + v;
+
+    // Create EIP-712 typed data for Safe transaction
+    const domain = {
+      chainId: await network.provider.send('eth_chainId'),
+      verifyingContract: await safe.getAddress()
+    };
+
+    const types = {
+      SafeTx: [
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'data', type: 'bytes' },
+        { name: 'operation', type: 'uint8' },
+        { name: 'safeTxGas', type: 'uint256' },
+        { name: 'baseGas', type: 'uint256' },
+        { name: 'gasPrice', type: 'uint256' },
+        { name: 'gasToken', type: 'address' },
+        { name: 'refundReceiver', type: 'address' },
+        { name: 'nonce', type: 'uint256' }
+      ]
+    };
+
+    const message = {
+      to: to,
+      value: value.toString(),
+      data: data,
+      operation: 0,
+      safeTxGas: 0,
+      baseGas: 0,
+      gasPrice: 0,
+      gasToken: ethers.ZeroAddress,
+      refundReceiver: ethers.ZeroAddress,
+      nonce: currentNonce.toString()
+    };
+
+    // Sign the typed data
+    const signature = await signer.signTypedData(domain, types, message);
+  
     signatures.push(signature);
   }
 
