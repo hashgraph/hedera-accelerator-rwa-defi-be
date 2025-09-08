@@ -8,8 +8,8 @@ abstract contract BuildingFactoryStorage {
         address uniswapRouter;
         address uniswapFactory;
         address buildingBeacon;
-        address onchainIdGateway;
-        address trexGateway;
+        address identityFactory;
+        address trexFactory;
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;

@@ -35,18 +35,9 @@ async function deployFixture() {
   const identityImplementation = await ethers.deployContract('Identity', [owner.address, true], owner);
   const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], owner);
   const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
-  const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
-  const identityGatewayAddress = await identityGateway.getAddress();
 
-  // vault factory
-  const VaultFactory = await ethers.getContractFactory("VaultFactory");
-  const vaultFactory = await VaultFactory.deploy(identityGatewayAddress);
-  await vaultFactory.waitForDeployment();
-
-  // autocompounder factory
-  const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
-  const autoCompounderFactory = await AutoCompounderFactory.deploy(identityGatewayAddress);
-  await autoCompounderFactory.waitForDeployment();
+  const buildingIdentityFactory = await ethers.deployContract('BuildingIdentityFactory', [await identityFactory.getAddress()], owner);
+  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
 
   const upkeeper = await ethers.deployContract('UpKeeper');
   const upkeeperAddress = await upkeeper.getAddress();
@@ -117,30 +108,40 @@ async function deployFixture() {
   const trexlibraries = {
     "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
   }
-  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries: trexlibraries });
+  const TREXFactory = await ethers.getContractFactory('TREXFactoryAts', { libraries: trexlibraries });
   const trexFactory = await TREXFactory.deploy(
     await trexImplementationAuthority.getAddress(),
     await identityFactory.getAddress(),
   );
   
   await identityFactory.connect(owner).addTokenFactory(await trexFactory.getAddress());
-  const trexGateway = await ethers.deployContract('TREXGateway', [await trexFactory.getAddress(), true], owner);
-  await trexFactory.transferOwnership(await trexGateway.getAddress());
+  await trexFactory.transferOwnership(owner);
 
-  const trexGatewayAddress = await trexGateway.getAddress();
+  await identityFactory.transferOwnership(buildingIdentityFactoryAddress);
+
   const trexFactoryAddress = await trexFactory.getAddress();
 
-  // ------------------------------------------------------
 
-  // identityGateway must be the Owner of the IdFactory 
-  await identityFactory.transferOwnership(identityGatewayAddress);
+  // vault factory
+  const VaultFactory = await ethers.getContractFactory("VaultFactory");
+  const vaultFactory = await VaultFactory.deploy(buildingIdentityFactoryAddress);
+  await vaultFactory.waitForDeployment();
+  const vaultFactoryAddress = await vaultFactory.getAddress();
+
+  // autocompounder factory
+  const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
+  const autoCompounderFactory = await AutoCompounderFactory.deploy(buildingIdentityFactoryAddress);
+  await autoCompounderFactory.waitForDeployment();
+  const autoCompounderFactoryAddress = await autoCompounderFactory.getAddress();
+
+  // ------------------------------------------------------
 
   const buildingFactoryInit: BuildingFactoryInitStruct = {
     nft: nftCollectionAddress, 
     uniswapRouter: uniswapRouterAddress, 
     uniswapFactory: uniswapFactoryAddress,
-    onchainIdGateway: identityGatewayAddress,
-    trexGateway: trexGatewayAddress,
+    identityFactory: buildingIdentityFactoryAddress,
+    trexFactory: trexFactoryAddress,
     usdc: usdcAddress,
     buildingBeacon: buildingBeaconAddress,
     treasuryBeacon: treasuryBeaconAddress,
@@ -159,6 +160,10 @@ async function deployFixture() {
   const buildingFactoryAddress = await bf.getAddress()
   const buildingFactory = await ethers.getContractAt('BuildingFactory', buildingFactoryAddress);
 
+  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), buildingFactoryAddress);
+  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), vaultFactoryAddress);
+  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), autoCompounderFactoryAddress);
+
   // add identiriry registry agents when deploy new erc3643 tokens
   await buildingFactory.addRegistryAgents([
     await vaultFactory.getAddress(),
@@ -166,7 +171,6 @@ async function deployFixture() {
   ]);
 
   await nftCollection.transferOwnership(buildingFactoryAddress);
-  await trexGateway.addDeployer(buildingFactoryAddress);
 
   // grant TRUSTED_REGISTRY_ROLE to building factory
   await upkeeper.grantRole(await upkeeper.TRUSTED_REGISTRY_ROLE(), buildingFactoryAddress);
@@ -185,9 +189,7 @@ async function deployFixture() {
     uniswapRouterAddress,
     uniswapFactoryAddress,
     identityFactory,
-    identityGateway,
     trexFactoryAddress,
-    trexGatewayAddress,
     voter1,
     voter2,
     voter3,
@@ -583,7 +585,7 @@ describe('BuildingFactory', () => {
 
   describe('integration flows', () => {
     it('should create building suite (token, vault, treasury governance), create a payment proposal, execute payment proposal', async () => {
-        const { buildingFactory, usdc, usdcAddress, owner, voter1, voter2, voter3, identityGateway } = await loadFixture(deployFixture);
+        const { buildingFactory, usdc, usdcAddress, owner, voter1, voter2, voter3 } = await loadFixture(deployFixture);
 
         // create building
         const buildingDetails = {
