@@ -459,12 +459,12 @@
             },
             {
               "internalType": "address",
-              "name": "onchainIdGateway",
+              "name": "identityFactory",
               "type": "address"
             },
             {
               "internalType": "address",
-              "name": "trexGateway",
+              "name": "trexFactory",
               "type": "address"
             },
             {
@@ -761,7 +761,7 @@
       "BuildingAutoCompounderLib": [
         {
           "length": 20,
-          "start": 9233
+          "start": 8866
         }
       ]
     },
@@ -769,7 +769,7 @@
       "BuildingGovernanceLib": [
         {
           "length": 20,
-          "start": 8987
+          "start": 8620
         }
       ]
     },
@@ -777,7 +777,7 @@
       "BuildingTokenLib": [
         {
           "length": 20,
-          "start": 7854
+          "start": 7487
         }
       ]
     },
@@ -785,7 +785,7 @@
       "BuildingTreasuryLib": [
         {
           "length": 20,
-          "start": 8289
+          "start": 7922
         }
       ]
     },
@@ -793,7 +793,7 @@
       "BuildingVaultLib": [
         {
           "length": 20,
-          "start": 8489
+          "start": 8122
         }
       ]
     }
@@ -803,7 +803,7 @@
       "BuildingAutoCompounderLib": [
         {
           "length": 20,
-          "start": 9003
+          "start": 8636
         }
       ]
     },
@@ -811,7 +811,7 @@
       "BuildingGovernanceLib": [
         {
           "length": 20,
-          "start": 8757
+          "start": 8390
         }
       ]
     },
@@ -819,7 +819,7 @@
       "BuildingTokenLib": [
         {
           "length": 20,
-          "start": 7624
+          "start": 7257
         }
       ]
     },
@@ -827,7 +827,7 @@
       "BuildingTreasuryLib": [
         {
           "length": 20,
-          "start": 8059
+          "start": 7692
         }
       ]
     },
@@ -835,7 +835,7 @@
       "BuildingVaultLib": [
         {
           "length": 20,
-          "start": 8259
+          "start": 7892
         }
       ]
     }

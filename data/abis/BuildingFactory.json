@@ -464,12 +464,12 @@
             },
             {
               "internalType": "address",
-              "name": "onchainIdGateway",
+              "name": "identityFactory",
               "type": "address"
             },
             {
               "internalType": "address",
-              "name": "trexGateway",
+              "name": "trexFactory",
               "type": "address"
             },
             {
@@ -720,7 +720,7 @@
           "type": "address"
         }
       ],
-      "name": "removeRegistryAgent",
+      "name": "removeRegistryAgent", 
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -753,7 +753,7 @@
       "BuildingAutoCompounderLib": [
         {
           "length": 20,
-          "start": 6614
+          "start": 6347
         }
       ]
     },
@@ -761,7 +761,7 @@
       "BuildingGovernanceLib": [
         {
           "length": 20,
-          "start": 6368
+          "start": 6101
         }
       ]
     },
@@ -769,7 +769,7 @@
       "BuildingTokenLib": [
         {
           "length": 20,
-          "start": 5235
+          "start": 4968
         }
       ]
     },
@@ -777,7 +777,7 @@
       "BuildingTreasuryLib": [
         {
           "length": 20,
-          "start": 5670
+          "start": 5403
         }
       ]
     },
@@ -785,7 +785,7 @@
       "BuildingVaultLib": [
         {
           "length": 20,
-          "start": 5870
+          "start": 5603
         }
       ]
     }
@@ -795,7 +795,7 @@
       "BuildingAutoCompounderLib": [
         {
           "length": 20,
-          "start": 6384
+          "start": 6117
         }
       ]
     },
@@ -803,7 +803,7 @@
       "BuildingGovernanceLib": [
         {
           "length": 20,
-          "start": 6138
+          "start": 5871
         }
       ]
     },
@@ -811,7 +811,7 @@
       "BuildingTokenLib": [
         {
           "length": 20,
-          "start": 5005
+          "start": 4738
         }
       ]
     },
@@ -819,7 +819,7 @@
       "BuildingTreasuryLib": [
         {
           "length": 20,
-          "start": 5440
+          "start": 5173
         }
       ]
     },
@@ -827,7 +827,7 @@
       "BuildingVaultLib": [
         {
           "length": 20,
-          "start": 5640
+          "start": 5373
         }
       ]
     }
