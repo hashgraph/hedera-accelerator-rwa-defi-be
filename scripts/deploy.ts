@@ -51,6 +51,8 @@ async function deployBuildingIdentityFactory(contracts: Record<string, any>): Pr
   const buildingIdentityFactory = await ethers.deployContract('BuildingIdentityFactory', [await identityFactory.getAddress()], owner);
   const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
 
+  await identityFactory.transferOwnership(buildingIdentityFactoryAddress);
+
   return {
     ...contracts,
     factories: {
