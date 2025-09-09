@@ -23,7 +23,8 @@ struct TokenDetails {
 library BuildingTokenLib {
 
     function detployERC3643Token(TokenDetails memory details) external returns (address) {
-        string memory salt  = string(abi.encodePacked(Strings.toHexString(details.initialOwner), details.name));
+        // create a proper random salt that will not conflict with other tokens
+        string memory salt = string(abi.encodePacked(details.initialOwner, details.name, details.symbol, block.timestamp));
 
         ITREXFactoryAts.TokenDetailsAts memory tokenDetails = ITREXFactoryAts.TokenDetailsAts(
             details.initialOwner, //owner,
@@ -46,7 +47,7 @@ library BuildingTokenLib {
             ITREXFactoryAts.SecurityData(
                 false, //arePartitionsProtected,
                 false, //isMultiPartition,
-                TRexIBusinessLogicResolver(0xeCa365F3d0DF975bbA70ee31B98A8504Cda5f184), //resolver,
+                TRexIBusinessLogicResolver(0x217E910B5BC5B5F0a98Fc5982191c33BBe9c06B5), //resolver,
                 ITREXFactoryAts.ResolverProxyConfiguration(0x0000000000000000000000000000000000000000000000000000000000000001, 1), //resolverProxyConfiguration,
                 new IResolverProxy.Rbac[](0), //rbacs,
                 true, //isControllable,
