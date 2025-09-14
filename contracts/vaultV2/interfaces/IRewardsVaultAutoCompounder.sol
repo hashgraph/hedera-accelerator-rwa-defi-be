@@ -79,6 +79,12 @@ interface IRewardsVaultAutoCompounder {
     /// @notice Returns user's assets
     function assetsOf(address user) external view returns (uint256);
 
+    /// @notice Returns the underlying asset address
+    function asset() external view returns (address);
+
+    /// @notice Returns the related vault address
+    function vault() external view returns (address);
+
     /// @notice Returns current exchange rate (autocompounder shares / assets)
     function exchangeRate() external view returns (uint256);
 

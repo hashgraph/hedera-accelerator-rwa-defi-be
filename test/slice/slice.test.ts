@@ -1,23 +1,20 @@
 import { ethers, expect, time } from "../setup";
 import { PrivateKey, Client, AccountId } from "@hashgraph/sdk";
 import { AddressLike, ZeroAddress } from "ethers";
-import { VaultToken, Slice, BasicVault, AsyncVault, AutoCompounder } from "../../typechain-types";
-import { VaultType, deployBasicVault, deployAsyncVault } from "../erc4626/helper";
+import { VaultToken, Slice, RewardsVault4626, RewardsVaultAutoCompounder } from "../../typechain-types";
 import { SignHelper } from "../signHelper";
-import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
-async function deployVaultWithType(
-    vaultType: VaultType,
-    stakingToken: AddressLike,
-    owner: AddressLike,
-    feeConfig: any,
-    unlockDuration: number
-) {
-    if (vaultType === VaultType.Basic) {
-        return await deployBasicVault(stakingToken, owner, feeConfig, unlockDuration) as BasicVault;
-    } else {
-        return await deployAsyncVault(stakingToken, owner, feeConfig, unlockDuration) as AsyncVault;
-    }
+async function deployRewardsVault(stakingToken: AddressLike, owner: AddressLike, unlockDuration: number) {
+    const RewardsVault4626 = await ethers.getContractFactory("RewardsVault4626");
+    return (await RewardsVault4626.deploy(
+        stakingToken,
+        "Test Vault",
+        "TVLT",
+        18,
+        unlockDuration,
+        owner,
+    )) as RewardsVault4626;
 }
 
 // constants
@@ -36,58 +33,40 @@ const feeConfig = {
 
 // Tests
 describe("Slice", function () {
-    async function deployFixture(vault1Type: VaultType, vault2Type: VaultType) {
-        const [
-            owner,
-            staker
-        ] = await ethers.getSigners();
+    async function deployFixture() {
+        const [owner, staker] = await ethers.getSigners();
 
         let client = Client.forTestnet();
 
-        const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || '');
-        const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || '');
+        const operatorPrKey = PrivateKey.fromStringECDSA(process.env.PRIVATE_KEY || "");
+        const operatorAccountId = AccountId.fromString(process.env.ACCOUNT_ID || "");
 
-        client.setOperator(
-            operatorAccountId,
-            operatorPrKey
-        );
+        client.setOperator(operatorAccountId, operatorPrKey);
 
         // Uniswap
-        const UniswapV2Factory = await ethers.getContractFactory('UniswapV2Factory', owner);
-        const uniswapV2Factory = await UniswapV2Factory.deploy(
-            owner.address,
-        );
+        const UniswapV2Factory = await ethers.getContractFactory("UniswapV2Factory", owner);
+        const uniswapV2Factory = await UniswapV2Factory.deploy(owner.address);
         await uniswapV2Factory.waitForDeployment();
 
-        const WETH = await ethers.getContractFactory('WETH9', owner);
+        const WETH = await ethers.getContractFactory("WETH9", owner);
         const weth = await WETH.deploy();
         await weth.waitForDeployment();
 
-        const UniswapV2Router02 = await ethers.getContractFactory('UniswapV2Router02', owner);
-        const uniswapV2Router02 = await UniswapV2Router02.deploy(
-            uniswapV2Factory.target,
-            weth.target
-        );
+        const UniswapV2Router02 = await ethers.getContractFactory("UniswapV2Router02", owner);
+        const uniswapV2Router02 = await UniswapV2Router02.deploy(uniswapV2Factory.target, weth.target);
         await uniswapV2Router02.waitForDeployment();
 
         const MockV3Aggregator = await ethers.getContractFactory("MockV3Aggregator");
-        const mockV3Aggregator = await MockV3Aggregator.deploy(
-            18,
-            ethers.parseUnits("1", 18)
-        );
+        const mockV3Aggregator = await MockV3Aggregator.deploy(18, ethers.parseUnits("1", 18));
         await mockV3Aggregator.waitForDeployment();
 
         // Staking Token
         const VaultToken = await ethers.getContractFactory("VaultToken");
 
-        const stakingToken1 = await VaultToken.deploy(
-            18
-        ) as VaultToken;
+        const stakingToken1 = (await VaultToken.deploy(18)) as VaultToken;
         await stakingToken1.waitForDeployment();
 
-        const stakingToken2 = await VaultToken.deploy(
-            18
-        ) as VaultToken;
+        const stakingToken2 = (await VaultToken.deploy(18)) as VaultToken;
         await stakingToken2.waitForDeployment();
 
         // Mint staking token for owner
@@ -99,62 +78,52 @@ describe("Slice", function () {
         await stakingToken2.mint(staker.address, ethers.parseUnits("500000000", 18));
 
         // Reward Token
-        const rewardToken = await VaultToken.deploy(
-            6
-        ) as VaultToken;
+        const rewardToken = (await VaultToken.deploy(6)) as VaultToken;
         await rewardToken.waitForDeployment();
 
         await rewardToken.mint(owner.address, ethers.parseUnits("500000000", 18));
 
-        // Vault
-        const vault1 = await deployVaultWithType(
-            vault1Type,
-            stakingToken1,
-            owner,
-            feeConfig,
-            unlockDuration1
-        );
+        // Vaults
+        const vault1 = await deployRewardsVault(stakingToken1.target, owner.address, unlockDuration1);
+        await vault1.waitForDeployment();
 
-        const vault2 = await deployVaultWithType(
-            vault2Type,
-            stakingToken2,
-            owner,
-            feeConfig,
-            unlockDuration2
-        );
+        const vault2 = await deployRewardsVault(stakingToken2.target, owner.address, unlockDuration2);
+        await vault2.waitForDeployment();
 
         // Slice
         const Slice = await ethers.getContractFactory("Slice");
-        const slice = await Slice.deploy(
-            uniswapV2Router02.target,   // Uniswap router V2
-            rewardToken.target,         // BaseToken TODO: Change to real USDC
-            sTokenPayload,              // sToken name
-            sTokenPayload,              // sToken symbol
-            metadataUri,                // Slice metadata URI
-        ) as Slice;
+        const slice = (await Slice.deploy(
+            uniswapV2Router02.target, // Uniswap router V2
+            rewardToken.target, // BaseToken TODO: Change to real USDC
+            sTokenPayload, // sToken name
+            sTokenPayload, // sToken symbol
+            metadataUri, // Slice metadata URI
+        )) as Slice;
         await slice.waitForDeployment();
 
         // AutoCompounder
-        const AutoCompounder = await ethers.getContractFactory("AutoCompounder");
+        const RewardsVaultAutoCompounder = await ethers.getContractFactory("RewardsVaultAutoCompounder");
 
-        const autoCompounder1 = await AutoCompounder.deploy(
-            uniswapV2Router02.target,
+        const autoCompounder1 = (await RewardsVaultAutoCompounder.deploy(
             vault1.target,
-            rewardToken.target,
-            "TST",
-            "TST",
-            slice.target
-        ) as AutoCompounder;
+            "Test AutoCompounder 1",
+            "TAC1",
+            ethers.parseUnits("1", 18), // minimumClaimThreshold
+            uniswapV2Router02.target,
+            rewardToken.target, // intermediate token
+            300, // maxSlippage (3%)
+        )) as RewardsVaultAutoCompounder;
         await autoCompounder1.waitForDeployment();
 
-        const autoCompounder2 = await AutoCompounder.deploy(
-            uniswapV2Router02.target,
+        const autoCompounder2 = (await RewardsVaultAutoCompounder.deploy(
             vault2.target,
-            rewardToken.target,
-            "TST",
-            "TST",
-            slice.target
-        ) as AutoCompounder;
+            "Test AutoCompounder 2",
+            "TAC2",
+            ethers.parseUnits("1", 18), // minimumClaimThreshold
+            uniswapV2Router02.target,
+            rewardToken.target, // intermediate token
+            300, // maxSlippage (3%)
+        )) as RewardsVaultAutoCompounder;
         await autoCompounder2.waitForDeployment();
 
         return {
@@ -170,16 +139,8 @@ describe("Slice", function () {
             rewardToken,
             client,
             owner,
-            staker
+            staker,
         };
-    }
-
-    async function deployFixtureBasicBasic() {
-      return deployFixture(VaultType.Basic, VaultType.Basic);
-    }
-
-    async function deployFixtureBasicAsync() {
-      return deployFixture(VaultType.Basic, VaultType.Async);
     }
 
     describe("rebalance", function () {
@@ -197,7 +158,7 @@ describe("Slice", function () {
                 stakingToken1,
                 stakingToken2,
                 rewardToken,
-            } = await loadFixture(deployFixtureBasicAsync);
+            } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
@@ -235,7 +196,7 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             const addLiquidityTx2 = await uniswapV2Router02.addLiquidity(
@@ -247,23 +208,15 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             console.log("Add Liquidity Tx1: ", addLiquidityTx1.hash);
             console.log("Add Liquidity Tx2: ", addLiquidityTx2.hash);
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
-            await slice.addAllocation(
-                autoCompounder2.target,
-                mockV3Aggregator.target,
-                allocationPercentage2
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
+            await slice.addAllocation(autoCompounder2.target, mockV3Aggregator.target, allocationPercentage2);
 
             console.log("Tracking tokens added");
 
@@ -321,7 +274,7 @@ describe("Slice", function () {
                 stakingToken1,
                 stakingToken2,
                 rewardToken,
-            } = await deployFixture(VaultType.Basic, VaultType.Async);
+            } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
@@ -341,7 +294,7 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             const addLiquidityTx2 = await uniswapV2Router02.addLiquidity(
@@ -353,23 +306,15 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             console.log("Add Liquidity Tx1: ", addLiquidityTx1.hash);
             console.log("Add Liquidity Tx2: ", addLiquidityTx2.hash);
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
-            await slice.addAllocation(
-                autoCompounder2.target,
-                mockV3Aggregator.target,
-                allocationPercentage2
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
+            await slice.addAllocation(autoCompounder2.target, mockV3Aggregator.target, allocationPercentage2);
 
             console.log("Tracking tokens added");
 
@@ -413,31 +358,23 @@ describe("Slice", function () {
         });
 
         it("Should revert if total allocation percentage exceeds 100%", async function () {
-          const { slice, autoCompounder1, autoCompounder2, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
-      
-          // Add first allocation with 6000 (60%)
-          await slice.addAllocation(
-              autoCompounder1.target,
-              mockV3Aggregator.target,
-              6000
-          );
-      
-          // Add second allocation with 4000 (40%) - should succeed
-          await slice.addAllocation(
-              autoCompounder2.target,
-              mockV3Aggregator.target,
-              4000
-          );
-      
-          // Try to add another allocation with 1 (0.01%) - should fail (total would be 10001)
-          await expect(
-              slice.addAllocation(
-                  autoCompounder2.target, // can use a new mock if needed
-                  mockV3Aggregator.target,
-                  1
-              )
-          ).to.be.revertedWith("Slice: Total allocation exceeds 100%");
-      });
+            const { slice, autoCompounder1, autoCompounder2, mockV3Aggregator } = await loadFixture(deployFixture);
+
+            // Add first allocation with 6000 (60%)
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, 6000);
+
+            // Add second allocation with 4000 (40%) - should succeed
+            await slice.addAllocation(autoCompounder2.target, mockV3Aggregator.target, 4000);
+
+            // Try to add another allocation with 1 (0.01%) - should fail (total would be 10001)
+            await expect(
+                slice.addAllocation(
+                    autoCompounder2.target, // can use a new mock if needed
+                    mockV3Aggregator.target,
+                    1,
+                ),
+            ).to.be.revertedWith("Slice: Total allocation exceeds 100%");
+        });
 
         it("Should distribute tokens close to the provided allocation Autocompounders with partially unlocked tokens", async function () {
             const {
@@ -453,7 +390,7 @@ describe("Slice", function () {
                 stakingToken1,
                 stakingToken2,
                 rewardToken,
-            } = await deployFixture(VaultType.Basic, VaultType.Async);
+            } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const allocationPercentage2 = 6000;
             const amountToDeposit = ethers.parseUnits("50", 12);
@@ -463,21 +400,8 @@ describe("Slice", function () {
             await stakingToken1.connect(staker).approve(vault1.target, amountToDeposit);
             await stakingToken2.connect(staker).approve(vault2.target, amountToDeposit);
 
-            const basicVault = vault1 as BasicVault;
-            await basicVault.connect(staker).deposit(
-                amountToDeposit / 2n,
-                staker.address
-            );
-            const asyncVault = vault2 as AsyncVault;
-            await asyncVault.connect(staker).requestDeposit(
-                amountToDeposit / 2n,
-                staker.address,
-                staker.address
-            );
-            await asyncVault.connect(staker)["deposit(uint256,address)"](
-                amountToDeposit / 2n,
-                staker.address
-            );
+            await vault1.connect(staker).deposit(amountToDeposit / 2n, staker.address);
+            await vault2.connect(staker).deposit(amountToDeposit / 2n, staker.address);
 
             // Add Liquidity
             await rewardToken.approve(uniswapV2Router02.target, ethers.parseUnits("50000000", 18));
@@ -493,7 +417,7 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             const addLiquidityTx2 = await uniswapV2Router02.addLiquidity(
@@ -505,23 +429,15 @@ describe("Slice", function () {
                 ethers.parseUnits("5000000", 18),
                 owner.address,
                 ethers.MaxUint256,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             console.log("Add Liquidity Tx1: ", addLiquidityTx1.hash);
             console.log("Add Liquidity Tx2: ", addLiquidityTx2.hash);
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
-            await slice.addAllocation(
-                autoCompounder2.target,
-                mockV3Aggregator.target,
-                allocationPercentage2
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
+            await slice.addAllocation(autoCompounder2.target, mockV3Aggregator.target, allocationPercentage2);
 
             console.log("Tracking tokens added");
 
@@ -569,210 +485,199 @@ describe("Slice", function () {
 
     describe("deposit", function () {
         it("Should deposit to AutoCompounder and get aToken", async function () {
-            const {
-                slice,
-                owner,
-                autoCompounder1,
-                mockV3Aggregator,
-                stakingToken1,
-            } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
 
             // Deposit to Slice
             await stakingToken1.approve(slice.target, amountToDeposit);
             const depositAutoCompounderTx1 = await slice.deposit(autoCompounder1.target, amountToDeposit);
 
-            await expect(
-                depositAutoCompounderTx1
-            ).to.emit(slice, "Deposit")
+            await expect(depositAutoCompounderTx1)
+                .to.emit(slice, "Deposit")
                 .withArgs(autoCompounder1, owner.address, amountToDeposit);
 
             const exchangeRate = await autoCompounder1.exchangeRate();
 
             // Check user received sTokens
-            await expect(
-                depositAutoCompounderTx1
-            ).to.changeTokenBalance(slice, owner.address, amountToDeposit * ethers.parseUnits("1", 18) / exchangeRate);
+            await expect(depositAutoCompounderTx1).to.changeTokenBalance(
+                slice,
+                owner.address,
+                (amountToDeposit * ethers.parseUnits("1", 18)) / exchangeRate,
+            );
         });
 
         it("Should revert if invalid amount to deposit", async function () {
-            const {
-                slice,
-                autoCompounder1,
-            } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixture);
             const amountToDeposit = 0;
 
-            await expect(
-                slice.deposit(autoCompounder1.target, amountToDeposit)
-            ).to.be.revertedWith("Slice: Invalid amount");
+            await expect(slice.deposit(autoCompounder1.target, amountToDeposit)).to.be.revertedWith(
+                "Slice: Invalid amount",
+            );
         });
 
         it("Should revert if allocation for the deposited token doesn't exist", async function () {
-            const {
-                slice,
-            } = await loadFixture(deployFixtureBasicBasic);
+            const { slice } = await loadFixture(deployFixture);
             const amountToDeposit = ethers.parseUnits("50", 12);
 
-            await expect(
-                slice.deposit(ZeroAddress, amountToDeposit)
-            ).to.be.revertedWithCustomError(slice, 'AllocationNotFound')
+            await expect(slice.deposit(ZeroAddress, amountToDeposit))
+                .to.be.revertedWithCustomError(slice, "AllocationNotFound")
                 .withArgs(ZeroAddress);
         });
     });
 
     describe("depositWithSignature", () => {
-      it("Should deposit to AutoCompounder and get aToken", async function () {
-        const {
-          slice,
-          owner,
-          autoCompounder1,
-          mockV3Aggregator,
-        } = await loadFixture(deployFixtureBasicBasic);
+        it("Should deposit to AutoCompounder and get aToken", async function () {
+            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixture);
 
-        const allocationPercentage1 = 4000;
-        const amountToDeposit = ethers.parseUnits("50", 12);
+            const allocationPercentage1 = 4000;
+            const amountToDeposit = ethers.parseUnits("50", 12);
 
-        // Add tracking tokens
-        await slice.addAllocation(
-            autoCompounder1.target,
-            mockV3Aggregator.target,
-            allocationPercentage1
-        );
+            // Add tracking tokens
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
 
-        const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
-        const spender = await slice.getAddress();
-        const currentTime = (await ethers.provider.getBlock('latest'))?.timestamp as number;
-        const deadline = currentTime + 3600;
-        
-        console.log({currentTime, deadline, isValid: deadline >= currentTime});
-        const {v, r, s} = await new SignHelper().SignPermitTypedData(owner, spender, asset1, amountToDeposit, deadline);
+            const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
+            const spender = await slice.getAddress();
+            const currentTime = (await ethers.provider.getBlock("latest"))?.timestamp as number;
+            const deadline = currentTime + 3600;
 
-        const tx = await slice.depositWithSignature(autoCompounder1.target, amountToDeposit, deadline, v, r, s);
+            console.log({ currentTime, deadline, isValid: deadline >= currentTime });
+            const { v, r, s } = await new SignHelper().SignPermitTypedData(
+                owner,
+                spender,
+                asset1,
+                amountToDeposit,
+                deadline,
+            );
 
-        await expect(tx)
-          .to.emit(slice, "Deposit").withArgs(autoCompounder1, owner.address, amountToDeposit);
+            const tx = await slice.depositWithSignature(autoCompounder1.target, amountToDeposit, deadline, v, r, s);
 
-        const exchangeRate = await autoCompounder1.exchangeRate();
+            await expect(tx).to.emit(slice, "Deposit").withArgs(autoCompounder1, owner.address, amountToDeposit);
 
-        // Check user received sTokens
-        await expect(tx)
-          .to.changeTokenBalance(slice, owner.address, amountToDeposit * ethers.parseUnits("1", 18) / exchangeRate);
-      });
+            const exchangeRate = await autoCompounder1.exchangeRate();
+
+            // Check user received sTokens
+            await expect(tx).to.changeTokenBalance(
+                slice,
+                owner.address,
+                (amountToDeposit * ethers.parseUnits("1", 18)) / exchangeRate,
+            );
+        });
     });
 
     describe("depositBatchWithSignatures", () => {
-      it("Should deposit to AutoCompounder and get aToken", async function () {
-        const {
-          slice,
-          owner,
-          autoCompounder1,
-          autoCompounder2,
-          mockV3Aggregator,
-        } = await loadFixture(deployFixtureBasicBasic);
+        it("Should deposit to AutoCompounder and get aToken", async function () {
+            const { slice, owner, autoCompounder1, autoCompounder2, mockV3Aggregator } = await loadFixture(
+                deployFixture,
+            );
 
-        const allocationPercentage1 = 4000;
-        const allocationPercentage2 = 6000;
-        const amountToDeposit = ethers.parseUnits("50", 12);
+            const allocationPercentage1 = 4000;
+            const allocationPercentage2 = 6000;
+            const amountToDeposit = ethers.parseUnits("50", 12);
 
-        // Add tracking tokens
-        await slice.addAllocation(
-            autoCompounder1.target,
-            mockV3Aggregator.target,
-            allocationPercentage1
-        );
+            // Add tracking tokens
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
 
-        await slice.addAllocation(
-          autoCompounder2.target,
-          mockV3Aggregator.target,
-          allocationPercentage2
-        );
+            await slice.addAllocation(autoCompounder2.target, mockV3Aggregator.target, allocationPercentage2);
 
-        const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
-        const asset2 = await autoCompounder2.asset(); // This is the token implementing permit()
-        const spender = await slice.getAddress();
+            const asset1 = await autoCompounder1.asset(); // This is the token implementing permit()
+            const asset2 = await autoCompounder2.asset(); // This is the token implementing permit()
+            const spender = await slice.getAddress();
 
-        // create a list with the ac tokens to sign the permit
-        const signatureList = [
-          { signer: owner, spender, autocompunder: autoCompounder1.target , asset: asset1, amount: amountToDeposit },
-          { signer: owner, spender, autocompunder: autoCompounder2.target, asset: asset2, amount: amountToDeposit },
-        ];
+            // create a list with the ac tokens to sign the permit
+            const signatureList = [
+                {
+                    signer: owner,
+                    spender,
+                    autocompunder: autoCompounder1.target,
+                    asset: asset1,
+                    amount: amountToDeposit,
+                },
+                {
+                    signer: owner,
+                    spender,
+                    autocompunder: autoCompounder2.target,
+                    asset: asset2,
+                    amount: amountToDeposit,
+                },
+            ];
 
-        const collectSignaturesFor = async (list: typeof signatureList) => {
-          const signatures = await Promise.all(
-            list.map(async ({ signer, spender, autocompunder, asset, amount }) => {
-              // set permit deadline
-              const currentTime = (await ethers.provider.getBlock('latest'))?.timestamp as number;
-              const deadline = currentTime + 3600;
-              // sign the permit for the underlying token
-              const {v, r, s} = await new SignHelper().SignPermitTypedData(signer, spender, asset, amount, deadline);
-              
-              return {
-                autocompunder,
-                amount,
-                deadline,
-                v, r, s
-              }
-            })
-          );
+            const collectSignaturesFor = async (list: typeof signatureList) => {
+                const signatures = await Promise.all(
+                    list.map(async ({ signer, spender, autocompunder, asset, amount }) => {
+                        // set permit deadline
+                        const currentTime = (await ethers.provider.getBlock("latest"))?.timestamp as number;
+                        const deadline = currentTime + 3600;
+                        // sign the permit for the underlying token
+                        const { v, r, s } = await new SignHelper().SignPermitTypedData(
+                            signer,
+                            spender,
+                            asset,
+                            amount,
+                            deadline,
+                        );
 
-          const aTokens = signatures.map(s => s.autocompunder);
-          const amounts = signatures.map(s => s.amount);
-          const deadlines = signatures.map(s => s.deadline);
-          const v = signatures.map(s => s.v);
-          const r = signatures.map(s => s.r);
-          const s = signatures.map(s => s.s);
+                        return {
+                            autocompunder,
+                            amount,
+                            deadline,
+                            v,
+                            r,
+                            s,
+                        };
+                    }),
+                );
 
-          return {
-            aTokens,
-            amounts,
-            deadlines,
-            v, r, s
-          }
-        }
-      
-        const {aTokens, amounts, deadlines, v, r, s } = await collectSignaturesFor(signatureList);
+                const aTokens = signatures.map((s) => s.autocompunder);
+                const amounts = signatures.map((s) => s.amount);
+                const deadlines = signatures.map((s) => s.deadline);
+                const v = signatures.map((s) => s.v);
+                const r = signatures.map((s) => s.r);
+                const s = signatures.map((s) => s.s);
 
-        const tx = await slice.depositBatchWithSignatures(aTokens, amounts, deadlines, v, r, s);
+                return {
+                    aTokens,
+                    amounts,
+                    deadlines,
+                    v,
+                    r,
+                    s,
+                };
+            };
 
-        await expect(tx)
-          .to.emit(slice, "Deposit").withArgs(autoCompounder1, owner.address, amountToDeposit)
-          .to.emit(slice, "Deposit").withArgs(autoCompounder2, owner.address, amountToDeposit);
+            const { aTokens, amounts, deadlines, v, r, s } = await collectSignaturesFor(signatureList);
 
-        const exchangeRate = await autoCompounder1.exchangeRate();
+            const tx = await slice.depositBatchWithSignatures(aTokens, amounts, deadlines, v, r, s);
 
-        // Check user received sTokens
-        await expect(tx)
-          .to.changeTokenBalance(slice, owner.address, (amountToDeposit * 2n) * ethers.parseUnits("1", 18) / exchangeRate);
-      });
+            await expect(tx)
+                .to.emit(slice, "Deposit")
+                .withArgs(autoCompounder1, owner.address, amountToDeposit)
+                .to.emit(slice, "Deposit")
+                .withArgs(autoCompounder2, owner.address, amountToDeposit);
+
+            const exchangeRate = await autoCompounder1.exchangeRate();
+
+            // Check user received sTokens
+            await expect(tx).to.changeTokenBalance(
+                slice,
+                owner.address,
+                (amountToDeposit * 2n * ethers.parseUnits("1", 18)) / exchangeRate,
+            );
+        });
     });
 
     describe("withdraw", function () {
         it("Should withdraw", async function () {
-            const {
-                slice,
-                owner,
-                autoCompounder1,
-                mockV3Aggregator,
-                stakingToken1,
-            } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const amountToWithdraw = ethers.parseUnits("25", 12);
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
 
             // Deposit to Slice
             await stakingToken1.approve(slice.target, amountToDeposit);
@@ -782,130 +687,96 @@ describe("Slice", function () {
 
             console.log(tx.hash);
 
-            const share = amountToWithdraw / await slice.totalSupply();
+            const share = amountToWithdraw / (await slice.totalSupply());
 
-            await expect(
-                tx
-            ).to.emit(slice, "Withdraw")
-                .withArgs(
-                    autoCompounder1.target,
-                    owner.address,
-                    amountToDeposit * share
-                );
+            await expect(tx)
+                .to.emit(slice, "Withdraw")
+                .withArgs(autoCompounder1.target, owner.address, amountToDeposit * share);
         });
 
         it("Should revert if invalid amount to withdraw", async function () {
-            const {
-                slice,
-                autoCompounder1,
-                mockV3Aggregator,
-                stakingToken1,
-            } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixture);
             const allocationPercentage1 = 4000;
             const amountToDeposit = ethers.parseUnits("50", 12);
             const amountToWithdraw = 0;
 
             // Add tracking tokens
-            await slice.addAllocation(
-                autoCompounder1.target,
-                mockV3Aggregator.target,
-                allocationPercentage1
-            );
+            await slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage1);
 
             // Deposit to Slice
             await stakingToken1.approve(slice.target, amountToDeposit);
             await slice.deposit(autoCompounder1.target, amountToDeposit);
 
-            await expect(
-                slice.withdraw(amountToWithdraw)
-            ).to.be.revertedWith("Slice: Invalid amount");
+            await expect(slice.withdraw(amountToWithdraw)).to.be.revertedWith("Slice: Invalid amount");
         });
     });
 
     describe("addAllocation", function () {
         it("Should add token allocation", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator, stakingToken1 } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
 
             const tx = await slice.addAllocation(
                 autoCompounder1.target,
                 mockV3Aggregator.target,
                 allocationPercentage,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             console.log(tx.hash);
 
-            await expect(
-                tx
-            ).to.emit(slice, "AllocationAdded")
+            await expect(tx)
+                .to.emit(slice, "AllocationAdded")
                 .withArgs(autoCompounder1.target, stakingToken1.target, mockV3Aggregator.target, allocationPercentage);
         });
 
         it("Should revert if zero token address", async function () {
-            const { slice, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, mockV3Aggregator } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
 
             await expect(
-                slice.addAllocation(
-                    ZeroAddress,
-                    mockV3Aggregator.target,
-                    allocationPercentage,
-                )
+                slice.addAllocation(ZeroAddress, mockV3Aggregator.target, allocationPercentage),
             ).to.be.revertedWith("Slice: Invalid aToken address");
         });
 
         it("Should revert if invalid price id", async function () {
-            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
 
             await expect(
-                slice.addAllocation(
-                    autoCompounder1.target,
-                    ZeroAddress,
-                    allocationPercentage,
-                )
+                slice.addAllocation(autoCompounder1.target, ZeroAddress, allocationPercentage),
             ).to.be.revertedWith("Slice: Invalid price feed address");
         });
 
         it("Should revert if invalid percentage", async function () {
-            const { slice, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixture);
             const allocationPercentage = 0;
 
             await expect(
-                slice.addAllocation(
-                    autoCompounder1.target,
-                    mockV3Aggregator.target,
-                    allocationPercentage,
-                )
+                slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage),
             ).to.be.revertedWith("Slice: Invalid allocation percentage");
         });
 
         it("Should revert if token already added", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
 
             const tx = await slice.addAllocation(
                 autoCompounder1.target,
                 mockV3Aggregator.target,
                 allocationPercentage,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
-            await expect(
-                slice.addAllocation(
-                    autoCompounder1.target,
-                    mockV3Aggregator.target,
-                    allocationPercentage,
-                )
-            ).to.be.revertedWithCustomError(slice, 'AssociatedAllocationExists')
+            await expect(slice.addAllocation(autoCompounder1.target, mockV3Aggregator.target, allocationPercentage))
+                .to.be.revertedWithCustomError(slice, "AssociatedAllocationExists")
                 .withArgs(autoCompounder1.target);
         });
     });
 
     describe("setAllocationPercentage", function () {
         it("Should change allocation percentage", async function () {
-            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, owner, autoCompounder1, mockV3Aggregator } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
             const newAllocationPercentage = 5000;
 
@@ -913,48 +784,38 @@ describe("Slice", function () {
                 autoCompounder1.target,
                 mockV3Aggregator.target,
                 allocationPercentage,
-                { from: owner.address, gasLimit: 3000000 }
+                { from: owner.address, gasLimit: 3000000 },
             );
 
             console.log(tx.hash);
 
-            await expect(
-                tx
-            ).to.emit(slice, "AllocationAdded");
+            await expect(tx).to.emit(slice, "AllocationAdded");
 
             const setAllocationTx = await slice.setAllocationPercentage(
                 autoCompounder1.target,
-                newAllocationPercentage
+                newAllocationPercentage,
             );
 
-            await expect(
-                setAllocationTx
-            ).to.emit(slice, "AllocationPercentageChanged")
+            await expect(setAllocationTx)
+                .to.emit(slice, "AllocationPercentageChanged")
                 .withArgs(autoCompounder1.target, newAllocationPercentage);
         });
 
         it("Should revert if token doesn't exist", async function () {
-            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixture);
             const allocationPercentage = 4000;
 
-            await expect(
-                slice.setAllocationPercentage(
-                    autoCompounder1.target,
-                    allocationPercentage,
-                )
-            ).to.be.revertedWithCustomError(slice, 'AllocationNotFound')
+            await expect(slice.setAllocationPercentage(autoCompounder1.target, allocationPercentage))
+                .to.be.revertedWithCustomError(slice, "AllocationNotFound")
                 .withArgs(autoCompounder1.target);
         });
 
         it("Should revert if invalid percentage", async function () {
-            const { slice, autoCompounder1 } = await loadFixture(deployFixtureBasicBasic);
+            const { slice, autoCompounder1 } = await loadFixture(deployFixture);
             const allocationPercentage = 0;
 
             await expect(
-                slice.setAllocationPercentage(
-                    autoCompounder1.target,
-                    allocationPercentage,
-                )
+                slice.setAllocationPercentage(autoCompounder1.target, allocationPercentage),
             ).to.be.revertedWith("Slice: Invalid percentage");
         });
     });

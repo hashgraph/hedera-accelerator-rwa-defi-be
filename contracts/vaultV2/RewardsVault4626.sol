@@ -17,16 +17,16 @@ contract RewardsVault4626 is IERC4626 {
 
     /// @notice The underlying asset token
     IERC20 public immutable asset;
-    
+
     /// @notice Lock period in seconds
     uint256 public immutable lockPeriod;
-    
+
     /// @notice Contract owner
     address public owner;
-    
+
     /// @notice Array of reward token addresses
     address[] public rewardTokens;
-    
+
     /// @notice Total amount of underlying assets in the vault
     uint256 private _totalAssets;
 
@@ -51,7 +51,7 @@ contract RewardsVault4626 is IERC4626 {
 
     /// @notice User information mapping
     mapping(address => UserInfo) public userInfo;
-    
+
     /// @notice Reward token information mapping
     mapping(address => RewardInfo) public rewardInfo;
 
@@ -95,30 +95,25 @@ contract RewardsVault4626 is IERC4626 {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposits assets and returns shares
-    function deposit(uint256 assets, address receiver) 
-        public 
-        virtual 
-        override 
-        returns (uint256 shares) 
-    {
+    function deposit(uint256 assets, address receiver) public virtual override returns (uint256 shares) {
         require(assets > 0, "Cannot deposit 0");
         require(receiver != address(0), "Invalid receiver");
 
         // Calculate shares to mint
         shares = previewDeposit(assets);
-        
+
         // Update user info
         _updateUserRewards(receiver);
-        
+
         // Transfer assets from caller to vault
         require(asset.transferFrom(msg.sender, address(this), assets), "Transfer failed");
-        
+
         // Mint shares to receiver
         _mint(receiver, shares);
-        
+
         // Update total assets
         _totalAssets += assets;
-        
+
         // Set lock time if first deposit
         if (!userInfo[receiver].exists) {
             userInfo[receiver].lockTimeStart = block.timestamp;
@@ -131,28 +126,23 @@ contract RewardsVault4626 is IERC4626 {
     }
 
     /// @notice Mints shares and returns assets needed
-    function mint(uint256 shares, address receiver) 
-        public 
-        virtual 
-        override 
-        returns (uint256 assets) 
-    {
+    function mint(uint256 shares, address receiver) public virtual override returns (uint256 assets) {
         require(shares > 0, "Cannot mint 0");
-        
+
         assets = previewMint(shares);
-        
+
         // Update user info
         _updateUserRewards(receiver);
-        
+
         // Transfer assets from caller to vault
         require(asset.transferFrom(msg.sender, address(this), assets), "Transfer failed");
-        
+
         // Mint shares to receiver
         _mint(receiver, shares);
-        
+
         // Update total assets
         _totalAssets += assets;
-        
+
         // Set lock time if first deposit
         if (!userInfo[receiver].exists) {
             userInfo[receiver].lockTimeStart = block.timestamp;
@@ -172,9 +162,9 @@ contract RewardsVault4626 is IERC4626 {
     ) public virtual override returns (uint256 shares) {
         require(assets > 0, "Cannot withdraw 0");
         require(_isUnlocked(owner_), "Assets are still locked");
-        
+
         shares = previewWithdraw(assets);
-        
+
         // Check allowance if not owner
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender];
@@ -182,16 +172,16 @@ contract RewardsVault4626 is IERC4626 {
                 allowance[owner_][msg.sender] = allowed - shares;
             }
         }
-        
+
         // Claim all rewards before withdrawal
         _claimAllRewards(owner_);
-        
+
         // Burn shares from owner
         _burn(owner_, shares);
-        
+
         // Update total assets
         _totalAssets -= assets;
-        
+
         // Transfer assets to receiver
         require(asset.transfer(receiver, assets), "Transfer failed");
 
@@ -199,16 +189,12 @@ contract RewardsVault4626 is IERC4626 {
     }
 
     /// @notice Redeems shares and returns assets
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner_
-    ) public virtual override returns (uint256 assets) {
+    function redeem(uint256 shares, address receiver, address owner_) public virtual override returns (uint256 assets) {
         require(shares > 0, "Cannot redeem 0");
         require(_isUnlocked(owner_), "Assets are still locked");
-        
+
         assets = previewRedeem(shares);
-        
+
         // Check allowance if not owner
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender];
@@ -216,16 +202,16 @@ contract RewardsVault4626 is IERC4626 {
                 allowance[owner_][msg.sender] = allowed - shares;
             }
         }
-        
+
         // Claim all rewards before redemption
         _claimAllRewards(owner_);
-        
+
         // Burn shares from owner
         _burn(owner_, shares);
-        
+
         // Update total assets
         _totalAssets -= assets;
-        
+
         // Transfer assets to receiver
         require(asset.transfer(receiver, assets), "Transfer failed");
 
@@ -248,7 +234,7 @@ contract RewardsVault4626 is IERC4626 {
 
     /// @notice Returns assets per share
     function assetsPerShare() public view virtual override returns (uint256) {
-        return _convertToAssetsDown(10**decimals);
+        return _convertToAssetsDown(10 ** decimals);
     }
 
     /// @notice Preview deposit calculation
@@ -316,16 +302,12 @@ contract RewardsVault4626 is IERC4626 {
     }
 
     /// @notice Get claimable reward amount for a specific token
-    function getClaimableReward(address user, address token) 
-        external 
-        view 
-        returns (uint256) 
-    {
+    function getClaimableReward(address user, address token) external view returns (uint256) {
         if (!rewardInfo[token].exists || balanceOf[user] == 0) return 0;
-        
+
         uint256 amount = rewardInfo[token].amount;
         uint256 lastClaimed = userInfo[user].lastClaimedAmountPerToken[token];
-        
+
         return (amount - lastClaimed).mulDivDown(balanceOf[user], 1e18);
     }
 
@@ -341,10 +323,10 @@ contract RewardsVault4626 is IERC4626 {
     /// @notice Get time remaining until unlock
     function getTimeUntilUnlock(address user) external view returns (uint256) {
         if (!userInfo[user].exists) return 0;
-        
+
         uint256 unlockTime = userInfo[user].lockTimeStart + lockPeriod;
         if (block.timestamp >= unlockTime) return 0;
-        
+
         return unlockTime - block.timestamp;
     }
 
@@ -352,25 +334,25 @@ contract RewardsVault4626 is IERC4626 {
     function unlock(uint256 startPosition, uint256 assets) external returns (uint256, uint256, uint256) {
         require(userInfo[msg.sender].exists, "User has no deposits");
         require(_isUnlocked(msg.sender), "You can't unlock your token because the lock period is not reached");
-        
+
         // Claim rewards with pagination (process 10 rewards at a time)
         uint256 endPosition = startPosition + 10;
         if (endPosition > rewardTokens.length) {
             endPosition = rewardTokens.length;
         }
-        
+
         for (uint256 i = startPosition; i < endPosition; i++) {
             _claimReward(msg.sender, rewardTokens[i]);
         }
-        
+
         // Then withdraw the assets
         uint256 shares = previewWithdraw(assets);
         _burn(msg.sender, shares);
         _totalAssets -= assets;
         require(asset.transfer(msg.sender, assets), "Transfer failed");
-        
+
         emit Withdraw(msg.sender, msg.sender, assets, shares);
-        
+
         return (block.timestamp, userInfo[msg.sender].lockTimeStart, lockPeriod);
     }
 
@@ -437,7 +419,7 @@ contract RewardsVault4626 is IERC4626 {
 
     function _updateUserRewards(address user) internal {
         if (!userInfo[user].exists) return;
-        
+
         for (uint256 i = 0; i < rewardTokens.length; i++) {
             _claimReward(user, rewardTokens[i]);
         }
@@ -461,10 +443,10 @@ contract RewardsVault4626 is IERC4626 {
 
         uint256 amount = rewardInfo[token].amount;
         uint256 lastClaimed = userInfo[user].lastClaimedAmountPerToken[token];
-        
+
         if (amount > lastClaimed) {
             uint256 reward = (amount - lastClaimed).mulDivDown(balanceOf[user], 1e18);
-            
+
             if (reward > 0) {
                 userInfo[user].lastClaimedAmountPerToken[token] = amount;
                 require(IERC20(token).transfer(user, reward), "Transfer failed");
@@ -480,10 +462,10 @@ contract RewardsVault4626 is IERC4626 {
         require(totalSupply > 0, "No shares minted yet");
 
         IERC20 rewardToken = IERC20(token);
-        
+
         // Calculate reward per share using original Vault logic
         uint256 perShareRewards = amount.mulDivDown(1e18, totalSupply);
-        
+
         // Register token if not exists
         if (!rewardInfo[token].exists) {
             rewardTokens.push(token);

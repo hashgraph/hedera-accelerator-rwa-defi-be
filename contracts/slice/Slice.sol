@@ -20,9 +20,9 @@ import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165C
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC7540} from "../erc7540/interfaces/IERC7540.sol";
 
-import {IAutoCompounder} from "../autocompounder/interfaces/IAutoCompounder.sol";
+import {IRewardsVaultAutoCompounder} from "../vaultV2/interfaces/IRewardsVaultAutoCompounder.sol";
 import {ISlice} from "./interfaces/ISlice.sol";
-import {IRewards} from "../erc4626/interfaces/IRewards.sol";
+import {IRewardsVault4626} from "../vaultV2/interfaces/IRewardsVault4626.sol";
 
 /**
  * @title Slice
@@ -129,7 +129,14 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param r // signature r
      * @param s // signature s
      */
-    function depositWithSignature(address aToken, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external returns (uint256 aTokenAmount) {
+    function depositWithSignature(
+        address aToken,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external returns (uint256 aTokenAmount) {
         require(amount > 0, "Slice: Invalid amount");
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(deadline >= block.timestamp, "Slice: Invalid deadline");
@@ -141,17 +148,11 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
 
         address _sender = msg.sender;
 
-        IERC20Permit(_asset).permit(
-            _sender,
-            address(this),
-            amount,
-            deadline,
-            v, r, s
-        );
+        IERC20Permit(_asset).permit(_sender, address(this), amount, deadline, v, r, s);
 
         return _deposit(_sender, aToken, _asset, amount);
     }
-    
+
     /**
      * Batch deposit to slice using Permit from ERC-2612
      * @param aTokens list of autocompunder tokens
@@ -162,21 +163,22 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param s list of s sig
      */
     function depositBatchWithSignatures(
-        address[] memory aTokens, 
-        uint256[] memory amounts, 
-        uint256[] memory deadlines, 
-        uint8[] memory v, 
-        bytes32[] memory r, 
-        bytes32[] memory  s
+        address[] memory aTokens,
+        uint256[] memory amounts,
+        uint256[] memory deadlines,
+        uint8[] memory v,
+        bytes32[] memory r,
+        bytes32[] memory s
     ) external returns (uint256[] memory) {
         // require same length
         require(
             aTokens.length == amounts.length &&
-            aTokens.length == deadlines.length &&
-            aTokens.length == v.length &&
-            aTokens.length == r.length &&
-            aTokens.length == s.length , "Slice: different array lengths");
-        
+                aTokens.length == deadlines.length &&
+                aTokens.length == v.length &&
+                aTokens.length == r.length &&
+                aTokens.length == s.length,
+            "Slice: different array lengths"
+        );
 
         address _sender = msg.sender;
         uint256[] memory aTokenAmount = new uint256[](aTokens.length);
@@ -186,16 +188,10 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             require(aTokens[i] != address(0), "Slice: Invalid aToken address");
             require(deadlines[i] >= block.timestamp, "Slice: Invalid deadline");
             address _asset = getTokenAllocation(aTokens[i]).asset;
-            
+
             if (_asset == address(0)) revert AllocationNotFound(aTokens[i]);
 
-            IERC20Permit(_asset).permit(
-                _sender,
-                address(this),
-                amounts[i],
-                deadlines[i],
-                v[i], r[i], s[i]
-            );
+            IERC20Permit(_asset).permit(_sender, address(this), amounts[i], deadlines[i], v[i], r[i], s[i]);
 
             aTokenAmount[i] = _deposit(_sender, aTokens[i], _asset, amounts[i]);
         }
@@ -210,13 +206,18 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param _asset address of the underlying asset
      * @param amount amount to be deposit
      */
-    function _deposit(address _sender, address aToken, address _asset, uint256 amount) internal returns (uint256 aTokenAmount) {
+    function _deposit(
+        address _sender,
+        address aToken,
+        address _asset,
+        uint256 amount
+    ) internal returns (uint256 aTokenAmount) {
         // Transfer underlying token from user to contract
         IERC20(_asset).safeTransferFrom(_sender, address(this), amount);
 
         // Deposit to AutoCompounder
         IERC20(_asset).approve(aToken, amount);
-        aTokenAmount = IAutoCompounder(aToken).deposit(amount, address(this));
+        aTokenAmount = IRewardsVaultAutoCompounder(aToken).deposit(amount, address(this));
 
         _balances[aToken] += aTokenAmount;
 
@@ -274,14 +275,14 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         if (getTokenAllocation(aToken).aToken != address(0)) revert AssociatedAllocationExists(aToken);
 
         // Check aToken implements needed interface
-        if (!ERC165Checker.supportsInterface(aToken, type(IAutoCompounder).interfaceId))
+        if (!ERC165Checker.supportsInterface(aToken, type(IRewardsVaultAutoCompounder).interfaceId))
             revert UnsupportedAToken(aToken);
 
         // Check current allocations amount isn't gt max allowed
         if (_allocations.length == MAX_TOKENS_AMOUNT) revert AllocationsLimitReached();
 
         // Get underlying asset from Autocompounder
-        address asset = IAutoCompounder(aToken).asset();
+        address asset = IRewardsVaultAutoCompounder(aToken).asset();
 
         _allocations.push(Allocation({aToken: aToken, asset: asset, targetPercentage: percentage}));
         _allocated += percentage;
@@ -328,7 +329,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         uint256 amountToWithdraw,
         uint256 exchangeRate
     ) public returns (uint256 withdrawnAmount) {
-        address vault = IAutoCompounder(aToken).vault();
+        address vault = IRewardsVaultAutoCompounder(aToken).vault();
         uint256 maxWithdrawAmount = IERC4626(vault).maxWithdraw(aToken);
 
         uint256 neededUnderlying = amountToWithdraw.mulDivDown(PRECISION, exchangeRate); // Convert aToken to underlying for checks
@@ -340,22 +341,22 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
 
             if (maxWithdrawAmount < neededUnderlying) {
                 return
-                    IAutoCompounder(aToken).withdraw(
+                    IRewardsVaultAutoCompounder(aToken).withdraw(
                         maxWithdrawAmount.mulDivDown(exchangeRate, PRECISION),
                         address(this)
                     ); // Withdraw max possible amount
             } else {
-                return IAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
+                return IRewardsVaultAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
             }
         } else {
             if (maxWithdrawAmount < neededUnderlying) {
                 return
-                    IAutoCompounder(aToken).withdraw(
+                    IRewardsVaultAutoCompounder(aToken).withdraw(
                         maxWithdrawAmount.mulDivDown(exchangeRate, PRECISION),
                         address(this)
                     ); // Withdraw max possible amount
             } else {
-                return IAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
+                return IRewardsVaultAutoCompounder(aToken).withdraw(amountToWithdraw, address(this)); // Withdraw needed amount
             }
         }
     }
@@ -420,7 +421,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                         targetUnderlyingAmount: targetUnderlyingAmount,
                         aTokenTargetAmount: aTokenTargetAmount,
                         currentBalance: aTokenBalance,
-                        availableReward: IRewards(IAutoCompounder(aToken).vault()).getUserReward(aToken, baseToken())
+                        availableReward: IRewardsVault4626(IRewardsVaultAutoCompounder(aToken).vault())
+                            .getClaimableReward(aToken, baseToken())
                     });
                 }
             } else {
@@ -430,7 +432,10 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                     targetUnderlyingAmount: targetUnderlyingAmount,
                     aTokenTargetAmount: aTokenTargetAmount,
                     currentBalance: aTokenBalance,
-                    availableReward: IRewards(IAutoCompounder(aToken).vault()).getUserReward(aToken, baseToken())
+                    availableReward: IRewardsVault4626(IRewardsVaultAutoCompounder(aToken).vault()).getClaimableReward(
+                        aToken,
+                        baseToken()
+                    )
                 });
             }
         }
@@ -466,7 +471,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             // Balance can't be gt 'aTokenTargetAmount' amount cuz possible excess was swapped in previous step, if tokens were unlocked
             if (balance >= aTokenTargetAmount) continue;
 
-            currentExchangeRate = IAutoCompounder(aToken).exchangeRate();
+            currentExchangeRate = IRewardsVaultAutoCompounder(aToken).exchangeRate();
 
             difference = aTokenTargetAmount - balance;
             neededUnderlying = difference.mulDivDown(PRECISION, currentExchangeRate);
@@ -502,7 +507,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
 
             // Reinvest to get aToken
             IERC20(asset).approve(aToken, underlyingBalance);
-            _balances[aToken] += IAutoCompounder(aToken).deposit(underlyingBalance, address(this));
+            _balances[aToken] += IRewardsVaultAutoCompounder(aToken).deposit(underlyingBalance, address(this));
         }
     }
 
@@ -535,7 +540,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         returns (uint256 currentValue, uint256 underlyingValue, uint256 underlyingPrice, uint256 aTokenToUnderlyingRate)
     {
         uint256 balance = _balances[aToken];
-        aTokenToUnderlyingRate = IAutoCompounder(aToken).exchangeRate();
+        aTokenToUnderlyingRate = IRewardsVaultAutoCompounder(aToken).exchangeRate();
         underlyingPrice = uint256(getChainlinkDataFeedLatestAnswer(asset));
 
         // Get Underlying value in aToken

@@ -6,11 +6,13 @@ import {RewardsVault4626} from "./RewardsVault4626.sol";
 import {FixedPointMathLib} from "../math/FixedPointMathLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV2Router02} from "../uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
+import {IRewardsVaultAutoCompounder} from "./interfaces/IRewardsVaultAutoCompounder.sol";
+import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title RewardsVaultAutoCompounder
 /// @notice Simplified auto-compounder for RewardsVault4626
 /// @dev This contract allows users to deposit and automatically claims rewards to reinvest them
-contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
+contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAutoCompounder, ERC165 {
     using FixedPointMathLib for uint256;
 
     /*///////////////////////////////////////////////////////////////
@@ -19,34 +21,34 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
 
     /// @notice The underlying vault
     RewardsVault4626 public immutable VAULT;
-    
+
     /// @notice The underlying asset token
     IERC20 public immutable ASSET;
-    
+
     /// @notice Uniswap V2 router for swaps
     IUniswapV2Router02 public immutable UNISWAP_ROUTER;
-    
+
     /// @notice Intermediate token for swaps (e.g., WETH, USDC)
     address public immutable INTERMEDIATE_TOKEN;
-    
+
     /// @notice Name of the autocompounder token
     string public name;
-    
+
     /// @notice Symbol of the autocompounder token
     string public symbol;
-    
+
     /// @notice Number of decimals
     uint8 public immutable DECIMALS;
-    
+
     /// @notice Total supply of autocompounder tokens
     uint256 public totalSupply;
-    
+
     /// @notice Contract owner
     address public owner;
-    
+
     /// @notice Minimum threshold to perform automatic claim
     uint256 public minimumClaimThreshold;
-    
+
     /// @notice Maximum allowed slippage for swaps (in basis points, e.g., 300 = 3%)
     uint256 public maxSlippage;
 
@@ -65,41 +67,15 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
 
     /// @notice User balances in the autocompounder
     mapping(address => uint256) public override balanceOf;
-    
+
     /// @notice Allowances for transfers
     mapping(address => mapping(address => uint256)) public override allowance;
-    
+
     /// @notice User information
     mapping(address => UserInfo) public userInfo;
-    
+
     /// @notice Custom swap paths for each reward token to asset
     mapping(address => address[]) public swapPaths;
-
-    /*///////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    event Deposit(address indexed user, uint256 assets, uint256 shares);
-    event Withdraw(address indexed user, uint256 shares, uint256 assets);
-    event RewardsClaimed(address indexed user, address indexed rewardToken, uint256 amount);
-    event AutoCompound(uint256 totalAssetsReinvested, uint256 swapCount);
-    event TokenSwapped(address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut);
-    event SwapPathUpdated(address indexed rewardToken, address[] newPath);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    /*///////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error NotOwner();
-    error InvalidAmount();
-    error InvalidReceiver();
-    error TransferFailed();
-    error InsufficientBalance();
-    error InvalidNewOwner();
-    error InvalidSlippage();
-    error SwapFailed();
-    error InvalidSwapPath();
 
     /*///////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -132,10 +108,10 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
         minimumClaimThreshold = _minimumClaimThreshold;
         UNISWAP_ROUTER = _uniswapRouter;
         INTERMEDIATE_TOKEN = _intermediateToken;
-        
+
         if (_maxSlippage > 5000) revert InvalidSlippage(); // Max 50%
         maxSlippage = _maxSlippage;
-        
+
         // Set up default path for asset (no swap needed)
         address[] memory directPath = new address[](1);
         directPath[0] = address(ASSET);
@@ -156,23 +132,23 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
 
         // Calculate shares to mint
         shares = _convertToShares(assets);
-        
+
         // Transfer assets from user to this contract
         if (!ASSET.transferFrom(msg.sender, address(this), assets)) revert TransferFailed();
-        
+
         // Approve and deposit into vault
         ASSET.approve(address(VAULT), assets);
         VAULT.deposit(assets, address(this));
-        
+
         // Mint autocompounder shares
         _mint(receiver, shares);
-        
+
         // Update user info
         if (userInfo[receiver].depositTimestamp == 0) {
             userInfo[receiver].depositTimestamp = block.timestamp;
         }
         userInfo[receiver].totalDeposited += assets;
-        
+
         emit Deposit(receiver, assets, shares);
     }
 
@@ -183,31 +159,34 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     function withdraw(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
         if (shares == 0) revert InvalidAmount();
         if (shares > balanceOf[msg.sender]) revert InsufficientBalance();
-        
+
         // Calculate assets to withdraw
         assets = _convertToAssets(shares);
-        
+
         // Calculate vault shares BEFORE burning autocompounder shares
         uint256 vaultSharesToRedeem = _convertToVaultShares(shares);
         if (vaultSharesToRedeem == 0) revert InvalidAmount();
-        
+
         // Burn autocompounder shares
         _burn(msg.sender, shares);
-        
+
         // Withdraw from vault and transfer to receiver
         VAULT.redeem(vaultSharesToRedeem, receiver, address(this));
-        
+
         // Update user info only if any remaining
         if (userInfo[msg.sender].totalDeposited > 0) {
             uint256 remainingShares = balanceOf[msg.sender];
             if (remainingShares == 0) {
                 userInfo[msg.sender].totalDeposited = 0;
             } else {
-                uint256 assetsReduction = assets.mulDivDown(userInfo[msg.sender].totalDeposited, remainingShares + shares);
+                uint256 assetsReduction = assets.mulDivDown(
+                    userInfo[msg.sender].totalDeposited,
+                    remainingShares + shares
+                );
                 userInfo[msg.sender].totalDeposited -= assetsReduction;
             }
         }
-        
+
         emit Withdraw(msg.sender, shares, assets);
     }
 
@@ -221,23 +200,23 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
 
         // Calculate required assets
         assets = _convertToAssets(shares);
-        
+
         // Transfer assets from user to this contract
         if (!ASSET.transferFrom(msg.sender, address(this), assets)) revert TransferFailed();
-        
+
         // Approve and deposit into vault
         ASSET.approve(address(VAULT), assets);
         VAULT.deposit(assets, address(this));
-        
+
         // Mint autocompounder shares
         _mint(receiver, shares);
-        
+
         // Update user info
         if (userInfo[receiver].depositTimestamp == 0) {
             userInfo[receiver].depositTimestamp = block.timestamp;
         }
         userInfo[receiver].totalDeposited += assets;
-        
+
         emit Deposit(receiver, assets, shares);
     }
 
@@ -249,7 +228,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     function redeem(uint256 shares, address receiver, address owner_) external nonReentrant returns (uint256 assets) {
         if (shares == 0) revert InvalidAmount();
         if (receiver == address(0)) revert InvalidReceiver();
-        
+
         // Check allowances if not the owner
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender];
@@ -257,22 +236,22 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
                 allowance[owner_][msg.sender] = allowed - shares;
             }
         }
-        
+
         if (shares > balanceOf[owner_]) revert InsufficientBalance();
-        
+
         // Calculate assets to withdraw
         assets = _convertToAssets(shares);
-        
+
         // Calculate vault shares to redeem
         uint256 vaultSharesToRedeem = _convertToVaultShares(shares);
         if (vaultSharesToRedeem == 0) revert InvalidAmount();
-        
+
         // Burn autocompounder shares
         _burn(owner_, shares);
-        
+
         // Withdraw from vault and transfer to receiver
         VAULT.redeem(vaultSharesToRedeem, receiver, address(this));
-        
+
         // Update user info
         if (userInfo[owner_].totalDeposited > 0) {
             uint256 remainingShares = balanceOf[owner_];
@@ -283,7 +262,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
                 userInfo[owner_].totalDeposited -= assetsReduction;
             }
         }
-        
+
         emit Withdraw(owner_, assets, shares);
     }
 
@@ -296,20 +275,20 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     function autoCompound() external nonReentrant {
         // Claim all available rewards for this contract
         VAULT.claimAllRewards();
-        
+
         uint256 totalAssetsToReinvest = 0;
         uint256 swapCount = 0;
-        
+
         // Get the list of reward tokens from the vault
         uint256 rewardTokensLength = VAULT.getRewardTokensLength();
-        
+
         for (uint256 i = 0; i < rewardTokensLength; i++) {
             address rewardToken = VAULT.rewardTokens(i);
             uint256 rewardBalance = IERC20(rewardToken).balanceOf(address(this));
-            
+
             if (rewardBalance >= minimumClaimThreshold) {
                 uint256 assetsObtained;
-                
+
                 // If reward token is already the vault's asset, no swap needed
                 if (rewardToken == address(ASSET)) {
                     assetsObtained = rewardBalance;
@@ -320,17 +299,17 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
                         swapCount++;
                     }
                 }
-                
+
                 totalAssetsToReinvest += assetsObtained;
             }
         }
-        
+
         // Reinvest all obtained assets in the vault
         if (totalAssetsToReinvest > 0) {
             ASSET.approve(address(VAULT), totalAssetsToReinvest);
             VAULT.deposit(totalAssetsToReinvest, address(this));
         }
-        
+
         emit AutoCompound(totalAssetsToReinvest, swapCount);
     }
 
@@ -339,13 +318,13 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     function claimUserRewards() external nonReentrant {
         uint256 userShares = balanceOf[msg.sender];
         if (userShares == 0) revert InvalidAmount();
-        
+
         // Calculate user's proportion
         uint256 userProportion = userShares.mulDivDown(1e18, totalSupply);
-        
+
         // Claim all vault rewards
         VAULT.claimAllRewards();
-        
+
         // For simplicity, just transfer proportion of available assets
         uint256 availableAssets = ASSET.balanceOf(address(this));
         if (availableAssets > 0) {
@@ -426,31 +405,33 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     /// @return assetsObtained Amount of assets obtained after swap
     function _swapRewardToAsset(address rewardToken, uint256 amount) internal returns (uint256 assetsObtained) {
         address[] memory path = swapPaths[rewardToken];
-        
+
         // If no path is configured, try default path via intermediate token
         if (path.length == 0) {
             path = _getDefaultSwapPath(rewardToken);
         }
-        
+
         // If still no valid path, skip this token
         if (path.length < 2 || path[path.length - 1] != address(ASSET)) {
             return 0;
         }
-        
+
         // Approve token for Uniswap router
         IERC20(rewardToken).approve(address(UNISWAP_ROUTER), amount);
-        
+
         // Calculate minimum expected amount with slippage
         uint256[] memory amountsOut = UNISWAP_ROUTER.getAmountsOut(amount, path);
-        uint256 amountOutMin = amountsOut[amountsOut.length - 1] * (10000 - maxSlippage) / 10000;
-        
-        try UNISWAP_ROUTER.swapExactTokensForTokens(
-            amount,
-            amountOutMin,
-            path,
-            address(this),
-            block.timestamp + 300 // 5 minutes deadline
-        ) returns (uint256[] memory amounts) {
+        uint256 amountOutMin = (amountsOut[amountsOut.length - 1] * (10000 - maxSlippage)) / 10000;
+
+        try
+            UNISWAP_ROUTER.swapExactTokensForTokens(
+                amount,
+                amountOutMin,
+                path,
+                address(this),
+                block.timestamp + 300 // 5 minutes deadline
+            )
+        returns (uint256[] memory amounts) {
             assetsObtained = amounts[amounts.length - 1];
             emit TokenSwapped(rewardToken, address(ASSET), amount, assetsObtained);
         } catch {
@@ -487,25 +468,25 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
 
     function transfer(address to, uint256 amount) external override returns (bool) {
         if (to == address(0)) revert InvalidReceiver();
-        
+
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
-        
+
         emit Transfer(msg.sender, to, amount);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
         if (to == address(0)) revert InvalidReceiver();
-        
+
         uint256 allowed = allowance[from][msg.sender];
         if (allowed != type(uint256).max) {
             allowance[from][msg.sender] = allowed - amount;
         }
-        
+
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
-        
+
         emit Transfer(from, to, amount);
         return true;
     }
@@ -544,7 +525,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
         if (path.length < 2) revert InvalidSwapPath();
         if (path[0] != rewardToken) revert InvalidSwapPath();
         if (path[path.length - 1] != address(ASSET)) revert InvalidSwapPath();
-        
+
         swapPaths[rewardToken] = path;
         emit SwapPathUpdated(rewardToken, path);
     }
@@ -566,9 +547,9 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
         if (path.length == 0) {
             path = _getDefaultSwapPath(rewardToken);
         }
-        
+
         if (path.length < 2) return 0;
-        
+
         try UNISWAP_ROUTER.getAmountsOut(amount, path) returns (uint256[] memory amounts) {
             amountOut = amounts[amounts.length - 1];
         } catch {
@@ -597,5 +578,24 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard {
     /// @notice Emergency function to recover stuck tokens
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
         if (!IERC20(token).transfer(owner, amount)) revert TransferFailed();
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        IAutoCompounder COMPATIBILITY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns underlying asset address (for IAutoCompounder compatibility)
+    function asset() external view returns (address) {
+        return address(ASSET);
+    }
+
+    /// @notice Returns related vault address (for IAutoCompounder compatibility)
+    function vault() external view returns (address) {
+        return address(VAULT);
+    }
+
+    /// @notice ERC165 interface support check
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == type(IRewardsVaultAutoCompounder).interfaceId || super.supportsInterface(interfaceId);
     }
 }
