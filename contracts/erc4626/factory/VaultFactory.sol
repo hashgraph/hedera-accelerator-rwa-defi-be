@@ -11,7 +11,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ITokenVotes} from "../../erc3643/token/ITokenVotes.sol";
 import {IIdentityRegistry} from "../../erc3643/registry/interface/IIdentityRegistry.sol";
 import {IIdentity} from "../../onchainid/interface/IIdentity.sol";
-import {IBuildingIdentityFactory} from "../../buildings/interfaces/IBuildingIdentityFactory.sol";
+import {IdentityGateway} from "../../onchainid/gateway/Gateway.sol";
 
 /**
  * @title Vault Factory
@@ -24,13 +24,13 @@ contract VaultFactory is Ownable, IVaultFactory, ERC165 {
     // Used salt => deployed Vault
     mapping(string => address) public vaultDeployed;
 
-    IBuildingIdentityFactory private identityFactory;
+    IdentityGateway private idGateway;
 
     /**
      * @dev Initializes contract with passed parameters.
      */
-    constructor(address _identityFactory) Ownable(msg.sender) {
-        identityFactory = IBuildingIdentityFactory(_identityFactory);
+    constructor(address _idGateway) Ownable(msg.sender) {
+        idGateway = IdentityGateway(_idGateway);
     }
 
     /**
@@ -60,8 +60,7 @@ contract VaultFactory is Ownable, IVaultFactory, ERC165 {
         
         // check if asset is an erc3643 token and register identity
         try erc3643Token.identityRegistry() returns (IIdentityRegistry registry) {
-            IIdentity identity = IIdentity(identityFactory.createIdentity(vault));
-
+            IIdentity identity = IIdentity(idGateway.deployIdentityForWallet(vault));
             registry.registerIdentity(vault, identity, 840);
         } catch  {
             // do nothing

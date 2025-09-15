@@ -14,58 +14,8 @@
         },
         {
           "indexed": false,
-          "internalType": "address",
-          "name": "safeAddress",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "receiver",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "MultisigProposalExecuted",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "threshold",
-          "type": "uint256"
-        }
-      ],
-      "name": "MultisigThresholdUpdated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
           "internalType": "enum BuildingGovernanceStorage.ProposalType",
           "name": "proposalType",
-          "type": "uint8"
-        },
-        {
-          "indexed": false,
-          "internalType": "enum BuildingGovernanceStorage.ProposalLevel",
-          "name": "level",
           "type": "uint8"
         },
         {
@@ -88,19 +38,6 @@
         }
       ],
       "name": "ProposalDefined",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "safeAddress",
-          "type": "address"
-        }
-      ],
-      "name": "SafeAddressUpdated",
       "type": "event"
     }
   ],

@@ -4,8 +4,7 @@ import TestnetDeployments from '../data/deployments/chain-296.json';
 
 import {
   usdcAddress,
-  uniswapRouterAddress,
-  trexFactoryAddress
+  uniswapRouterAddress
 } from "../constants";
 import { BuildingFactoryInitStruct } from '../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory';
 
@@ -15,6 +14,93 @@ async function init(): Promise<Record<string, any>> {
   return {
     ...TestnetDeployments
   };
+}
+
+// Deploy main contracts for the ERC3643 Standart (T-REX)
+async function deployERC3643(contracts: Record<string, any>): Promise<Record<string, any>> {
+  console.log(' - Deploying ERC3643 contracts...');
+  const [deployer] = await ethers.getSigners();
+
+  //Deploy implementations
+  const claimTopicsRegistryImplementation = await ethers.deployContract('ClaimTopicsRegistry', deployer);
+  const trustedIssuersRegistryImplementation = await ethers.deployContract('TrustedIssuersRegistry', deployer);
+  const identityRegistryStorageImplementation = await ethers.deployContract('IdentityRegistryStorage', deployer);
+  const identityRegistryImplementation = await ethers.deployContract('IdentityRegistry', deployer);
+  const modularComplianceImplementation = await ethers.deployContract('ModularCompliance', deployer);
+  const tokenImplementation = await ethers.deployContract('TokenVotes', deployer);
+  tokenImplementation.waitForDeployment();
+  const identityImplementation = await ethers.deployContract('Identity', [deployer.address, true], deployer);
+  const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], deployer);
+  const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], deployer);
+  const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], deployer);
+  const trexImplementationAuthority = await ethers.deployContract('TREXImplementationAuthority', [true, ethers.ZeroAddress, ethers.ZeroAddress], deployer);
+
+  // creates TREX Factory
+  const versionStruct = {
+    major: 4,
+    minor: 0,
+    patch: 0,
+  };
+
+  const contractsStruct = {
+    tokenImplementation: await tokenImplementation.getAddress(),
+    ctrImplementation: await claimTopicsRegistryImplementation.getAddress(),
+    irImplementation: await identityRegistryImplementation.getAddress(),
+    irsImplementation: await identityRegistryStorageImplementation.getAddress(),
+    tirImplementation: await trustedIssuersRegistryImplementation.getAddress(),
+    mcImplementation: await modularComplianceImplementation.getAddress(),
+  };
+
+  const trexImplementationAuthorityContract = await ethers.getContractAt(
+    "TREXImplementationAuthority",
+    await trexImplementationAuthority.getAddress()
+  );
+
+  await trexImplementationAuthorityContract.addAndUseTREXVersion(versionStruct, contractsStruct, { gasLimit: 15000000 });
+
+  const libraries = {
+    "TREXDeployments" : await (await (await ethers.deployContract("TREXDeployments")).waitForDeployment()).getAddress()
+  }
+  const TREXFactory = await ethers.getContractFactory('TREXFactory', { libraries });
+  const trexFactory = await TREXFactory.deploy(
+    await trexImplementationAuthority.getAddress(),
+    await identityFactory.getAddress(),
+  );
+  await trexFactory.waitForDeployment();
+
+  await identityFactory.addTokenFactory(await trexFactory.getAddress());
+
+  const TREXGateway = await ethers.getContractFactory('TREXGateway');
+  const trexGateway = await TREXGateway.deploy(
+    await trexFactory.getAddress(),
+    true
+  );
+  await trexGateway.waitForDeployment();
+
+  await trexFactory.connect(deployer).transferOwnership(await trexGateway.getAddress());
+  await identityFactory.connect(deployer).transferOwnership(await identityGateway.getAddress());
+
+  return {
+    ...contracts,
+    implementations: {
+      Token: await tokenImplementation.getAddress(),
+      ClaimTopicsRegistry: await claimTopicsRegistryImplementation.getAddress(),
+      TrustedIssuersRegistry: await trustedIssuersRegistryImplementation.getAddress(),
+      IdentityRegistryStorage: await identityRegistryStorageImplementation.getAddress(),
+      IdentityRegistry: await identityRegistryImplementation.getAddress(),
+      ModularCompliance: await modularComplianceImplementation.getAddress(),
+      Identity: await identityImplementation.getAddress(),
+      ImplementationAuthority: await identityImplementationAuthority.getAddress(),
+    },
+    factories: {
+      IdFactory: await identityFactory.getAddress(),
+      TREXImplementationAuthority: await trexImplementationAuthority.getAddress(),
+      TREXFactory: await trexFactory.getAddress(),
+      TREXGateway: await trexGateway.getAddress(),
+      IdentityGateway: await identityGateway.getAddress(),
+    }
+  }
+
 }
 
 async function deployComplianceModules(contracts: Record<string, any>): Promise<Record<string, any>> {
@@ -41,39 +127,13 @@ async function deployComplianceModules(contracts: Record<string, any>): Promise<
   }
 }
 
-async function deployBuildingIdentityFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
-  console.log(' - Deploying Building Identity Factory...');
-  const [owner] = await ethers.getSigners();
-  const identityImplementation = await ethers.deployContract('Identity', [owner.address, true], owner);
-  const identityImplementationAuthority = await ethers.deployContract('ImplementationAuthority', [await identityImplementation.getAddress()], owner);
-  const identityFactory = await ethers.deployContract('IdFactory', [await identityImplementationAuthority.getAddress()], owner);
-
-  const buildingIdentityFactory = await ethers.deployContract('BuildingIdentityFactory', [await identityFactory.getAddress()], owner);
-  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
-
-  await identityFactory.transferOwnership(buildingIdentityFactoryAddress);
-
-  return {
-    ...contracts,
-    factories: {
-      ...contracts.factories,
-      BuildingIdentityFactory: buildingIdentityFactoryAddress,
-    }
-  }
-}
-
 async function deployVaultFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(' - Deploying Vault Factory...');
   const [deployer] = await ethers.getSigners();
-  const buildingIdentityFactory = await ethers.getContractAt('BuildingIdentityFactory', contracts.factories.BuildingIdentityFactory);
-  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
 
   const VaultFactory = await ethers.getContractFactory("VaultFactory");
-  const vaultFactory = await VaultFactory.deploy(buildingIdentityFactoryAddress, { from: deployer.address });
+  const vaultFactory = await VaultFactory.deploy(contracts.factories.IdentityGateway, { from: deployer.address });
   await vaultFactory.waitForDeployment();
-  const vaultFactoryAddress = await vaultFactory.getAddress();
-
-  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), vaultFactoryAddress);
 
   return {
     ...contracts,
@@ -89,18 +149,12 @@ async function deployAsyncVaultFactory(contracts: Record<string, any>): Promise<
   console.log(' - Deploying Async Vault Factory...');
   const [deployer] = await ethers.getSigners();
 
-  const buildingIdentityFactory = await ethers.getContractAt('BuildingIdentityFactory', contracts.factories.BuildingIdentityFactory);
-  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
-
   const AsyncVaultFactory = await ethers.getContractFactory("AsyncVaultFactory");
   const asyncVaultFactory = await AsyncVaultFactory.deploy(
-    buildingIdentityFactoryAddress,
+    contracts.factories.IdentityGateway,
     { from: deployer.address, gasLimit: 15000000 }
   );
   await asyncVaultFactory.waitForDeployment();
-  const asyncVaultFactoryAddress = await asyncVaultFactory.getAddress();
-
-  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), asyncVaultFactoryAddress);
 
   return {
     ...contracts,
@@ -131,15 +185,9 @@ async function deploySliceFactory(contracts: Record<string, any>): Promise<Recor
 async function deployAutoCompounderFactory(contracts: Record<string, any>): Promise<Record<string, any>> {
   console.log(' - Deploying AutoCompounder Factory...');
 
-  const buildingIdentityFactory = await ethers.getContractAt('BuildingIdentityFactory', contracts.factories.BuildingIdentityFactory);
-  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
-
   const AutoCompounderFactory = await ethers.getContractFactory("AutoCompounderFactory");
-  const autoCompounderFactory = await AutoCompounderFactory.deploy(buildingIdentityFactoryAddress);
+  const autoCompounderFactory = await AutoCompounderFactory.deploy(contracts.factories.IdentityGateway);
   await autoCompounderFactory.waitForDeployment();
-  const autoCompounderFactoryAddress = await autoCompounderFactory.getAddress();
-
-  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), autoCompounderFactoryAddress);
 
   return {
     ...contracts,
@@ -188,16 +236,18 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
   await buildingBeacon.waitForDeployment();
   const buildingBeaconAddress = await buildingBeacon.getAddress();
 
-  const buildingIdentityFactory = await ethers.getContractAt('BuildingIdentityFactory', contracts.factories.BuildingIdentityFactory);
-  const buildingIdentityFactoryAddress = await buildingIdentityFactory.getAddress();
-
   const buildingFactoryFactory = await ethers.getContractFactory('BuildingFactory', { libraries: contracts.libraries });
   const buildingFactoryBeacon = await upgrades.deployBeacon(buildingFactoryFactory, { unsafeAllow: ["external-library-linking"] } );
   await buildingFactoryBeacon.waitForDeployment();
   const buildingFactoryBeaconAddress = await buildingFactoryBeacon.getAddress();
+  const identityGateway = await ethers.getContractAt('IdentityGateway', contracts.factories.IdentityGateway);
+  const identityGatewayAddress = await identityGateway.getAddress();
 
   const uniswapRouter = await ethers.getContractAt('UniswapV2Router02', uniswapRouterAddress);
   const uniswapFactoryAddress = await uniswapRouter.factory();
+
+  const trexGatewayAddress = contracts.factories.TREXGateway;
+  const trexGateway = await ethers.getContractAt('TREXGateway', trexGatewayAddress);
 
   // Beacon Upgradable Pattern for Treasury
   const treasuryImplementation = await ethers.deployContract('Treasury', { gasLimit: 15000000 });
@@ -221,13 +271,13 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
     nft: contracts.implementations.ERC721Metadata, 
     uniswapRouter: uniswapRouterAddress, 
     uniswapFactory: uniswapFactoryAddress,
-    trexFactory: trexFactoryAddress,
+    onchainIdGateway: identityGatewayAddress,
+    trexGateway: trexGatewayAddress,
     usdc: usdcAddress,
     buildingBeacon: buildingBeaconAddress,
     treasuryBeacon: treasuryBeaconAddress,
     governanceBeacon: governanceBeaconAddress,
     upkeeper: contracts.implementations.UpKeeper,
-    identityFactory: buildingIdentityFactoryAddress,
   }
 
   const buildingFactory = await upgrades.deployBeaconProxy(
@@ -249,12 +299,11 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
 
   const nftCollection = await ethers.getContractAt('ERC721Metadata', contracts.implementations.ERC721Metadata);
   await nftCollection.transferOwnership(buildingFactoryAddress);
+  await trexGateway.addDeployer(buildingFactoryAddress);
 
   // grant TRUSTED_REGISTRY_ROLE to building factory
   const upkeeper = await ethers.getContractAt('UpKeeper', contracts.implementations.UpKeeper);
   await upkeeper.grantRole(await upkeeper.TRUSTED_REGISTRY_ROLE(), buildingFactoryAddress);
-
-  await buildingIdentityFactory.grantRole(await buildingIdentityFactory.IDENTITY_DEPLOYER_ROLE(), buildingFactoryAddress);
 
   return {
     ...contracts,
@@ -337,7 +386,7 @@ async function finish(): Promise<void> {
 
 init()
   // add subsequent deployment script after this comment
-  .then(deployBuildingIdentityFactory)
+  .then(deployERC3643)
   .then(deployComplianceModules)
   .then(deployVaultFactory)
   .then(deployAsyncVaultFactory)
