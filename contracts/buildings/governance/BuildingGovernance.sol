@@ -12,6 +12,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BuildingGovernanceStorage} from "./BuildingGovernanceStorage.sol";
+import {ISafe} from "./interfaces/ISafe.sol";
 
 contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCountingSimpleUpgradeable, GovernorVotesUpgradeable, GovernorVotesQuorumFractionUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BuildingGovernanceStorage {
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -39,6 +40,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         $.treasury = treasury;
         $.auditRegistry = auditRegistry;
+        $.multisigThreshold = 500e6; // 500 USDC
     }
 
     function createTextProposal(ProposalLevel /*level*/, string memory description) public returns(uint256 proposalId) {
@@ -62,13 +64,24 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].proposalType = ProposalType.Text;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
 
-        emit ProposalDefined(proposalId, ProposalType.Text, msg.sender, address(0), 0);
+        emit ProposalDefined(proposalId, ProposalType.Text, ProposalLevel.GovernorVote, msg.sender, address(0), 0);
     }
 
     function createPaymentProposal(uint256 amount, address to, string memory description) public returns (uint256 proposalId) {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
-        // keep track of payments made in a month
-        // decide between multisig vote proposal or governor proposal 
+        
+        // Check if amount is below multisig threshold
+        if (amount <= $.multisigThreshold && $.safeAddress != address(0)) {
+            // Create multisig proposal
+            return _createMultisigPaymentProposal(amount, to, description);
+        } else {
+            // Create DAO proposal
+            return _createDaoPaymentProposal(amount, to, description);
+        }
+    }
+
+    function _createDaoPaymentProposal(uint256 amount, address to, string memory description) internal returns (uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
 
         address[] memory _treasury = new address[](1);
         _treasury[0] = $.treasury;
@@ -91,7 +104,29 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].amount = amount;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalDefined(proposalId, ProposalType.Payment, msg.sender, to, amount);
+        emit ProposalDefined(proposalId, ProposalType.Payment, ProposalLevel.GovernorVote, msg.sender, to, amount);
+    }
+
+    function _createMultisigPaymentProposal(uint256 amount, address to, string memory description) internal returns (uint256 proposalId) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        
+        // Generate a unique proposal ID for multisig proposals
+        proposalId = uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            msg.sender,
+            to,
+            amount,
+            description
+        )));
+
+        $.proposals[proposalId].exists = true;
+        $.proposals[proposalId].proposalType = ProposalType.Payment;
+        $.proposals[proposalId].to = to;
+        $.proposals[proposalId].amount = amount;
+        $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
+        $.proposals[proposalId].isMultisig = true;
+        
+        emit ProposalDefined(proposalId, ProposalType.Payment, ProposalLevel.MultisigVote, msg.sender, to, amount);
     }
 
     function createChangeReserveProposal(uint256 amount, string memory description) public returns (uint256 proposalId) {
@@ -116,7 +151,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].amount = amount;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalDefined(proposalId, ProposalType.ChangeReserve, msg.sender, address(0), amount);
+        emit ProposalDefined(proposalId, ProposalType.ChangeReserve, ProposalLevel.GovernorVote, msg.sender, address(0), amount);
     }
 
     function createAddAuditorProposal(address auditor, string memory description) public returns (uint256 proposalId) {
@@ -142,7 +177,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].to = auditor;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalDefined(proposalId, ProposalType.AddAuditor, msg.sender, auditor, 0);
+        emit ProposalDefined(proposalId, ProposalType.AddAuditor, ProposalLevel.GovernorVote, msg.sender, auditor, 0);
     }
 
     function createRemoveAuditorProposal(address auditor, string memory description) public returns (uint256 proposalId) {
@@ -168,14 +203,16 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         $.proposals[proposalId].to = auditor;
         $.proposals[proposalId].descriptionHash = keccak256(bytes(description));
         
-        emit ProposalDefined(proposalId, ProposalType.RemoveAuditor, msg.sender, auditor, 0);
+        emit ProposalDefined(proposalId, ProposalType.RemoveAuditor, ProposalLevel.GovernorVote, msg.sender, auditor, 0);
     }
 
     function executePaymentProposal(uint256 proposalId) external {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
 
         require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
-        require($.proposals[proposalId].proposalType == ProposalType.Payment , "BuildingGovernance: invalid proposal type");
+        require($.proposals[proposalId].proposalType == ProposalType.Payment, "BuildingGovernance: invalid proposal type");
+        require(!$.proposals[proposalId].isMultisig, "BuildingGovernance: use executeMultisigPaymentProposal for multisig proposals");
+
 
         address[] memory _treasury = new address[](1);
         _treasury[0] = $.treasury;
@@ -191,6 +228,43 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         );
 
         execute(_treasury, _values, _calldata, $.proposals[proposalId].descriptionHash);
+    }
+
+    function executeMultisigPaymentProposal(
+        uint256 proposalId,
+        bytes calldata signatures
+    ) external {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+
+        require($.proposals[proposalId].exists, "BuildingGovernance: invalid proposal ID");
+        require($.proposals[proposalId].proposalType == ProposalType.Payment, "BuildingGovernance: invalid proposal type");
+        require($.proposals[proposalId].isMultisig, "BuildingGovernance: not a multisig proposal");
+        require($.safeAddress != address(0), "BuildingGovernance: safe address not set");
+
+        // Prepare the transaction data for the Safe
+        bytes memory safeData = abi.encodeWithSignature(
+            "makePayment(address,uint256)",
+            $.proposals[proposalId].to,
+            $.proposals[proposalId].amount
+        );
+
+        // Execute the transaction through the Safe
+        bool success = ISafe($.safeAddress).execTransaction(
+            $.treasury,           // to
+            0,                    // value
+            safeData,             // data
+            0,                    // operation (0 = call)
+            0,                    // safeTxGas (0 = use default)
+            0,                    // baseGas (0 = use default)
+            0,                    // gasPrice (0 = use default)
+            address(0),           // gasToken
+            payable(address(0)),  // refundReceiver
+            signatures            // signatures
+        );
+
+        require(success, "BuildingGovernance: multisig execution failed");
+        
+        emit MultisigProposalExecuted(proposalId, $.safeAddress, $.proposals[proposalId].to, $.proposals[proposalId].amount);
     }
 
     function executeTextProposal(uint256 proposalId) external {
@@ -347,6 +421,29 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         returns (uint256)
     {
         return super.quorum(blockNumber);
+    }
+
+    // Configuration functions for multisig setup
+    function setMultisigThreshold(uint256 threshold) external onlyOwner {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        $.multisigThreshold = threshold;
+        emit MultisigThresholdUpdated(threshold);
+    }
+
+    function setSafeAddress(address safeAddress) external onlyOwner {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        $.safeAddress = safeAddress;
+        emit SafeAddressUpdated(safeAddress);
+    }
+
+    function getMultisigThreshold() external view returns (uint256) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        return $.multisigThreshold;
+    }
+
+    function getSafeAddress() external view returns (address) {
+        BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
+        return $.safeAddress;
     }
 }
 

@@ -6,6 +6,8 @@ abstract contract BuildingGovernanceStorage {
     struct BuildingGovernanceData {
         address treasury;
         address auditRegistry;
+        address safeAddress;           // Gnosis Safe address for multisig
+        uint256 multisigThreshold;     // Amount threshold for multisig vs DAO
         mapping (uint256 => ProposalData) proposals;
     }
 
@@ -15,6 +17,7 @@ abstract contract BuildingGovernanceStorage {
         address to;
         uint256 amount;
         bytes32 descriptionHash;
+        bool isMultisig;              // Flag to distinguish multisig from DAO proposals
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingGovernance")) - 1)) & ~bytes32(uint256(0xff));
@@ -26,7 +29,11 @@ abstract contract BuildingGovernanceStorage {
         }
     }    
     
-    enum ProposalLevel { GovernorVote }
+    enum ProposalLevel { GovernorVote, MultisigVote }
     enum ProposalType { Text, Payment, ChangeReserve, AddAuditor, RemoveAuditor }
-    event ProposalDefined(uint256 id, ProposalType proposalType, address proposer, address receiver, uint256 amount);
+    
+    event ProposalDefined(uint256 id, ProposalType proposalType, ProposalLevel level, address proposer, address receiver, uint256 amount);
+    event MultisigProposalExecuted(uint256 id, address safeAddress, address receiver, uint256 amount);
+    event MultisigThresholdUpdated(uint256 threshold);
+    event SafeAddressUpdated(address safeAddress);
 }

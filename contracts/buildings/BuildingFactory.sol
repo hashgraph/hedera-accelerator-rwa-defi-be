@@ -13,7 +13,6 @@ import {BuildingGovernanceLib, GovernanceDetails} from "./library/BuildingGovern
 import {BuildingTreasuryLib, TreasuryDetails} from "./library/BuildingTreasury.sol";
 import {BuildingTokenLib, TokenDetails} from "./library/BuildingToken.sol";
 import {BuildingAutoCompounderLib, AutoCompounderDetails} from "./library/BuildingAutoCompounder.sol";
-import {IIdFactory} from "../onchainid/factory/IIdFactory.sol";
 import {IIdentity} from "../onchainid/interface/IIdentity.sol";
 import {IIdentityRegistry} from "../erc3643/registry/interface/IIdentityRegistry.sol";
 import {ITokenVotes} from "../erc3643/token/ITokenVotes.sol";
@@ -23,6 +22,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IUpKeeper} from "../upkeeper/interface/IUpKeeper.sol";
 import {IRewardsVault4626} from "../vaultV2/interfaces/IRewardsVault4626.sol";
 import {IRewardsVaultAutoCompounder} from "../vaultV2/interfaces/IRewardsVaultAutoCompounder.sol";
+
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -43,8 +43,8 @@ struct BuildingFactoryInit {
     address nft;
     address uniswapRouter;
     address uniswapFactory;
-    address onchainIdGateway;
-    address trexGateway;
+    address identityFactory;
+    address trexFactory;
     address usdc;
     address buildingBeacon;
     address treasuryBeacon;
@@ -73,8 +73,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         $.uniswapRouter = init.uniswapRouter;
         $.uniswapFactory = init.uniswapFactory;
         $.buildingBeacon = init.buildingBeacon;
-        $.onchainIdGateway = init.onchainIdGateway;
-        $.trexGateway = init.trexGateway;
+        $.identityFactory = init.identityFactory;
+        $.trexFactory = init.trexFactory;
         $.treasuryBeacon = init.treasuryBeacon;
         $.usdc = init.usdc;
         $.governanceBeacon = init.governanceBeacon;
@@ -259,7 +259,9 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      */
     function deployIdentityForWallet(address wallet) external returns (address) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        return IIdentityGateway($.onchainIdGateway).deployIdentityForWallet(wallet);
+        IBuildingIdentityFactory idFactory = IBuildingIdentityFactory($.identityFactory);
+
+        return idFactory.createIdentity(wallet);
     }
 
     /**
@@ -274,7 +276,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
 
         BuildingDetails memory building = $.buildingDetails[buildingAddress];
         ITokenVotes token = ITokenVotes(building.erc3643Token);
-        IIdFactory idFactory = IIdentityGateway($.onchainIdGateway).idFactory();
+        IBuildingIdentityFactory idFactory = IBuildingIdentityFactory($.identityFactory);
         IIdentityRegistry ir = token.identityRegistry();
         address identity = idFactory.getIdentity(wallet);
 
@@ -292,7 +294,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      */
     function getIdentity(address wallet) external view returns (IIdentity) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        IIdFactory idFactory = IIdentityGateway($.onchainIdGateway).idFactory();
+        IBuildingIdentityFactory idFactory = IBuildingIdentityFactory($.identityFactory);
 
         return IIdentity(idFactory.getIdentity(wallet));
     }
@@ -306,16 +308,16 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      */
     function registeridentityForWallets(address building, address token, address[] memory wallets) private {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        IIdentityGateway identityGateway = IIdentityGateway($.onchainIdGateway);
+        IBuildingIdentityFactory idFactory = IBuildingIdentityFactory($.identityFactory);
         IIdentityRegistry identityRegistry = IIdentityRegistry(ITokenVotes(token).identityRegistry());
 
         for (uint256 i = 0; i < wallets.length; i++) {
-            IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(wallets[i]));
+            IIdentity identity = IIdentity(idFactory.getIdentity(wallets[i]));
             uint16 country = 840; // defaults to united states (ISO code)
 
             if (identity == IIdentity(address(0))) {
                 // if controller does not have identity, create one.
-                identity = IIdentity(identityGateway.deployIdentityForWallet(wallets[i]));
+                identity = IIdentity(idFactory.createIdentity(wallets[i]));
             }
 
             if (identityRegistry.identity(wallets[i]) == IIdentity(address(0))) {
