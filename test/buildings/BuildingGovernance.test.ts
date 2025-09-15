@@ -212,7 +212,7 @@ describe('BuildingGovernance', () => {
       const receiver = ethers.ZeroAddress // text proposal have zero address for receiver
       const amount = 0n // text proposal have zero amount
 
-      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, amount);
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, 0, proposer, receiver, amount);
     });
   });
 
@@ -233,7 +233,7 @@ describe('BuildingGovernance', () => {
       const proposer = owner.address
       const receiver = to;
 
-      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, amount);
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, 0, proposer, receiver, amount);
     });
 
     it('should execute payment proposal', async () => {
@@ -409,7 +409,7 @@ describe('BuildingGovernance', () => {
       const proposer = owner.address
       const receiver = auditor.address
 
-      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, 0);
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, 0, proposer, receiver, 0);
     });
 
     it('should execute add auditor proposal', async () => {
@@ -465,7 +465,7 @@ describe('BuildingGovernance', () => {
       const proposer = owner.address
       const receiver = auditor.address
 
-      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, proposer, receiver, 0);
+      await expect(tx).to.emit(governance, 'ProposalDefined').withArgs(proposalId, proposalType, 0, proposer, receiver, 0);
     });
 
     it('should execute remove auditor proposal', async () => {

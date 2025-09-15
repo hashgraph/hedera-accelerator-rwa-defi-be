@@ -10,7 +10,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ITokenVotes} from "../../erc3643/token/ITokenVotes.sol";
 import {IIdentityRegistry} from "../../erc3643/registry/interface/IIdentityRegistry.sol";
 import {IIdentity} from "../../onchainid/interface/IIdentity.sol";
-import {IdentityGateway} from "../../onchainid/gateway/Gateway.sol";
+import {IBuildingIdentityFactory} from "../../buildings/interfaces/IBuildingIdentityFactory.sol";
 
 /**
  * @title AutoCompounder Factory
@@ -23,13 +23,13 @@ contract AutoCompounderFactory is IAutoCompounderFactory, Ownable, ERC165 {
     // Used salt => deployed AutoCompounder
     mapping(string => address) public autoCompounderDeployed;
 
-    IdentityGateway private idGateway;
+    IBuildingIdentityFactory private identityFactory;
 
     /**
      * @dev Initializes contract with passed parameters.
      */
-    constructor(address _idGateway) Ownable(msg.sender) {
-        idGateway = IdentityGateway(_idGateway);
+    constructor(address _identityFactory) Ownable(msg.sender) {
+        identityFactory = IBuildingIdentityFactory(_identityFactory);
     }
 
     /**
@@ -61,7 +61,8 @@ contract AutoCompounderFactory is IAutoCompounderFactory, Ownable, ERC165 {
         
         // check if asset is an erc3643 token and register identity for the ac
         try erc3643Token.identityRegistry() returns (IIdentityRegistry registry) {
-            IIdentity identity = IIdentity(idGateway.deployIdentityForWallet(autoCompounder));
+            IIdentity identity = IIdentity(identityFactory.createIdentity(autoCompounder));
+
             registry.registerIdentity(autoCompounder, identity, 840);
         } catch  {
             // do nothing
