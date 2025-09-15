@@ -21,7 +21,8 @@ import {IModularCompliance} from "../erc3643/compliance/modular/IModularComplian
 import {UniswapV2Library} from "../uniswap/v2-periphery/libraries/UniswapV2Library.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {IUpKeeper} from "../upkeeper/interface/IUpKeeper.sol";
-import {IAutoCompounder} from "../autocompounder/interfaces/IAutoCompounder.sol";
+import {IRewardsVault4626} from "../vaultV2/interfaces/IRewardsVault4626.sol";
+import {IRewardsVaultAutoCompounder} from "../vaultV2/interfaces/IRewardsVaultAutoCompounder.sol";
 
 interface IOwnable {
     function transferOwnership(address to) external;
@@ -29,6 +30,7 @@ interface IOwnable {
 
 interface IIdentityGateway {
     function idFactory() external view returns (IIdFactory);
+
     function deployIdentityForWallet(address wallet) external returns (address);
 }
 
@@ -49,6 +51,7 @@ struct BuildingFactoryInit {
     address governanceBeacon;
     address upkeeper;
 }
+
 /**
  * @title BuildingFactory
  * @author Hashgraph
@@ -63,7 +66,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      * initialize used for upgradable contract
      * @param init BuildingFactoryInit config
      */
-    function initialize(BuildingFactoryInit calldata init) public virtual initializer  {
+    function initialize(BuildingFactoryInit calldata init) public virtual initializer {
         __Ownable_init(msg.sender);
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         $.nft = init.nft;
@@ -95,29 +98,29 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         return $.buildingDetails[buildingAddress];
     }
 
-
     /**
      * newBuilding Creates new building with create2, mints NFT and store it.
      * @param details NewBuildingDetails struct
      */
-    function newBuilding(NewBuildingDetails calldata details) public virtual returns (BuildingDetails memory buildingDetails){
+    function newBuilding(
+        NewBuildingDetails calldata details
+    ) public virtual returns (BuildingDetails memory buildingDetails) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        
+
         address initialOwner = msg.sender; // initial owner is sender
 
-        address building = address(new BeaconProxy(
-            $.buildingBeacon,
-            abi.encodeWithSelector(Building.initialize.selector, initialOwner)
-        ));
+        address building = address(
+            new BeaconProxy($.buildingBeacon, abi.encodeWithSelector(Building.initialize.selector, initialOwner))
+        );
 
         address auditRegistry = Building(building).getAuditRegistry();
 
         address erc3643Token = BuildingTokenLib.detployERC3643Token(
             TokenDetails(
-                initialOwner, 
-                $.trexGateway, 
-                details.tokenName, 
-                details.tokenSymbol, 
+                initialOwner,
+                $.trexGateway,
+                details.tokenName,
+                details.tokenSymbol,
                 details.tokenDecimals,
                 irAgents(),
                 tokenAgents()
@@ -126,10 +129,10 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
 
         address treasury = BuildingTreasuryLib.deployTreasury(
             TreasuryDetails(
-                $.treasuryBeacon, 
-                initialOwner, 
-                details.treasuryReserveAmount, 
-                details.treasuryNPercent, 
+                $.treasuryBeacon,
+                initialOwner,
+                details.treasuryReserveAmount,
+                details.treasuryNPercent,
                 initialOwner, // business address
                 $.usdc,
                 address(this) // building factory
@@ -138,52 +141,49 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
 
         address vault = BuildingVaultLib.deployVault(
             VaultDetails(
+                treasury, // initial owner
                 erc3643Token,
-                details.vaultShareTokenName, 
-                details.vaultShareTokenSymbol, 
-                details.vaultFeeReceiver, 
-                details.vaultFeeToken, 
-                details.vaultFeePercentage,
-                initialOwner, // rewardController
-                initialOwner, // feeConfigController
-                details.vaultCliff, 
-                details.vaultUnlockDuration
+                details.vaultShareTokenName,
+                details.vaultShareTokenSymbol,
+                18, // using 18 as token decimals for vault decimals
+                details.vaultUnlockDuration // using unlock duration as lock period
             )
-        );        
+        );
 
         address governance = BuildingGovernanceLib.deployGovernance(
             GovernanceDetails(
-                $.governanceBeacon, 
-                erc3643Token, 
-                details.governanceName, 
-                treasury, 
+                $.governanceBeacon,
+                erc3643Token,
+                details.governanceName,
+                treasury,
                 auditRegistry,
                 initialOwner
             )
         );
 
         address autoCompounder = BuildingAutoCompounderLib.deployAutoCompounder(
-            AutoCompounderDetails (
-                $.uniswapRouter,
+            AutoCompounderDetails(
                 vault,
-                $.usdc,
                 details.aTokenName,
                 details.aTokenSymbol,
-                initialOwner // operator
+                1e18, // minimumClaimThreshold: 1 token
+                $.uniswapRouter,
+                $.usdc, // intermediate token
+                300 // maxSlippage: 3% (300 basis points)
             )
         );
 
         // mint NFT representing the building with the tokenURI metadata
-        uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);        
+        uint256 nftId = IERC721Metadata($.nft).mint(building, details.tokenURI);
 
         // store building details
-        buildingDetails = BuildingDetails(  
+        buildingDetails = BuildingDetails(
             building,
             nftId,
             details.tokenURI,
             auditRegistry,
             erc3643Token,
-            treasury, 
+            treasury,
             governance,
             vault,
             autoCompounder,
@@ -203,7 +203,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      * @param buildingAddress address of the building contract
      */
     function configNewBuilding(address buildingAddress) public {
-        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();        
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         BuildingDetails storage building = $.buildingDetails[buildingAddress];
 
         require(building.addr != address(0), "Building not found");
@@ -226,23 +226,26 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
 
         // grant governance role to the governance contract and add vault to the treasury
         ITreasury(building.treasury).grantGovernanceRole(building.governance);
-        ITreasury(building.treasury).addVault(building.vault); 
-        
+        ITreasury(building.treasury).addVault(building.vault);
+
         // grant reward controller role to treasury
-        IAccessControl(building.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), building.treasury);
+        // IAccessControl(building.vault).grantRole(keccak256("VAULT_REWARD_CONTROLLER_ROLE"), building.treasury);
 
         // grant governance role to the governance contract and default admin role to the initial owner
         IAccessControl(building.auditRegistry).grantRole(keccak256("GOVERNANCE_ROLE"), building.governance); // default admin role
         IAccessControl(building.auditRegistry).grantRole(0x00, building.initialOwner); // default admin role to building owner
 
-        // transfer ownership of the vault and autoCompounder to the initial owner
-        IOwnable(building.vault).transferOwnership(building.initialOwner);
+        // transfer ownership of the vault to the treasury and autoCompounder to the initial owner
+        // IOwnable(building.vault).transferOwnership(building.treasury);
         IOwnable(building.autoCompounder).transferOwnership(building.initialOwner);
 
         // Register autocompounder- claiming rewards function in the UpKeeper.
         // This allows the upkeeper contract to register the claim function to be
         // executed autmatically by an off-chain keeper service
-        IUpKeeper($.upkeeper).registerTask(building.autoCompounder, IAutoCompounder(building.autoCompounder).claim.selector); 
+        IUpKeeper($.upkeeper).registerTask(
+            building.autoCompounder,
+            IRewardsVaultAutoCompounder(building.autoCompounder).autoCompound.selector
+        );
 
         building.isConfigured = true;
 
@@ -250,7 +253,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     }
 
     /**
-     *  deployIdentityForWallet 
+     *  deployIdentityForWallet
      * @param wallet address to deploy the identity to
      * @return identity address
      */
@@ -260,7 +263,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     }
 
     /**
-     * registerIdentity 
+     * registerIdentity
      * Register the identity in the Identity Registry
      * @param buildingAddress address
      * @param wallet wallet address
@@ -310,18 +313,14 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             IIdentity identity = IIdentity(identityGateway.idFactory().getIdentity(wallets[i]));
             uint16 country = 840; // defaults to united states (ISO code)
 
-            if (identity == IIdentity(address(0))) { 
+            if (identity == IIdentity(address(0))) {
                 // if controller does not have identity, create one.
                 identity = IIdentity(identityGateway.deployIdentityForWallet(wallets[i]));
             }
 
             if (identityRegistry.identity(wallets[i]) == IIdentity(address(0))) {
                 // if identity is not registered, register it.
-                identityRegistry.registerIdentity(
-                    wallets[i],
-                    identity,
-                    country
-                );
+                identityRegistry.registerIdentity(wallets[i], identity, country);
 
                 emit IdentityRegistered(building, wallets[i], address(identity), country);
             }
@@ -336,10 +335,10 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         require(agents.length <= 30, "max agents is 30");
 
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-        
+
         for (uint i = 0; i < agents.length; i++) {
             require(agents[i] != address(0), "Invalid agent address");
-            $.registryAgents.push(agents[i]);            
+            $.registryAgents.push(agents[i]);
         }
 
         emit RegistryAgentsAdded(agents);
@@ -351,14 +350,14 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
      */
     function removeRegistryAgent(address agent) public onlyOwner {
         require(agent != address(0), "Invalid agent address");
-        
+
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         address[] storage list = $.registryAgents;
 
         for (uint i = 0; i < list.length; i++) {
-            if (list[i] == agent){
+            if (list[i] == agent) {
                 list[i] = list[list.length - 1]; // overwrite with last
-                list.pop(); 
+                list.pop();
 
                 emit RegistryAgentRemoved(agent);
 
@@ -378,7 +377,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     /**
      * build array with identiry registry agents
      */
-    function irAgents () private view returns (address[] memory) {
+    function irAgents() private view returns (address[] memory) {
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
         address[] memory agents = new address[]($.registryAgents.length + 2);
 
@@ -386,9 +385,8 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
             agents[i] = $.registryAgents[i];
         }
 
-        agents[agents.length -1] = address(this);
-        agents[agents.length -2] = msg.sender;
-
+        agents[agents.length - 1] = address(this);
+        agents[agents.length - 2] = msg.sender;
 
         return agents;
     }
@@ -396,16 +394,16 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     /**
      * build array with token agents
      */
-    function tokenAgents () private view returns (address[] memory) {
-         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
-         address[] memory agents = new address[]($.tokenAgents.length + 2);
+    function tokenAgents() private view returns (address[] memory) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        address[] memory agents = new address[]($.tokenAgents.length + 2);
 
         for (uint i = 0; i < $.tokenAgents.length; i++) {
             agents[i] = $.tokenAgents[i];
         }
 
-        agents[agents.length -1] = address(this);
-        agents[agents.length -2] = msg.sender;
+        agents[agents.length - 1] = address(this);
+        agents[agents.length - 2] = msg.sender;
 
         return agents;
     }

@@ -21,14 +21,14 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
     constructor() {
         _disableInitializers();
     }
-    
-    bytes32 constant public GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
-    bytes32 constant public FACTORY_ROLE = keccak256("FACTORY_ROLE");
+
+    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+    bytes32 public constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
 
     function initialize(
         address _usdcAddress,
         uint256 _reserveAmount,
-        uint256 _nPercentage,   
+        uint256 _nPercentage,
         address _initialOwner,
         address _businessAddress,
         address _buildingFactory
@@ -47,6 +47,7 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
         _grantRole(FACTORY_ROLE, _buildingFactory);
+        _grantRole(FACTORY_ROLE, _initialOwner);
         _grantRole(GOVERNANCE_ROLE, _initialOwner);
     }
 
@@ -76,7 +77,7 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
 
         IERC20($.usdc).safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
-        
+
         _distributeFunds(amount);
     }
 
@@ -84,9 +85,9 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
     function makePayment(address to, uint256 amount) external onlyRole(GOVERNANCE_ROLE) {
         require(to != address(0), "Invalid recipient address");
         require(amount > 0, "Amount must be greater than zero");
-        
+
         TreasuryData storage $ = _getTreasuryStorage();
-        
+
         uint256 balance = IERC20($.usdc).balanceOf(address(this));
         require(balance >= amount, "Insufficient funds");
 
@@ -117,7 +118,7 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         require(governance != address(0), "Invalid governance address");
         _grantRole(GOVERNANCE_ROLE, governance);
     }
-    
+
     // grant factory role
     function grantFactoryRole(address factory) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(factory != address(0), "Invalid factory address");
@@ -136,7 +137,6 @@ contract Treasury is AccessControlUpgradeable, TreasuryStorage, ITreasury {
         emit FundsDistributed(toBusiness, toTreasury);
 
         _forwardExcessFunds();
-
     }
 
     function _forwardExcessFunds() internal {
