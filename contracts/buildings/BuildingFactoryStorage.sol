@@ -8,8 +8,8 @@ abstract contract BuildingFactoryStorage {
         address uniswapRouter;
         address uniswapFactory;
         address buildingBeacon;
-        address identityFactory;
-        address trexFactory;
+        address onchainIdGateway;
+        address trexGateway;
         address treasuryBeacon;
         address usdc;
         address governanceBeacon;
@@ -17,7 +17,7 @@ abstract contract BuildingFactoryStorage {
         address[] registryAgents;
         address[] tokenAgents;
         BuildingDetails[] buildingsList;
-        mapping (address => BuildingDetails) buildingDetails;
+        mapping(address => BuildingDetails) buildingDetails;
     }
 
     struct BuildingDetails {
@@ -56,7 +56,8 @@ abstract contract BuildingFactoryStorage {
     }
 
     //keccak256(abi.encode(uint256(keccak256("hashgraph.buildings.BuildingFactory")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant BuildingFactoryStorageLocation = 0x0f40dde8b99b0722537b774c6ef775b5e5a0af035d95bf9802cd87411f806f00;
+    bytes32 private constant BuildingFactoryStorageLocation =
+        0x0f40dde8b99b0722537b774c6ef775b5e5a0af035d95bf9802cd87411f806f00;
 
     function _getBuildingFactoryStorage() internal pure returns (BuildingFactoryStorageData storage $) {
         assembly {
@@ -64,7 +65,15 @@ abstract contract BuildingFactoryStorage {
         }
     }
 
-    event NewBuilding(address buildingAddress, address erc3643Token, address treasury, address vault, address governance, address initialOwner, address autoCompounder);
+    event NewBuilding(
+        address buildingAddress,
+        address erc3643Token,
+        address treasury,
+        address vault,
+        address governance,
+        address initialOwner,
+        address autoCompounder
+    );
     event IdentityRegistered(address building, address wallet, address identity, uint16 country);
     event ComplianceModuleAdded(address building, address module);
     event RegistryAgentsAdded(address[] agents);

@@ -1,45 +1,47 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {AutoCompounder} from "../../autocompounder/AutoCompounder.sol";
+import {RewardsVaultAutoCompounder} from "../../vaultV2/RewardsVaultAutoCompounder.sol";
+import {RewardsVault4626} from "../../vaultV2/RewardsVault4626.sol";
+import {IUniswapV2Router02} from "../../uniswap/v2-periphery/interfaces/IUniswapV2Router02.sol";
 
 struct AutoCompounderDetails {
-    address uniswapV2Router;
     address vault;
-    address usdc;
     string aTokenName;
     string aTokenSymbol;
-    address operator;
+    uint256 minimumClaimThreshold;
+    address uniswapRouter;
+    address intermediateToken;
+    uint256 maxSlippage;
 }
 
 library BuildingAutoCompounderLib {
-    function deployAutoCompounder(AutoCompounderDetails calldata autoCompounderDetails) external returns (address) {
-        bytes memory _code = type(AutoCompounder).creationCode;
-        bytes memory _constructData = abi.encode(
-            autoCompounderDetails.uniswapV2Router,
-            autoCompounderDetails.vault,
-            autoCompounderDetails.usdc,
-            autoCompounderDetails.aTokenName,
-            autoCompounderDetails.aTokenSymbol,
-            autoCompounderDetails.operator
+    /// @notice Deploy a RewardsVaultAutoCompounder directly
+    /// @param autoCompounderDetails AutoCompounder configuration details
+    /// @return autoCompounder Address of the deployed autocompounder
+    function deployAutoCompounder(
+        AutoCompounderDetails calldata autoCompounderDetails
+    ) external returns (address autoCompounder) {
+        require(autoCompounderDetails.vault != address(0), "BuildingAutoCompounderLib: Invalid vault address");
+        require(bytes(autoCompounderDetails.aTokenName).length > 0, "BuildingAutoCompounderLib: Empty name");
+        require(bytes(autoCompounderDetails.aTokenSymbol).length > 0, "BuildingAutoCompounderLib: Empty symbol");
+        require(autoCompounderDetails.uniswapRouter != address(0), "BuildingAutoCompounderLib: Invalid router address");
+        require(
+            autoCompounderDetails.intermediateToken != address(0),
+            "BuildingAutoCompounderLib: Invalid intermediate token"
         );
+        require(autoCompounderDetails.maxSlippage <= 5000, "BuildingAutoCompounderLib: Invalid slippage");
 
-        bytes memory deploymentData = abi.encodePacked(_code, _constructData);
-        return _deploy(deploymentData);
-    }
-
-    function _deploy(bytes memory bytecode) private returns (address) {
-        bytes32 saltBytes = bytes32(keccak256(abi.encodePacked(bytecode, msg.sender, block.number)));
-        address addr;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            let encoded_data := add(0x20, bytecode) // load initialization code.
-            let encoded_size := mload(bytecode) // load init code's length.
-            addr := create2(callvalue(), encoded_data, encoded_size, saltBytes)
-            if iszero(extcodesize(addr)) {
-                revert(0, 0)
-            }
-        }
-        return addr;
+        autoCompounder = address(
+            new RewardsVaultAutoCompounder(
+                RewardsVault4626(autoCompounderDetails.vault),
+                autoCompounderDetails.aTokenName,
+                autoCompounderDetails.aTokenSymbol,
+                autoCompounderDetails.minimumClaimThreshold,
+                IUniswapV2Router02(autoCompounderDetails.uniswapRouter),
+                autoCompounderDetails.intermediateToken,
+                autoCompounderDetails.maxSlippage
+            )
+        );
     }
 }
