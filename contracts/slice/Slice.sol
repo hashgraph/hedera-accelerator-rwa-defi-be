@@ -386,6 +386,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
 
             (, , uint256 underlyingPrice, uint256 aTokenToUnderlyingRate) = _getTokenValue(aToken, asset);
 
+            // Validate price feed data
+            require(underlyingPrice > 0, "Slice: Invalid price feed - zero or stale price");
+
             // Target amount in underlying
             targetValue = (totalValue * _allocations[i].targetPercentage) / BASIS_POINTS; // Target value in USD
             targetUnderlyingAmount = (targetValue * (10 ** IERC20Metadata(asset).decimals())) / underlyingPrice; // Target amount in underlying
@@ -405,6 +408,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                     _tradeForToken(asset, baseToken(), withdrawnUnderlyingAmount);
 
                     _balances[baseToken()] = IERC20(baseToken()).balanceOf(address(this));
+
+                    // Update internal balance tracking to reflect the withdrawal
+                    _balances[aToken] -= aTokenExcessAmount;
 
                     payloads[i] = RebalancePayload({
                         aToken: aToken,
@@ -480,34 +486,40 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                 difference > balance
                     ? withdrawnUnderlyingAmount = _handleWithdraw(aToken, balance, currentExchangeRate)
                     : withdrawnUnderlyingAmount = _handleWithdraw(aToken, difference, currentExchangeRate);
+
+                if (withdrawnUnderlyingAmount > 0) {
+                    // Swap underlying for USDC
+                    _tradeForToken(asset, baseToken(), withdrawnUnderlyingAmount);
+                }
             }
 
-            if (withdrawnUnderlyingAmount == 0) continue; // Skip the interation due to locked tokens
+            // For under-allocated tokens, use USDC from contract balance (from over-allocated tokens)
+            // Skip only if no USDC available and no rewards to claim
+            if (availableReward == 0 && IERC20(baseToken()).balanceOf(address(this)) == 0) continue;
 
-            // Swap underlying for USDC
-            _tradeForToken(asset, baseToken(), withdrawnUnderlyingAmount);
-
-            neededUsdcToSwapForUnderlying = _getQuoteAmount(
-                neededUnderlying + withdrawnUnderlyingAmount,
-                baseToken(),
-                asset
-            );
+            neededUsdcToSwapForUnderlying = _getQuoteAmount(neededUnderlying, baseToken(), asset);
 
             baseTokenBalance = IERC20(baseToken()).balanceOf(address(this));
 
             if (baseTokenBalance < neededUsdcToSwapForUnderlying) {
-                // Swap whole USDC balance for underlying
-                _tradeForToken(_baseToken, asset, baseTokenBalance);
+                // Swap whole USDC balance for underlying (only if amount is sufficient)
+                if (baseTokenBalance > 0) {
+                    _tradeForToken(_baseToken, asset, baseTokenBalance);
+                }
             } else {
-                // Swap USDC for aToken equivalent in underlying token
-                _tradeForToken(_baseToken, asset, neededUsdcToSwapForUnderlying);
+                // Swap USDC for aToken equivalent in underlying token (only if amount is sufficient)
+                if (neededUsdcToSwapForUnderlying > 0) {
+                    _tradeForToken(_baseToken, asset, neededUsdcToSwapForUnderlying);
+                }
             }
 
             underlyingBalance = IERC20(asset).balanceOf(address(this));
 
-            // Reinvest to get aToken
-            IERC20(asset).approve(aToken, underlyingBalance);
-            _balances[aToken] += IRewardsVaultAutoCompounder(aToken).deposit(underlyingBalance, address(this));
+            // Reinvest to get aToken (only if we have underlying tokens)
+            if (underlyingBalance > 0) {
+                IERC20(asset).approve(aToken, underlyingBalance);
+                _balances[aToken] += IRewardsVaultAutoCompounder(aToken).deposit(underlyingBalance, address(this));
+            }
         }
     }
 
@@ -543,6 +555,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         aTokenToUnderlyingRate = IRewardsVaultAutoCompounder(aToken).exchangeRate();
         underlyingPrice = uint256(getChainlinkDataFeedLatestAnswer(asset));
 
+        // Validate price feed data
+        require(underlyingPrice > 0, "Slice: Invalid price feed - zero or stale price");
+
         // Get Underlying value in aToken
         underlyingValue = balance.mulDivDown(aTokenToUnderlyingRate, PRECISION);
 
@@ -558,6 +573,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @param amountIn The input amount.
      */
     function _tradeForToken(address token, address targetToken, uint256 amountIn) internal {
+        // Skip swap if amount is too small for Uniswap
+        if (amountIn == 0) return;
+
         address[] memory path = new address[](2);
         path[0] = token;
         path[1] = targetToken;
