@@ -1,31 +1,70 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "IERC4626",
-  "sourceName": "contracts/vaultV2/IERC4626.sol",
+  "contractName": "IRewardsVaultAutoCompounder",
+  "sourceName": "contracts/vaultV2/interfaces/IRewardsVaultAutoCompounder.sol",
   "abi": [
+    {
+      "inputs": [],
+      "name": "InsufficientBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidAmount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidNewOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidReceiver",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidSlippage",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidSwapPath",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SwapFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransferFailed",
+      "type": "error"
+    },
     {
       "anonymous": false,
       "inputs": [
         {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalAssetsReinvested",
+          "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "amount",
+          "name": "swapCount",
           "type": "uint256"
         }
       ],
-      "name": "Approval",
+      "name": "AutoCompound",
       "type": "event"
     },
     {
@@ -34,19 +73,13 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "to",
+          "name": "user",
           "type": "address"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "amount",
+          "name": "assets",
           "type": "uint256"
         },
         {
@@ -65,23 +98,17 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "from",
+          "name": "previousOwner",
           "type": "address"
         },
         {
           "indexed": true,
           "internalType": "address",
-          "name": "to",
+          "name": "newOwner",
           "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
         }
       ],
-      "name": "Transfer",
+      "name": "OwnershipTransferred",
       "type": "event"
     },
     {
@@ -90,13 +117,13 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "from",
+          "name": "user",
           "type": "address"
         },
         {
           "indexed": true,
           "internalType": "address",
-          "name": "to",
+          "name": "rewardToken",
           "type": "address"
         },
         {
@@ -104,11 +131,80 @@
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
+        }
+      ],
+      "name": "RewardsClaimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "rewardToken",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "newPath",
+          "type": "address[]"
+        }
+      ],
+      "name": "SwapPathUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "fromToken",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "toToken",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountIn",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
+        }
+      ],
+      "name": "TokenSwapped",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
         },
         {
           "indexed": false,
           "internalType": "uint256",
           "name": "shares",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "assets",
           "type": "uint256"
         }
       ],
@@ -117,63 +213,15 @@
     },
     {
       "inputs": [],
-      "name": "DOMAIN_SEPARATOR",
+      "name": "asset",
       "outputs": [
         {
-          "internalType": "bytes32",
+          "internalType": "address",
           "name": "",
-          "type": "bytes32"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "name": "allowance",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "approve",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -197,31 +245,25 @@
     },
     {
       "inputs": [],
-      "name": "assetsPerShare",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
+      "name": "autoCompound",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "user",
           "type": "address"
         }
       ],
-      "name": "balanceOf",
+      "name": "canWithdraw",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "bool",
           "name": "",
-          "type": "uint256"
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -229,27 +271,21 @@
     },
     {
       "inputs": [],
-      "name": "decimals",
-      "outputs": [
-        {
-          "internalType": "uint8",
-          "name": "",
-          "type": "uint8"
-        }
-      ],
-      "stateMutability": "view",
+      "name": "claimUserRewards",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "amount",
+          "name": "assets",
           "type": "uint256"
         },
         {
           "internalType": "address",
-          "name": "to",
+          "name": "receiver",
           "type": "address"
         }
       ],
@@ -268,49 +304,23 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "token",
           "type": "address"
-        }
-      ],
-      "name": "maxDeposit",
-      "outputs": [
+        },
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "amount",
           "type": "uint256"
         }
       ],
+      "name": "emergencyWithdraw",
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "name": "maxMint",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "user",
-          "type": "address"
-        }
-      ],
-      "name": "maxRedeem",
+      "inputs": [],
+      "name": "exchangeRate",
       "outputs": [
         {
           "internalType": "uint256",
@@ -325,15 +335,39 @@
       "inputs": [
         {
           "internalType": "address",
+          "name": "rewardToken",
+          "type": "address"
+        }
+      ],
+      "name": "getSwapPath",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "path",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "user",
           "type": "address"
         }
       ],
-      "name": "maxWithdraw",
+      "name": "getUserInfo",
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "depositTimestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalDeposited",
           "type": "uint256"
         }
       ],
@@ -349,7 +383,7 @@
         },
         {
           "internalType": "address",
-          "name": "to",
+          "name": "receiver",
           "type": "address"
         }
       ],
@@ -357,7 +391,7 @@
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "underlyingAmount",
+          "name": "assets",
           "type": "uint256"
         }
       ],
@@ -365,76 +399,43 @@
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "name",
-      "outputs": [
+      "inputs": [
         {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
+          "internalType": "uint256",
+          "name": "shares",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "receiver",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "owner_",
+          "type": "address"
         }
       ],
-      "stateMutability": "view",
+      "name": "redeem",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "assets",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "rewardToken",
           "type": "address"
         }
       ],
-      "name": "nonces",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "value",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "deadline",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint8",
-          "name": "v",
-          "type": "uint8"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "r",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "s",
-          "type": "bytes32"
-        }
-      ],
-      "name": "permit",
+      "name": "removeSwapPath",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -443,115 +444,65 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "underlyingAmount",
+          "name": "newSlippage",
           "type": "uint256"
         }
       ],
-      "name": "previewDeposit",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "shareAmount",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
+      "name": "setMaxSlippage",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "shareAmount",
+          "name": "newThreshold",
           "type": "uint256"
         }
       ],
-      "name": "previewMint",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "underlyingAmount",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
+      "name": "setMinimumClaimThreshold",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
       "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "shareAmount",
-          "type": "uint256"
-        }
-      ],
-      "name": "previewRedeem",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "underlyingAmount",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "underlyingAmount",
-          "type": "uint256"
-        }
-      ],
-      "name": "previewWithdraw",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "shareAmount",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "shares",
-          "type": "uint256"
-        },
         {
           "internalType": "address",
-          "name": "to",
+          "name": "rewardToken",
           "type": "address"
         },
         {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
+          "internalType": "address[]",
+          "name": "path",
+          "type": "address[]"
         }
       ],
-      "name": "redeem",
-      "outputs": [
+      "name": "setSwapPath",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "rewardToken",
+          "type": "address"
+        },
         {
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
         }
       ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "symbol",
+      "name": "testSwap",
       "outputs": [
         {
-          "internalType": "string",
-          "name": "",
-          "type": "string"
+          "internalType": "uint256",
+          "name": "amountOut",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -571,13 +522,26 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
-      "name": "totalSupply",
+      "name": "vault",
       "outputs": [
         {
-          "internalType": "uint256",
+          "internalType": "address",
           "name": "",
-          "type": "uint256"
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -586,71 +550,13 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
           "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "transfer",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "from",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "transferFrom",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "amount",
+          "name": "shares",
           "type": "uint256"
         },
         {
           "internalType": "address",
-          "name": "to",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "from",
+          "name": "receiver",
           "type": "address"
         }
       ],
@@ -658,7 +564,7 @@
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "shares",
+          "name": "assets",
           "type": "uint256"
         }
       ],
