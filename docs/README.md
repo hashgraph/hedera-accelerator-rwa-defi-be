@@ -211,12 +211,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](../LIC
 -   **Technical Support**: Check the [support guide](https://github.com/hashgraph/.github/blob/main/SUPPORT.md)
 -   **Community**: Join the Hedera Discord
 
-## 🔄 Version History
-
--   **v1.0.0**: Initial release with core DeFi components
--   **v1.1.0**: Added ERC7540 async vault support
--   **v1.2.0**: Enhanced compliance and governance features
-
 ---
 
 For detailed information about each component, please refer to the individual documentation files linked above.

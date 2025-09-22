@@ -21,10 +21,8 @@ The `BuildingFactory` contract orchestrates the deployment of all building compo
 
 ```solidity
 contract BuildingFactory is AccessControl, BuildingFactoryStorage {
-    function deployBuilding(
-        BuildingConfig memory config,
-        GovernanceConfig memory govConfig,
-        TreasuryConfig memory treasuryConfig
+    function newBuilding(
+        NewBuildingDetails calldata details
     ) external returns (address buildingAddress)
 }
 ```
@@ -155,26 +153,24 @@ contract BuildingAutoCompounder is AutoCompounder {
 ### 1. Configuration Setup
 
 ```typescript
-const buildingConfig = {
-    name: "Downtown Office Building",
-    symbol: "DOB",
-    decimals: 18,
-    totalSupply: ethers.parseEther("1000000"),
-    // ... other configuration
-};
-
-const governanceConfig = {
-    votingDelay: 1,
-    votingPeriod: 100,
-    proposalThreshold: ethers.parseEther("1000"),
-    // ... other governance settings
-};
-
-const treasuryConfig = {
-    usdcAddress: usdcAddress,
-    reserveAmount: ethers.parseUnits("10000", 6),
-    nPercentage: 2000, // 20% to business
-    businessAddress: businessAddress,
+const buildingDetails = {
+    tokenURI: "https://example.com/downtown-office-metadata",
+    tokenName: "Downtown Office Building",
+    tokenSymbol: "DOB",
+    tokenDecimals: 18,
+    tokenMintAmount: ethers.parseEther("1000000"),
+    treasuryReserveAmount: ethers.parseUnits("10000", 6),
+    treasuryNPercent: 2000, // 20% to business
+    governanceName: "Downtown Office Governance",
+    vaultShareTokenName: "Downtown Office Vault Share",
+    vaultShareTokenSymbol: "DOVS",
+    vaultFeeReceiver: feeReceiverAddress,
+    vaultFeeToken: usdcAddress,
+    vaultFeePercentage: 100, // 1%
+    vaultCliff: 0,
+    vaultUnlockDuration: 86400 * 30, // 30 days
+    aTokenName: "Downtown Office Auto Compounder",
+    aTokenSymbol: "DOAC",
 };
 ```
 
@@ -184,7 +180,27 @@ const treasuryConfig = {
 // Deploy building via factory
 const buildingFactory = await ethers.getContractAt("BuildingFactory", factoryAddress);
 
-const tx = await buildingFactory.deployBuilding(buildingConfig, governanceConfig, treasuryConfig);
+const buildingDetails = {
+    tokenURI: "https://example.com/building-metadata",
+    tokenName: "Building Token",
+    tokenSymbol: "BT",
+    tokenDecimals: 18,
+    tokenMintAmount: ethers.parseEther("1000000"),
+    treasuryReserveAmount: ethers.parseUnits("10000", 6),
+    treasuryNPercent: 2000, // 20%
+    governanceName: "Building Governance",
+    vaultShareTokenName: "Building Vault Share",
+    vaultShareTokenSymbol: "BVS",
+    vaultFeeReceiver: feeReceiverAddress,
+    vaultFeeToken: usdcAddress,
+    vaultFeePercentage: 100, // 1%
+    vaultCliff: 0,
+    vaultUnlockDuration: 86400 * 30, // 30 days
+    aTokenName: "Building Auto Compounder",
+    aTokenSymbol: "BAC",
+};
+
+const tx = await buildingFactory.newBuilding(buildingDetails);
 
 const receipt = await tx.wait();
 const buildingAddress = receipt.logs[0].args.building;
