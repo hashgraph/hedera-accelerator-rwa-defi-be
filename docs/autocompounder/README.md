@@ -1,41 +1,47 @@
-# Auto Compounder
+# Auto Compounder (RewardsVaultAutoCompounder)
 
-The Auto Compounder is a smart contract that automatically reinvests vault rewards back into the underlying asset, creating a compounding effect for users. It supports both ERC4626 (synchronous) and ERC7540 (asynchronous) vaults.
+The RewardsVaultAutoCompounder is a smart contract that automatically reinvests vault rewards back into the underlying asset, creating a compounding effect for users. It's specifically designed to work with RewardsVault4626 contracts and provides enhanced Uniswap integration for reward token swapping.
 
 ## 📋 Overview
 
-The Auto Compounder acts as an automated yield optimization tool that:
+The RewardsVaultAutoCompounder acts as an automated yield optimization tool that:
 
 -   Accepts deposits of underlying assets
--   Issues aTokens representing the user's stake
--   Automatically claims rewards from the vault
--   Swaps rewards (USDC) back to underlying assets
+-   Issues autocompounder tokens representing the user's stake
+-   Automatically claims rewards from the RewardsVault4626
+-   Swaps reward tokens to underlying assets via Uniswap
 -   Reinvests the swapped assets back into the vault
 -   Maintains an exchange rate that increases over time
+-   Provides configurable swap paths and slippage protection
 
 ## 🏗️ Architecture
 
 ### Key Features
 
--   **Dual Vault Support**: Works with both ERC4626 and ERC7540 vaults
+-   **RewardsVault4626 Integration**: Specifically designed for RewardsVault4626 contracts
 -   **Automatic Compounding**: Claims and reinvests rewards automatically
--   **Exchange Rate Tracking**: aTokens increase in value as rewards compound
--   **Uniswap Integration**: Swaps USDC rewards to underlying assets
--   **User Reward Tracking**: Tracks individual user reward claims
+-   **Exchange Rate Tracking**: Autocompounder tokens increase in value as rewards compound
+-   **Enhanced Uniswap Integration**: Configurable swap paths and slippage protection
+-   **Multi-Token Reward Support**: Handles multiple reward tokens from the vault
+-   **User Information Tracking**: Tracks user deposit history and totals
 
 ### Contract Structure
 
 ```solidity
-contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 {
+contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAutoCompounder, ERC165 {
     // Immutable vault and configuration
-    IERC4626 private immutable _vault;
-    bool private immutable isAsync;
-    address private immutable _underlying;
-    IUniswapV2Router02 private _uniswapV2Router;
-    address private _usdc;
+    RewardsVault4626 public immutable VAULT;
+    IERC20 public immutable ASSET;
+    IUniswapV2Router02 public immutable UNISWAP_ROUTER;
+    address public immutable INTERMEDIATE_TOKEN;
 
-    // User reward tracking
-    mapping(address => uint256) internal _userClaimedRewards;
+    // Configuration
+    uint256 public minimumClaimThreshold;
+    uint256 public maxSlippage;
+
+    // User tracking
+    mapping(address => UserInfo) public userInfo;
+    mapping(address => address[]) public swapPaths;
 }
 ```
 
@@ -44,97 +50,101 @@ contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 
 ### Deposit
 
 ```solidity
-function deposit(uint256 assets, address receiver) external override returns (uint256 amountToMint)
+function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 shares)
 ```
 
 **Parameters:**
 
 -   `assets`: Amount of underlying assets to deposit
--   `receiver`: Address to receive the minted aTokens
+-   `receiver`: Address to receive the minted autocompounder tokens
 
 **Process:**
 
-1. Calculates aToken amount using current exchange rate
+1. Calculates shares to mint using current exchange rate
 2. Transfers underlying assets from user
-3. Deposits assets into the vault
-4. Mints aTokens to receiver
+3. Deposits assets into the RewardsVault4626
+4. Mints autocompounder tokens to receiver
+5. Updates user information
 
-**Returns:** Amount of aTokens minted
+**Returns:** Number of shares minted
 
 ### Withdraw
 
 ```solidity
-function withdraw(uint256 aTokenAmount, address receiver) external override returns (uint256 underlyingAmount)
+function withdraw(uint256 shares, address receiver) external nonReentrant returns (uint256 assets)
 ```
 
 **Parameters:**
 
--   `aTokenAmount`: Amount of aTokens to burn
+-   `shares`: Number of autocompounder tokens to burn
 -   `receiver`: Address to receive the underlying assets
 
 **Process:**
 
-1. Calculates underlying amount using exchange rate
-2. Claims user's reward share
-3. Burns aTokens
-4. Withdraws underlying assets from vault
-5. Transfers assets to receiver
+1. Calculates assets to withdraw using exchange rate
+2. Burns autocompounder tokens
+3. Redeems vault shares
+4. Transfers assets to receiver
+5. Updates user information
 
 **Returns:** Amount of underlying assets withdrawn
 
-### Claim Rewards
+### Auto Compound
 
 ```solidity
-function claim() external
+function autoCompound() external nonReentrant
 ```
 
 **Process:**
 
-1. Checks if minimum reward threshold is met (10 USDC)
-2. Claims all rewards from vault
-3. Swaps USDC to underlying asset via Uniswap
-4. Reinvests swapped assets back into vault
+1. Claims all available rewards from the vault
+2. Iterates through all reward tokens
+3. Swaps reward tokens to underlying asset via Uniswap
+4. Reinvests all obtained assets back into the vault
+5. Emits compounding event with statistics
 
-**Requirements:**
+**Features:**
 
--   Minimum reward amount must be met
--   Sufficient gas for transaction
+-   Configurable minimum claim threshold
+-   Slippage protection for swaps
+-   Custom swap paths for different tokens
+-   Graceful handling of failed swaps
 
 ## 📊 Exchange Rate Mechanism
 
 ### Exchange Rate Calculation
 
 ```solidity
-function exchangeRate() public view override returns (uint256)
+function exchangeRate() public view returns (uint256)
 ```
 
-The exchange rate determines how many aTokens a user receives for their underlying assets:
+The exchange rate determines how many autocompounder tokens a user receives for their underlying assets:
 
 ```
-exchangeRate = aTokenTotalSupply / vaultTotalSupply
+exchangeRate = totalAssets / totalSupply
 ```
 
 ### How Compounding Works
 
 1. **Initial Deposit**: User deposits 1000 underlying tokens
-2. **aToken Minting**: Receives 1000 aTokens (1:1 ratio initially)
-3. **Reward Accumulation**: Vault generates USDC rewards
-4. **Auto Compounding**: Rewards are claimed and reinvested
-5. **Exchange Rate Increase**: aToken value increases relative to underlying
+2. **Token Minting**: Receives 1000 autocompounder tokens (1:1 ratio initially)
+3. **Reward Accumulation**: Vault generates multiple reward tokens
+4. **Auto Compounding**: Rewards are claimed, swapped, and reinvested
+5. **Exchange Rate Increase**: Autocompounder token value increases relative to underlying
 
 ### Example Scenario
 
 ```
 Initial State:
 - User deposits: 1000 underlying tokens
-- User receives: 1000 aTokens
+- User receives: 1000 autocompounder tokens
 - Exchange rate: 1.0
 
 After Compounding:
-- Vault total supply: 1100 underlying tokens (100 rewards reinvested)
-- aToken total supply: 1000 aTokens
+- Vault total assets: 1100 underlying tokens (100 rewards reinvested)
+- Autocompounder total supply: 1000 tokens
 - Exchange rate: 1.1
-- User's aTokens now represent: 1100 underlying tokens
+- User's tokens now represent: 1100 underlying tokens
 ```
 
 ## 🔄 Reward Distribution
@@ -142,54 +152,62 @@ After Compounding:
 ### User Reward Calculation
 
 ```solidity
-function getPendingReward(address user) public view returns (uint256 pendingReward)
-```
-
-**Formula:**
-
-```
-userReward = (userBalance * totalReward) / totalSupply
-pendingReward = userReward - claimedRewards
-```
-
-### Claiming User Rewards
-
-```solidity
-function claimExactUserReward(address receiver) public
+function claimUserRewards() external nonReentrant
 ```
 
 **Process:**
 
-1. Calculates user's share of total rewards
-2. Subtracts already claimed rewards
-3. Claims exact amount from vault
-4. Transfers rewards to receiver
+1. Calculates user's proportion of total supply
+2. Claims all vault rewards
+3. Distributes proportional share to user
+4. Transfers rewards to user
+
+### User Information Tracking
+
+```solidity
+function getUserInfo(address user) external view returns (uint256 depositTimestamp, uint256 totalDeposited)
+```
+
+**Returns:**
+
+-   `depositTimestamp`: When user first deposited
+-   `totalDeposited`: Total amount user has deposited
+
+### Withdrawal Eligibility
+
+```solidity
+function canWithdraw(address user) external view returns (bool)
+```
+
+**Returns:** Whether user can withdraw based on vault's lock period
 
 ## 🏭 Factory Pattern
 
-### AutoCompounderFactory
+### RewardsVaultAutoCompounderFactory
 
-The factory contract deploys new AutoCompounder instances:
+The factory contract deploys new RewardsVaultAutoCompounder instances:
 
 ```solidity
 function deployAutoCompounder(
-    address uniswapV2Router_,
-    address vault_,
-    address usdc_,
-    string memory name_,
-    string memory symbol_,
-    address operator_
+    RewardsVault4626 _vault,
+    string memory _name,
+    string memory _symbol,
+    uint256 _minimumClaimThreshold,
+    IUniswapV2Router02 _uniswapRouter,
+    address _intermediateToken,
+    uint256 _maxSlippage
 ) external returns (address)
 ```
 
 **Parameters:**
 
--   `uniswapV2Router_`: Uniswap V2 router address
--   `vault_`: Target vault address (ERC4626 or ERC7540)
--   `usdc_`: USDC token address
--   `name_`: aToken name
--   `symbol_`: aToken symbol
--   `operator_`: Operator for ERC7540 vaults
+-   `_vault`: RewardsVault4626 contract address
+-   `_name`: Autocompounder token name
+-   `_symbol`: Autocompounder token symbol
+-   `_minimumClaimThreshold`: Minimum threshold for auto-compound
+-   `_uniswapRouter`: Uniswap V2 router address
+-   `_intermediateToken`: Intermediate token for swaps (e.g., WETH, USDC)
+-   `_maxSlippage`: Maximum allowed slippage (in basis points)
 
 ## 🔧 Configuration
 
@@ -197,46 +215,66 @@ function deployAutoCompounder(
 
 ```solidity
 constructor(
-    address uniswapV2Router_,
-    address vault_,
-    address usdc_,
-    string memory name_,
-    string memory symbol_,
-    address operator_
+    RewardsVault4626 _vault,
+    string memory _name,
+    string memory _symbol,
+    uint256 _minimumClaimThreshold,
+    IUniswapV2Router02 _uniswapRouter,
+    address _intermediateToken,
+    uint256 _maxSlippage
 )
 ```
 
 ### Validation
 
+-   Vault address cannot be zero
 -   Uniswap router address cannot be zero
--   Vault must support ERC4626 or ERC7540 interface
--   USDC address cannot be zero
--   For async vaults, operator is set automatically
+-   Intermediate token address cannot be zero
+-   Maximum slippage cannot exceed 50% (5000 basis points)
+-   Asset token is automatically derived from vault
 
 ## 📝 Events
 
 ### Deposit
 
 ```solidity
-event Deposit(address indexed sender, address indexed receiver, uint256 assets, uint256 amountToMint);
+event Deposit(address indexed user, uint256 assets, uint256 shares)
 ```
 
 ### Withdraw
 
 ```solidity
-event Withdraw(address indexed sender, uint256 aTokenAmount, uint256 underlyingAmount);
+event Withdraw(address indexed user, uint256 shares, uint256 assets)
 ```
 
-### Claim
+### Auto Compound
 
 ```solidity
-event Claim(uint256 underlyingAmount);
+event AutoCompound(uint256 totalAssetsReinvested, uint256 swapCount)
 ```
 
-### UserClaimedReward
+### Rewards Claimed
 
 ```solidity
-event UserClaimedReward(address indexed sender, address indexed receiver, uint256 userReward);
+event RewardsClaimed(address indexed user, address indexed rewardToken, uint256 amount)
+```
+
+### Token Swapped
+
+```solidity
+event TokenSwapped(address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut)
+```
+
+### Swap Path Updated
+
+```solidity
+event SwapPathUpdated(address indexed rewardToken, address[] newPath)
+```
+
+### Ownership Transferred
+
+```solidity
+event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 ```
 
 ## 🚀 Deployment
@@ -244,16 +282,17 @@ event UserClaimedReward(address indexed sender, address indexed receiver, uint25
 ### Using Factory
 
 ```typescript
-// Deploy AutoCompounder via factory
-const autoCompounderFactory = await ethers.getContractAt("AutoCompounderFactory", factoryAddress);
+// Deploy RewardsVaultAutoCompounder via factory
+const autoCompounderFactory = await ethers.getContractAt("RewardsVaultAutoCompounderFactory", factoryAddress);
 
 const tx = await autoCompounderFactory.deployAutoCompounder(
+    rewardsVaultAddress,
+    "Building Auto Compounder",
+    "BAC",
+    ethers.parseUnits("10", 6), // 10 USDC minimum threshold
     uniswapV2RouterAddress,
-    vaultAddress,
-    usdcAddress,
-    "Building A Token",
-    "BAT",
-    operatorAddress,
+    usdcAddress, // Intermediate token
+    300, // 3% max slippage
 );
 
 const receipt = await tx.wait();
@@ -264,13 +303,14 @@ const autoCompounderAddress = receipt.logs[0].args.autoCompounder;
 
 ```typescript
 // Deploy directly (not recommended)
-const autoCompounder = await ethers.deployContract("AutoCompounder", [
+const autoCompounder = await ethers.deployContract("RewardsVaultAutoCompounder", [
+    rewardsVaultAddress,
+    "Building Auto Compounder",
+    "BAC",
+    ethers.parseUnits("10", 6), // 10 USDC minimum threshold
     uniswapV2RouterAddress,
-    vaultAddress,
-    usdcAddress,
-    "Building A Token",
-    "BAT",
-    operatorAddress,
+    usdcAddress, // Intermediate token
+    300, // 3% max slippage
 ]);
 ```
 
@@ -279,40 +319,43 @@ const autoCompounder = await ethers.deployContract("AutoCompounder", [
 ### Access Control
 
 -   Only owner can perform administrative functions
--   Users can only withdraw their own aTokens
--   Reward claiming is permissionless but tracked
+-   Users can only withdraw their own autocompounder tokens
+-   Auto-compounding is permissionless but tracked
 
 ### Reentrancy Protection
 
--   No external calls in critical functions
+-   All external functions protected with `nonReentrant` modifier
 -   SafeERC20 for token transfers
 -   Proper state updates before external calls
 
 ### Slippage Protection
 
--   Uniswap swaps use minimum amount out of 0
--   Consider implementing slippage protection for production
+-   Configurable maximum slippage (default 3%)
+-   Minimum amount out calculated with slippage protection
+-   Failed swaps are handled gracefully without reverting
 
 ## 🧪 Testing
 
 ### Test Coverage
 
-The AutoCompounder includes comprehensive tests:
+The RewardsVaultAutoCompounder includes comprehensive tests:
 
 -   Deposit and withdrawal functionality
 -   Exchange rate calculations
--   Reward claiming and distribution
--   Async vault integration
+-   Auto-compounding and reward distribution
+-   Uniswap swap integration
+-   Swap path configuration
+-   Slippage protection
 -   Edge cases and error conditions
 
 ### Running Tests
 
 ```bash
-# Run AutoCompounder tests
-yarn hardhat test test/autocompounder/autocompounder.test.ts
+# Run RewardsVaultAutoCompounder tests
+yarn hardhat test test/vaultV2/
 
 # Run with gas reporting
-yarn hardhat test test/autocompounder/autocompounder.test.ts --gas-report
+yarn hardhat test test/vaultV2/ --gas-report
 ```
 
 ## 📚 Usage Examples
@@ -320,78 +363,87 @@ yarn hardhat test test/autocompounder/autocompounder.test.ts --gas-report
 ### Basic Deposit and Withdrawal
 
 ```typescript
-// Connect to AutoCompounder
-const autoCompounder = await ethers.getContractAt("AutoCompounder", autoCompounderAddress);
+// Connect to RewardsVaultAutoCompounder
+const autoCompounder = await ethers.getContractAt("RewardsVaultAutoCompounder", autoCompounderAddress);
 
 // Deposit underlying assets
 await autoCompounder.deposit(ethers.parseEther("1000"), userAddress);
 
-// Check aToken balance
-const aTokenBalance = await autoCompounder.balanceOf(userAddress);
+// Check autocompounder token balance
+const tokenBalance = await autoCompounder.balanceOf(userAddress);
 
 // Check exchange rate
 const exchangeRate = await autoCompounder.exchangeRate();
 
 // Withdraw assets
-await autoCompounder.withdraw(aTokenBalance, userAddress);
+await autoCompounder.withdraw(tokenBalance, userAddress);
 ```
 
-### Reward Management
+### Auto-Compounding
 
 ```typescript
-// Check pending rewards
-const pendingReward = await autoCompounder.getPendingReward(userAddress);
+// Trigger auto-compounding
+await autoCompounder.autoCompound();
 
-// Claim user rewards
-await autoCompounder.claimExactUserReward(userAddress);
+// Check user information
+const userInfo = await autoCompounder.getUserInfo(userAddress);
+console.log("Deposit timestamp:", userInfo.depositTimestamp);
+console.log("Total deposited:", userInfo.totalDeposited);
 
-// Trigger auto compounding (if minimum threshold met)
-await autoCompounder.claim();
+// Check if user can withdraw
+const canWithdraw = await autoCompounder.canWithdraw(userAddress);
 ```
 
-### Integration with Vaults
+### Swap Path Configuration
 
 ```typescript
-// For ERC4626 vaults
-const vault = await ethers.getContractAt("IERC4626", vaultAddress);
-const totalAssets = await vault.totalAssets();
+// Configure custom swap path for a reward token
+const customPath = [rewardTokenAddress, intermediateTokenAddress, assetAddress];
+await autoCompounder.setSwapPath(rewardTokenAddress, customPath);
 
-// For ERC7540 vaults
-const asyncVault = await ethers.getContractAt("IERC7540", vaultAddress);
-const isAsync = await asyncVault.supportsInterface("0x...");
+// Test a swap to verify it works
+const estimatedOutput = await autoCompounder.testSwap(rewardTokenAddress, ethers.parseEther("100"));
+
+// Get configured swap path
+const swapPath = await autoCompounder.getSwapPath(rewardTokenAddress);
 ```
 
 ## 🔗 Integration Points
 
-### With Vaults
+### With RewardsVault4626
 
--   **ERC4626 Vaults**: Direct deposit/withdraw calls
--   **ERC7540 Vaults**: Request-based operations with operator
+-   **Direct Integration**: Specifically designed for RewardsVault4626
+-   **Multi-Token Rewards**: Handles multiple reward tokens from vault
+-   **Lock Period Support**: Respects vault's lock period restrictions
+-   **Reward Claiming**: Automatic reward claiming and reinvestment
 
 ### With Uniswap
 
--   **Swap Path**: USDC → Underlying Asset
+-   **Configurable Swap Paths**: Custom paths for different reward tokens
 -   **Router**: Uniswap V2 Router
--   **Slippage**: Currently set to 0 (consider adding protection)
+-   **Slippage Protection**: Configurable maximum slippage (default 3%)
+-   **Intermediate Token**: Support for multi-hop swaps
 
-### With Rewards System
+### With Reward System
 
--   **Reward Token**: USDC
--   **Claiming**: Automatic via `claim()` function
--   **Distribution**: Proportional to aToken holdings
+-   **Multiple Reward Tokens**: Handles any ERC20 reward token
+-   **Automatic Swapping**: Swaps rewards to underlying asset
+-   **Reinvestment**: Automatically reinvests swapped assets
+-   **Distribution**: Proportional to autocompounder token holdings
 
 ## 📈 Gas Optimization
 
 ### Efficient Calculations
 
 -   Uses `FixedPointMathLib` for precise math operations
--   Cached vault type detection
 -   Immutable variables for gas savings
+-   Optimized swap path handling
 
 ### Batch Operations
 
--   No batch operations currently implemented
--   Consider adding batch deposit/withdraw functions
+-   Auto-compounding processes all reward tokens in single transaction
+-   Efficient reward token iteration
+-   Graceful handling of failed swaps
 
 ## 🚨 Error Handling
 
@@ -405,12 +457,14 @@ error InsufficientReward(uint256 reward);
 
 -   Invalid asset amounts (zero)
 -   Invalid receiver addresses
--   Insufficient reward for compounding
--   Unsupported vault interface
+-   Insufficient balance for withdrawal
+-   Invalid slippage configuration (>50%)
+-   Invalid swap paths
+-   Transfer failures
 
 ## 🔄 Upgrade Path
 
-The AutoCompounder is not upgradeable by design. For updates:
+The RewardsVaultAutoCompounder is not upgradeable by design. For updates:
 
 1. Deploy new version
 2. Migrate user positions
@@ -429,12 +483,13 @@ The AutoCompounder is not upgradeable by design. For updates:
 ### Events to Monitor
 
 -   `Deposit` events for user activity
--   `Claim` events for compounding activity
--   `UserClaimedReward` events for reward distribution
+-   `AutoCompound` events for compounding activity
+-   `RewardsClaimed` events for reward distribution
+-   `TokenSwapped` events for swap activity
 
 ## 📞 Support
 
-For questions or issues related to the AutoCompounder:
+For questions or issues related to the RewardsVaultAutoCompounder:
 
 -   Check the test files for usage examples
 -   Review the contract source code

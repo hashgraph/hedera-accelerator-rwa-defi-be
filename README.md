@@ -248,10 +248,10 @@ async function createSlice() {
         "https://example.com/metadata",
     ]);
 
-    // Add assets to portfolio
-    await slice.addAsset(buildingAAddress, 3000, oracleAAddress);
-    await slice.addAsset(buildingBAddress, 3000, oracleBAddress);
-    await slice.addAsset(buildingCAddress, 4000, oracleCAddress);
+    // Add allocations to portfolio
+    await slice.addAllocation(buildingAAddress, oracleAAddress, 3000);
+    await slice.addAllocation(buildingBAddress, oracleBAddress, 3000);
+    await slice.addAllocation(buildingCAddress, oracleCAddress, 4000);
 }
 ```
 
@@ -284,12 +284,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 -   **Issues**: Open an issue in this repository
 -   **Technical Support**: See our [support guide](https://github.com/hashgraph/.github/blob/main/SUPPORT.md)
 -   **Community**: Join the Hedera Discord
-
-## 🔄 Version History
-
--   **v1.0.0**: Initial release with core DeFi components
--   **v1.1.0**: Added ERC7540 async vault support
--   **v1.2.0**: Enhanced compliance and governance features
 
 ## ⚠️ Disclaimer
 

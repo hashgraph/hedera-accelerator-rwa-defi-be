@@ -43,27 +43,27 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
 
 ### Portfolio Management
 
-#### Add Asset to Portfolio
+#### Add Allocation to Portfolio
 
 ```solidity
-function addAsset(
-    address asset,
-    uint256 targetAllocation,
-    address priceOracle
+function addAllocation(
+    address aToken,
+    address priceFeed,
+    uint16 percentage
 ) external onlyOwner
 ```
 
 **Parameters:**
 
--   `asset`: Address of the asset to add
--   `targetAllocation`: Target allocation percentage (in basis points)
--   `priceOracle`: Chainlink price oracle address
+-   `aToken`: Address of the aToken (autocompounder token) to add
+-   `priceFeed`: Chainlink price feed address
+-   `percentage`: Target allocation percentage (in basis points)
 
 **Process:**
 
-1. Validates asset and oracle addresses
-2. Sets target allocation
-3. Configures price oracle
+1. Validates aToken and price feed addresses
+2. Sets allocation percentage
+3. Configures price feed
 4. Initializes current allocation
 
 #### Remove Asset from Portfolio
@@ -193,26 +193,19 @@ The rebalancing process:
 
 ### Oracle Configuration
 
-```solidity
-function setPriceOracle(address asset, address oracle) external onlyOwner
-```
-
-**Parameters:**
-
--   `asset`: Asset address
--   `oracle`: Chainlink oracle address
+Price feeds are configured when adding allocations using the `addAllocation` function. The price feed address is set during allocation creation and cannot be changed afterward.
 
 ### Price Fetching
 
 ```solidity
-function getAssetPrice(address asset) public view returns (uint256)
+function getChainlinkDataFeedLatestAnswer(address token) public view returns (int)
 ```
 
 **Process:**
 
 1. Fetches price from Chainlink oracle
-2. Converts to 18 decimal precision
-3. Returns current asset price
+2. Returns raw price data as int
+3. Used internally for rebalancing calculations
 
 ## 🚀 Deployment
 
@@ -304,23 +297,23 @@ yarn hardhat test test/slice/ --gas-report
 // Connect to Slice
 const slice = await ethers.getContractAt("Slice", sliceAddress);
 
-// Add assets to portfolio
-await slice.addAsset(
+// Add allocations to portfolio
+await slice.addAllocation(
     buildingAAddress,
-    3000, // 30% allocation
     chainlinkOracleA,
-);
-
-await slice.addAsset(
-    buildingBAddress,
     3000, // 30% allocation
-    chainlinkOracleB,
 );
 
-await slice.addAsset(
+await slice.addAllocation(
+    buildingBAddress,
+    chainlinkOracleB,
+    3000, // 30% allocation
+);
+
+await slice.addAllocation(
     buildingCAddress,
-    4000, // 40% allocation
     chainlinkOracleC,
+    4000, // 40% allocation
 );
 ```
 
@@ -354,11 +347,11 @@ const targetAllocation = await slice.getTargetAllocation(buildingAAddress);
 ### Price Management
 
 ```typescript
-// Get asset price
-const assetPrice = await slice.getAssetPrice(buildingAAddress);
+// Get asset price from Chainlink
+const assetPrice = await slice.getChainlinkDataFeedLatestAnswer(buildingAAddress);
 
-// Update price oracle
-await slice.setPriceOracle(buildingAAddress, newOracleAddress);
+// Get price feed for an asset
+const priceFeedAddress = await slice.priceFeed(buildingAAddress);
 ```
 
 ## 🔗 Integration Points
