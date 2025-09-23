@@ -99,13 +99,17 @@ function updateTargetAllocation(address asset, uint256 newAllocation) external o
 #### Deposit Assets
 
 ```solidity
-function deposit(address asset, uint256 amount) external
+function deposit(address aToken, uint256 amount) external returns (uint256 aTokenAmount)
 ```
 
 **Parameters:**
 
--   `asset`: Asset to deposit
+-   `aToken`: aToken (autocompounder token) to deposit
 -   `amount`: Amount to deposit
+
+**Returns:**
+
+-   `aTokenAmount`: Amount of aTokens received
 
 **Process:**
 
@@ -117,13 +121,16 @@ function deposit(address asset, uint256 amount) external
 #### Withdraw Assets
 
 ```solidity
-function withdraw(address asset, uint256 sTokenAmount) external
+function withdraw(uint256 sTokenAmount) external returns (uint256[] memory amounts)
 ```
 
 **Parameters:**
 
--   `asset`: Asset to withdraw
 -   `sTokenAmount`: Amount of sTokens to burn
+
+**Returns:**
+
+-   `amounts`: Array of amounts received for each asset
 
 **Process:**
 
@@ -320,14 +327,14 @@ await slice.addAllocation(
 ### User Interactions
 
 ```typescript
-// Deposit assets
+// Deposit aTokens
 await slice.deposit(buildingAAddress, ethers.parseEther("1000"));
 
 // Check sToken balance
 const sTokenBalance = await slice.balanceOf(userAddress);
 
-// Withdraw assets
-await slice.withdraw(buildingAAddress, sTokenBalance);
+// Withdraw aTokens
+await slice.withdraw(sTokenBalance);
 ```
 
 ### Rebalancing

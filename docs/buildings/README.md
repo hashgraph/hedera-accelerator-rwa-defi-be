@@ -209,12 +209,17 @@ const buildingAddress = receipt.logs[0].args.building;
 ### 3. Component Access
 
 ```typescript
-// Get component addresses
-const buildingToken = await buildingFactory.getBuildingToken(buildingAddress);
-const buildingVault = await buildingFactory.getBuildingVault(buildingAddress);
-const buildingGovernor = await buildingFactory.getBuildingGovernor(buildingAddress);
-const buildingTreasury = await buildingFactory.getBuildingTreasury(buildingAddress);
-const buildingAutoCompounder = await buildingFactory.getBuildingAutoCompounder(buildingAddress);
+// Get all building component addresses
+const buildingDetails = await buildingFactory.getBuildingDetails(buildingAddress);
+
+// Access individual components
+const buildingToken = buildingDetails.erc3643Token;
+const buildingVault = buildingDetails.vault;
+const buildingGovernor = buildingDetails.governance;
+const buildingTreasury = buildingDetails.treasury;
+const buildingAutoCompounder = buildingDetails.autoCompounder;
+const auditRegistry = buildingDetails.auditRegistry;
+const nftId = buildingDetails.nftId;
 ```
 
 ## 🔐 Identity and Compliance
@@ -405,25 +410,6 @@ yarn hardhat test test/buildings/ --gas-report
 ```
 
 ## 📚 Usage Examples
-
-### Complete Building Deployment
-
-```typescript
-// 1. Deploy building
-const buildingAddress = await deployBuilding(config);
-
-// 2. Get component addresses
-const components = await getBuildingComponents(buildingAddress);
-
-// 3. Set up compliance
-await setupCompliance(components.token, complianceModules);
-
-// 4. Initialize treasury
-await initializeTreasury(components.treasury, treasuryConfig);
-
-// 5. Start auto compounding
-await startAutoCompounding(components.autoCompounder);
-```
 
 ### Governance Workflow
 

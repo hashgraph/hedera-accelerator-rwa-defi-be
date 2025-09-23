@@ -42,6 +42,7 @@ The project follows a modular architecture with the following key principles:
 | [Buildings](./buildings/README.md)            | Complete building tokenization suite         | [📖 Read More](./buildings/README.md)      |
 | [ERC721 Metadata](./erc721/README.md)         | Enhanced NFT with on-chain metadata          | [📖 Read More](./erc721/README.md)         |
 | [Exchange](./exchange/README.md)              | One-sided exchange for token trading         | [📖 Read More](./exchange/README.md)       |
+| [Governance](./governance/README.md)          | On-chain governance for building decisions   | [📖 Read More](./governance/README.md)     |
 | [Slice](./slice/README.md)                    | Portfolio management and rebalancing         | [📖 Read More](./slice/README.md)          |
 | [Treasury](./treasury/README.md)              | Fund management and distribution             | [📖 Read More](./treasury/README.md)       |
 | [Upkeeper](./upkeeper/README.md)              | Automated task execution system              | [📖 Read More](./upkeeper/README.md)       |
@@ -98,7 +99,6 @@ yarn deploy
 
 # Deploy specific components
 yarn hardhat run scripts/deploy-building.ts --network testnet
-yarn hardhat run scripts/deploy-autocompounder-factory.ts --network testnet
 ```
 
 ### Step-by-Step Deployment
@@ -113,17 +113,6 @@ yarn hardhat run scripts/deploy-autocompounder-factory.ts --network testnet
 
     ```bash
     yarn hardhat run scripts/deploy-building.ts --network testnet
-    ```
-
-3. **Deploy Vault Factory**
-
-    ```bash
-    yarn hardhat run scripts/deploy-rewards-vault4626-factory.ts --network testnet
-    ```
-
-4. **Deploy Auto Compounder**
-    ```bash
-    yarn hardhat run scripts/deploy-autocompounder-factory.ts --network testnet
     ```
 
 ## 🧪 Testing
@@ -152,7 +141,6 @@ yarn hardhat coverage
 
 -   **Unit Tests**: Individual contract functionality
 -   **Integration Tests**: Cross-contract interactions
--   **Fork Tests**: Mainnet state simulation
 
 ## 📁 Data Folder
 
