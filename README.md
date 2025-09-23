@@ -34,33 +34,11 @@ Comprehensive documentation is available in the [`docs/`](./docs/) folder:
 -   **[📊 Vault](./docs/vault/README.md)** - ERC4626-compliant yield vaults
 -   **[🎯 Slice](./docs/slice/README.md)** - Portfolio management and rebalancing
 -   **[🏛️ Treasury](./docs/treasury/README.md)** - Fund management and distribution
+-   **[🗳️ Governance](./docs/governance/README.md)** - On-chain governance for building decisions
 -   **[🔍 Audit Registry](./docs/audit/README.md)** - Building audit management
 -   **[🎨 ERC721 Metadata](./docs/erc721/README.md)** - Enhanced NFT with on-chain metadata
 -   **[💱 Exchange](./docs/exchange/README.md)** - One-sided token exchange
 -   **[⚙️ Upkeeper](./docs/upkeeper/README.md)** - Automated task execution system
-
-## 🏗️ Architecture Overview
-
-The Hedera RWA DeFi Accelerator provides a complete ecosystem for tokenizing real-world assets:
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Buildings     │    │   Auto          │    │   Vault         │
-│   (ERC3643)     │◄──►│   Compounder    │◄──►│   (ERC4626)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Treasury      │    │   Slice         │    │   Exchange      │
-│   Management    │◄──►│   Portfolio     │◄──►│   Trading       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Audit         │    │   ERC721        │    │   Upkeeper      │
-│   Registry      │    │   Metadata      │    │   Automation    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
 
 ## 🧩 Core Components
 
@@ -230,9 +208,27 @@ import { ethers } from "hardhat";
 async function deployBuilding() {
     const buildingFactory = await ethers.getContractAt("BuildingFactory", factoryAddress);
 
-    const buildingAddress = await buildingFactory.deployBuilding(buildingConfig, governanceConfig, treasuryConfig);
+    const buildingDetails = {
+        tokenURI: "https://example.com/building-metadata",
+        tokenName: "Building Token",
+        tokenSymbol: "BT",
+        tokenDecimals: 18,
+        tokenMintAmount: ethers.parseEther("1000000"),
+        treasuryReserveAmount: ethers.parseUnits("10000", 6),
+        treasuryNPercent: 2000, // 20%
+        governanceName: "Building Governance",
+        vaultShareTokenName: "Building Vault Share",
+        vaultShareTokenSymbol: "BVS",
+        vaultFeeReceiver: feeReceiverAddress,
+        vaultFeeToken: usdcAddress,
+        vaultFeePercentage: 100, // 1%
+        vaultCliff: 0,
+        vaultUnlockDuration: 86400 * 30, // 30 days
+        aTokenName: "Building Auto Compounder",
+        aTokenSymbol: "BAC",
+    };
 
-    console.log("Building deployed to:", buildingAddress);
+    await buildingFactory.newBuilding(buildingDetails);
 }
 ```
 
