@@ -161,7 +161,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
                 vault,
                 details.aTokenName,
                 details.aTokenSymbol,
-                1e18, // minimumClaimThreshold: 1 token
+                1e6, // minimumClaimThreshold: 1 token USDC decimals (6)
                 $.uniswapRouter,
                 $.usdc, // intermediate token
                 300 // maxSlippage: 3% (300 basis points)
