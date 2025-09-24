@@ -226,9 +226,8 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
 
     // age identity registry agents to be able to register identities for the erc3643 tokens
     await buildingFactory.addRegistryAgents([
-        contracts.vault.RewardsVault4626Factory,
-        contracts.autoCompounder.RewardsVaultAutoCompounderFactory,
-        contracts.asyncVault.AsyncVaultFactory,
+        contracts.factories.RewardsVault4626Factory,
+        contracts.factories.RewardsVaultAutoCompounderFactory,
     ]);
 
     const nftCollection = await ethers.getContractAt("ERC721Metadata", contracts.implementations.ERC721Metadata);
@@ -331,19 +330,20 @@ async function finish(): Promise<void> {
     process.exit();
 }
 
+// Description: 🔍 - Deploy Factory contracts and REIT Suite contracts
 init()
     // add subsequent deployment script after this comment
-    // .then(deployBuildingIdentityFactory)
-    // .then(deployComplianceModules)
+    .then(deployBuildingIdentityFactory)
+    .then(deployComplianceModules)
     .then(deployVaultFactory)
-    // .then(deploySliceFactory)
+    .then(deploySliceFactory)
     .then(deployAutoCompounderFactory)
-    // .then(deployERC721Metadata)
-    // .then(deployUpkeeper)
-    // .then(deployLibraries)
-    // .then(deployBuildingFactory)
-    // .then(deployAudit)
-    // .then(deployExchange)
+    .then(deployERC721Metadata)
+    .then(deployUpkeeper)
+    .then(deployLibraries)
+    .then(deployBuildingFactory)
+    .then(deployAudit)
+    .then(deployExchange)
     .then(exportDeploymentVersion)
     .then(logContracts)
     .then(finish)
