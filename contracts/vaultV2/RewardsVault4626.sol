@@ -311,6 +311,29 @@ contract RewardsVault4626 is IERC4626 {
         return (amount - lastClaimed).mulDivDown(balanceOf[user], 1e18);
     }
 
+    /// @notice Get user's rewards for all reward tokens
+    /// @param user Address of the user
+    /// @return tokens Array of reward token addresses
+    /// @return amounts Array of claimable reward amounts corresponding to each token
+    function getUserReward(address user) external view returns (address[] memory tokens, uint256[] memory amounts) {
+        uint256 length = rewardTokens.length;
+        tokens = new address[](length);
+        amounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address token = rewardTokens[i];
+            tokens[i] = token;
+            
+            if (!rewardInfo[token].exists || balanceOf[user] == 0) {
+                amounts[i] = 0;
+            } else {
+                uint256 amount = rewardInfo[token].amount;
+                uint256 lastClaimed = userInfo[user].lastClaimedAmountPerToken[token];
+                amounts[i] = (amount - lastClaimed).mulDivDown(balanceOf[user], 1e18);
+            }
+        }
+    }
+
     /*///////////////////////////////////////////////////////////////
                         LOCK PERIOD LOGIC
     //////////////////////////////////////////////////////////////*/
