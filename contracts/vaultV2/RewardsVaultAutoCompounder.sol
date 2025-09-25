@@ -367,6 +367,39 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         return VAULT.isUnlocked(user);
     }
 
+    /// @notice Get user's proportional rewards for all reward tokens
+    /// @param user Address of the user
+    /// @return tokens Array of reward token addresses
+    /// @return amounts Array of claimable reward amounts corresponding to each token (user's proportional share)
+    function getUserReward(address user) external view returns (address[] memory tokens, uint256[] memory amounts) {
+        uint256 userShares = balanceOf[user];
+        
+        // If user has no shares, return empty arrays
+        if (userShares == 0 || totalSupply == 0) {
+            tokens = new address[](0);
+            amounts = new uint256[](0);
+            return (tokens, amounts);
+        }
+
+        // Calculate user's proportion of total supply
+        uint256 userProportion = userShares.mulDivDown(1e18, totalSupply);
+
+        // Get rewards from the underlying vault for this autocompounder contract
+        (address[] memory vaultTokens, uint256[] memory vaultAmounts) = VAULT.getUserReward(address(this));
+
+        uint256 length = vaultTokens.length;
+        tokens = new address[](length);
+        amounts = new uint256[](length);
+
+        // Calculate user's proportional share of each reward token
+        for (uint256 i = 0; i < length; i++) {
+            tokens[i] = vaultTokens[i];
+            
+            // User gets their proportional share of the autocompounder's rewards
+            amounts[i] = vaultAmounts[i].mulDivDown(userProportion, 1e18);
+        }
+    }
+
     /*///////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/

@@ -140,6 +140,146 @@ describe("RewardsVault4626", function () {
         });
     });
 
+    describe("getUserReward Function", function () {
+        let secondRewardToken: SimpleToken;
+
+        beforeEach(async function () {
+            // Deploy second reward token for multiple token testing
+            const SimpleToken = await ethers.getContractFactory("SimpleToken");
+            secondRewardToken = await SimpleToken.deploy("Second Reward", "SRW", 18);
+            await secondRewardToken.waitForDeployment();
+            await secondRewardToken.mint(owner.address, ethers.parseEther("1000"));
+
+            // Setup initial deposits
+            const depositAmount = ethers.parseEther("100");
+            await asset.connect(alice).approve(await vault.getAddress(), depositAmount);
+            await asset.connect(bob).approve(await vault.getAddress(), depositAmount);
+            
+            await vault.connect(alice).deposit(depositAmount, alice.address);
+            await vault.connect(bob).deposit(depositAmount, bob.address);
+        });
+
+        it("Should return empty arrays for user with no balance", async function () {
+            const charlie = (await ethers.getSigners())[3];
+            const [tokens, amounts] = await vault.getUserReward(charlie.address);
+            
+            expect(tokens.length).to.equal(0);
+            expect(amounts.length).to.equal(0);
+        });
+
+        it("Should return correct rewards for single token", async function () {
+            // Add rewards
+            const rewardAmount = ethers.parseEther("100");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount);
+            
+            // Check Alice's rewards
+            const [tokens, amounts] = await vault.getUserReward(alice.address);
+            
+            expect(tokens.length).to.equal(1);
+            expect(amounts.length).to.equal(1);
+            expect(tokens[0]).to.equal(await rewardToken.getAddress());
+            expect(amounts[0]).to.equal(ethers.parseEther("50")); // 50% of 100
+        });
+
+        it("Should return correct rewards for multiple tokens", async function () {
+            // Add first reward token
+            const rewardAmount1 = ethers.parseEther("100");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount1);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount1);
+            
+            // Add second reward token
+            const rewardAmount2 = ethers.parseEther("200");
+            await secondRewardToken.approve(await vault.getAddress(), rewardAmount2);
+            await vault.addReward(await secondRewardToken.getAddress(), rewardAmount2);
+            
+            // Check Alice's rewards
+            const [tokens, amounts] = await vault.getUserReward(alice.address);
+            
+            expect(tokens.length).to.equal(2);
+            expect(amounts.length).to.equal(2);
+            
+            // Verify tokens are returned in correct order
+            expect(tokens[0]).to.equal(await rewardToken.getAddress());
+            expect(tokens[1]).to.equal(await secondRewardToken.getAddress());
+            
+            // Verify amounts (Alice has 50% of total supply)
+            expect(amounts[0]).to.equal(ethers.parseEther("50")); // 50% of 100
+            expect(amounts[1]).to.equal(ethers.parseEther("100")); // 50% of 200
+        });
+
+        it("Should return proportional rewards based on balance", async function () {
+            // Add a third user with different balance
+            const charlie = (await ethers.getSigners())[3];
+            await asset.mint(charlie.address, ethers.parseEther("1000"));
+            
+            const charlieDeposit = ethers.parseEther("200"); // Double the others
+            await asset.connect(charlie).approve(await vault.getAddress(), charlieDeposit);
+            await vault.connect(charlie).deposit(charlieDeposit, charlie.address);
+            
+            // Add rewards
+            const rewardAmount = ethers.parseEther("120");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount);
+            
+            // Check rewards for all users
+            const [aliceTokens, aliceAmounts] = await vault.getUserReward(alice.address);
+            const [bobTokens, bobAmounts] = await vault.getUserReward(bob.address);
+            const [charlieTokens, charlieAmounts] = await vault.getUserReward(charlie.address);
+            
+            // All should have same token
+            expect(aliceTokens[0]).to.equal(await rewardToken.getAddress());
+            expect(bobTokens[0]).to.equal(await rewardToken.getAddress());
+            expect(charlieTokens[0]).to.equal(await rewardToken.getAddress());
+            
+            // Verify proportional distribution (1:1:2 ratio)
+            expect(aliceAmounts[0]).to.equal(ethers.parseEther("30")); // 100/400 * 120 = 30
+            expect(bobAmounts[0]).to.equal(ethers.parseEther("30"));   // 100/400 * 120 = 30
+            expect(charlieAmounts[0]).to.equal(ethers.parseEther("60")); // 200/400 * 120 = 60
+        });
+
+        it("Should return zero rewards after claiming", async function () {
+            // Add rewards
+            const rewardAmount = ethers.parseEther("100");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount);
+            
+            // Alice claims rewards
+            await vault.connect(alice).claimAllRewards();
+            
+            // Check Alice's remaining rewards
+            const [tokens, amounts] = await vault.getUserReward(alice.address);
+            
+            expect(tokens.length).to.equal(1);
+            expect(amounts[0]).to.equal(0);
+            
+            // Bob should still have rewards
+            const [bobTokens, bobAmounts] = await vault.getUserReward(bob.address);
+            expect(bobAmounts[0]).to.equal(ethers.parseEther("50"));
+        });
+
+        it("Should handle multiple deposits and claims correctly", async function () {
+            // Initial rewards
+            const rewardAmount1 = ethers.parseEther("100");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount1);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount1);
+            
+            // Alice claims first batch
+            await vault.connect(alice).claimAllRewards();
+            
+            // Add more rewards
+            const rewardAmount2 = ethers.parseEther("200");
+            await rewardToken.approve(await vault.getAddress(), rewardAmount2);
+            await vault.addReward(await rewardToken.getAddress(), rewardAmount2);
+            
+            // Check Alice's new rewards
+            const [tokens, amounts] = await vault.getUserReward(alice.address);
+            
+            expect(tokens.length).to.equal(1);
+            expect(amounts[0]).to.equal(ethers.parseEther("100")); // 50% of new 200
+        });
+    });
+
     describe("ERC4626 Compliance", function () {
         it("Should implement totalAssets correctly", async function () {
             expect(await vault.totalAssets()).to.equal(0);
