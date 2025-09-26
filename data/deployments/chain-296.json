@@ -8,7 +8,7 @@
     "factories": {
         "BuildingFactory": "0x8019083c4a3b3f7E461a2827DA044C0FeDdD9698",
         "BuildingIdentityFactory": "0xBf2c3055197DEdD92CcfF8EaD8eD304D8076a41A",
-        "SliceFactory": "0xAF2755C8e5957d0d82Dc797B6ca1961C6AF2b78D",
+        "SliceFactory": "0x1321112eb380BCfB4250CF3F4e5754E3E1CAeCfB",
         "RewardsVault4626Factory": "0x9270bFD6E6F71d82326035ab5C76eafEDDf5c982",
         "RewardsVaultAutoCompounderFactory": "0x1AeD152De9ec05ED819725B1584b1DE66ecE6920"
     },

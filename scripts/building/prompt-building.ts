@@ -1,8 +1,9 @@
 import { ethers } from "hardhat";
 import Deployments from "../../data/deployments/chain-296.json";
 import * as readline from "readline";
+import { BuildingFactoryStorage } from "../../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory";
 
-export async function promptBuilding(): Promise<string> {
+export async function promptBuilding(): Promise<BuildingFactoryStorage.BuildingDetailsStructOutput> {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -18,13 +19,13 @@ export async function promptBuilding(): Promise<string> {
         console.log("No buildings deployed yet.");
     }
 
-    return new Promise<string>((resolve) => {
+    return new Promise((resolve) => {
         const prompt =
             `Enter building address` +
             (defaultBuildingAddress ? ` (press enter to use default ${defaultBuildingAddress})` : "") +
             ": ";
 
-        rl.question(prompt, (answer) => {
+        rl.question(prompt, async (answer) => {
             rl.close();
             const result = answer.trim() || defaultBuildingAddress;
 
@@ -32,7 +33,7 @@ export async function promptBuilding(): Promise<string> {
                 throw new Error(`Building address is required`);
             }
 
-            resolve(result);
+            resolve(await buildingFactory.getBuildingDetails(result));
         });
     });
 }

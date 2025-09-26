@@ -118,13 +118,7 @@ async function shouldRebalance(SLICE_ADDRESS: string, allocations: any[], slice:
 /**
  * Helper function to add liquidity to Uniswap pools if needed
  */
-async function addLiquidityIfNeeded(
-    SLICE_ADDRESS: string,
-    allocations: any[],
-    baseToken: string,
-    uniswapRouter: string,
-    owner: any,
-) {
+async function checkLiquidity(allocations: any[], baseToken: string, uniswapRouter: string) {
     console.log("\n--- Checking if Liquidity Addition is Needed ---");
 
     const router = await ethers.getContractAt("IUniswapV2Router02", uniswapRouter);
@@ -141,9 +135,6 @@ async function addLiquidityIfNeeded(
             } catch (error) {
                 console.log(`  ⚠️  ${allocation.asset} <-> ${baseToken}: Pool needs liquidity`);
                 console.log(`    Consider adding liquidity to this pool before rebalancing`);
-
-                // You could add automatic liquidity addition here if you have the tokens
-                // This would require having tokens in the owner's account
             }
         } catch (error) {
             console.log(`  ❌ Error checking pool for ${allocation.asset}: ${error}`);
@@ -168,8 +159,9 @@ async function main() {
         // Get Uniswap router and base token info
         const uniswapRouter = await slice.uniswapV2Router();
         const baseToken = await slice.baseToken();
+        const baseTokenContract = await ethers.getContractAt("ERC20Mock", baseToken);
         console.log(`Uniswap Router: ${uniswapRouter}`);
-        console.log(`Base Token: ${baseToken}`);
+        console.log(`Base Token: ${baseToken} - ${await baseTokenContract.symbol()}`);
 
         // Get current allocations before rebalance
         console.log("\n--- Current Allocations ---");
@@ -186,10 +178,8 @@ async function main() {
 
         // Check Uniswap pool liquidity before attempting rebalance
         console.log("\n--- Checking Uniswap Pool Liquidity ---");
-        await checkPoolLiquidity(SLICE_ADDRESS, allocations, baseToken, uniswapRouter);
-
         // Check if liquidity addition is needed
-        await addLiquidityIfNeeded(SLICE_ADDRESS, allocations, baseToken, uniswapRouter, owner);
+        await checkLiquidity(allocations, baseToken, uniswapRouter);
 
         // Check if rebalance is actually needed
         const needsRebalance = await shouldRebalance(SLICE_ADDRESS, allocations, slice);
@@ -220,7 +210,6 @@ async function main() {
             try {
                 // Get price feed for the asset
                 const priceFeedAddress = await slice.priceFeed(allocation.asset);
-                console.log(`    DEBUG - Price Feed Address: ${priceFeedAddress}`);
                 if (priceFeedAddress !== "0x0000000000000000000000000000000000000000") {
                     // Use slice contract's price function directly (matches contract logic)
                     const priceData = ethers.formatUnits(
@@ -228,30 +217,17 @@ async function main() {
                         18,
                     );
 
-                    console.log(`    DEBUG - Price Data: ${priceData}`);
                     const price = Number(priceData);
-
                     // Get current balance and convert to USD value
                     const aTokenContract = await ethers.getContractAt("AutoCompounder", allocation.aToken);
                     const currentBalance = await aTokenContract.balanceOf(SLICE_ADDRESS);
                     const exchangeRate = await aTokenContract.exchangeRate();
                     const aTokenDecimals = await aTokenContract.decimals();
-
-                    // Debug logging
-                    console.log(`    DEBUG - Price: ${price}`);
-                    console.log(`    DEBUG - Current Balance: ${ethers.formatUnits(currentBalance, aTokenDecimals)}`);
-                    console.log(`    DEBUG - Exchange Rate: ${ethers.formatUnits(exchangeRate, 18)}`);
-                    console.log(`    DEBUG - aToken Decimals: ${aTokenDecimals}`);
-
                     // Convert aToken balance to underlying asset amount (using BigInt for precision)
                     const underlyingValue = (currentBalance * exchangeRate) / ethers.parseUnits("1", aTokenDecimals);
-
-                    console.log(`    DEBUG - Underlying Value: ${ethers.formatUnits(underlyingValue, 18)}`);
-
                     // Get underlying value in USD (match slice contract formula exactly)
                     const usdValue = (underlyingValue * BigInt(price)) / 10n ** BigInt(aTokenDecimals);
 
-                    console.log(`    DEBUG - USD Value: ${Number(usdValue)}`);
                     console.log(`  ${allocation.asset}: $${Number(usdValue).toFixed(2)}`);
                     totalValue += Number(usdValue);
                 }
@@ -305,8 +281,6 @@ async function main() {
             const aTokenContract = await ethers.getContractAt("AutoCompounder", allocation.aToken);
             const newBalance = await aTokenContract.balanceOf(SLICE_ADDRESS);
             console.log(`Allocation ${i + 1}:`);
-            console.log(`  aToken: ${allocation.aToken}`);
-            console.log(`  Asset: ${allocation.asset}`);
             console.log(`  Target Percentage: ${Number(allocation.targetPercentage) / 100}%`);
             console.log(`  New Balance: ${ethers.formatUnits(newBalance, 18)} aTokens`);
         }

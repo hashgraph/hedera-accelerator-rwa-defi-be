@@ -581,6 +581,10 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         // Skip swap if amount is too small for Uniswap
         if (amountIn == 0) return;
 
+        // Check if we have enough balance
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance >= amountIn, "Slice: Insufficient token balance for swap");
+
         address[] memory path = new address[](2);
         path[0] = token;
         path[1] = targetToken;

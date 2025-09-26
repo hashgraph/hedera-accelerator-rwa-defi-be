@@ -288,7 +288,7 @@ async function analyzeRebalanceNecessity(sliceAddress: string) {
 
     // Calculate actual percentages and check if rebalancing is needed
     let needsRebalance = false;
-    const threshold = 0.01; // 1% threshold
+    const threshold = 1; // 1% threshold
 
     console.log(`\nTotal Portfolio Value: $${totalValue.toLocaleString()}`);
     console.log("\nCurrent vs Target Allocations:");

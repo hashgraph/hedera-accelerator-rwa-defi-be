@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 import { promptAddress } from "../building/prompt-address";
-import Deployments from "../../data/deployments/chain-296.json";
+import * as readline from "readline";
 
 /**
  * Script to deposit into a slice to create an imbalance for testing rebalancing
@@ -115,9 +115,16 @@ async function getDepositAmount(): Promise<bigint> {
     console.log("3. Large: 200 tokens");
     console.log("4. Custom amount");
 
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
     const userInput = await new Promise<string>((resolve) => {
-        process.stdout.write("Enter choice (1-4): ");
-        process.stdin.once("data", (data) => resolve(data.toString().trim()));
+        rl.question("Enter choice (1-4): ", (answer) => {
+            rl.close();
+            resolve(answer.trim());
+        });
     });
 
     switch (userInput) {
@@ -128,9 +135,16 @@ async function getDepositAmount(): Promise<bigint> {
         case "3":
             return DEPOSIT_AMOUNTS.large;
         case "4":
+            const customRl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout,
+            });
+
             const customAmount = await new Promise<string>((resolve) => {
-                process.stdout.write("Enter custom amount (tokens): ");
-                process.stdin.once("data", (data) => resolve(data.toString().trim()));
+                customRl.question("Enter custom amount (tokens): ", (answer) => {
+                    customRl.close();
+                    resolve(answer.trim());
+                });
             });
             return ethers.parseUnits(customAmount, 18);
         default:
@@ -153,9 +167,16 @@ async function getTargetAllocation(allocations: any[]): Promise<number> {
         console.log(`   Target: ${allocation.targetPercentage / 100n}%`);
     }
 
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
     const userInput = await new Promise<string>((resolve) => {
-        process.stdout.write(`Enter allocation number (1-${allocations.length}): `);
-        process.stdin.once("data", (data) => resolve(data.toString().trim()));
+        rl.question(`Enter allocation number (1-${allocations.length}): `, (answer) => {
+            rl.close();
+            resolve(answer.trim());
+        });
     });
 
     const allocationIndex = parseInt(userInput) - 1;
