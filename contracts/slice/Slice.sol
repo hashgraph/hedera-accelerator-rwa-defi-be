@@ -265,9 +265,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @dev Adds new aToken allocation.
      * @inheritdoc ISlice
      */
-    function addAllocation(address aToken, address priceFeed, uint16 percentage) external {
+    function addAllocation(address aToken, address priceFeedAddress, uint16 percentage) external {
         require(aToken != address(0), "Slice: Invalid aToken address");
-        require(priceFeed != address(0), "Slice: Invalid price feed address");
+        require(priceFeedAddress != address(0), "Slice: Invalid price feed address");
         require(percentage != 0 && percentage != BASIS_POINTS, "Slice: Invalid allocation percentage");
         require(_allocated + percentage <= BASIS_POINTS, "Slice: Total allocation exceeds 100%");
 
@@ -287,9 +287,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         _allocations.push(Allocation({aToken: aToken, asset: asset, targetPercentage: percentage}));
         _allocated += percentage;
 
-        _priceFeeds[asset] = AggregatorV3Interface(priceFeed);
+        _priceFeeds[asset] = AggregatorV3Interface(priceFeedAddress);
 
-        emit AllocationAdded(aToken, asset, priceFeed, percentage);
+        emit AllocationAdded(aToken, asset, priceFeedAddress, percentage);
     }
 
     /**
