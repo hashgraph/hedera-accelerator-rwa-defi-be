@@ -1,6 +1,7 @@
 import { ethers } from "hardhat";
 import Deployments from "../../data/deployments/chain-296.json";
 import { usdcAddress } from "../../constants";
+import { promptString } from "./prompt-string";
 
 // Description: 🏢 - Deploy a new building
 async function createBuilding(): Promise<string> {
@@ -8,24 +9,31 @@ async function createBuilding(): Promise<string> {
 
     const buildingFactory = await ethers.getContractAt("BuildingFactory", Deployments.factories.BuildingFactory);
 
+    const buildingName = await promptString("building name");
+    const buildingSymbol = await promptString("building symbol");
+    const tokenURI = await promptString(
+        "token URI",
+        "ipfs://bafkreidmn4ozne5okre4wpdjarywmiqgtayamg5r3ceq7sq5ez3m5sfpcq",
+    );
+
     const buildingDetails = {
-        tokenURI: "ipfs://bafkreidmn4ozne5okre4wpdjarywmiqgtayamg5r3ceq7sq5ez3m5sfpcq",
-        tokenName: "Dubai Complex 0222",
-        tokenSymbol: "DUB0122",
+        tokenURI: tokenURI,
+        tokenName: buildingName,
+        tokenSymbol: buildingSymbol,
         tokenDecimals: 18n,
         tokenMintAmount: ethers.parseEther("1000"),
         treasuryNPercent: 2000n,
         treasuryReserveAmount: ethers.parseUnits("1000", 6),
-        governanceName: "Dubai Governance 22",
-        vaultShareTokenName: "Dubai Vault Token 22",
-        vaultShareTokenSymbol: "vDUB02",
+        governanceName: buildingName + "Governance",
+        vaultShareTokenName: buildingName + "Vault Token",
+        vaultShareTokenSymbol: "v" + buildingSymbol,
         vaultFeeReceiver: owner,
         vaultFeeToken: usdcAddress,
         vaultFeePercentage: 2000,
         vaultCliff: 0n,
         vaultUnlockDuration: 0n,
-        aTokenName: "Dubait AutoCompounder Token 222",
-        aTokenSymbol: "aDUB02",
+        aTokenName: buildingName + "AutoCompounder Token",
+        aTokenSymbol: "a" + buildingSymbol,
     };
 
     const tx = await buildingFactory.newBuilding(buildingDetails, {

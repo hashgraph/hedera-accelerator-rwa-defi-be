@@ -1,23 +1,38 @@
 import { ethers } from "hardhat";
 import Deployments from "../../data/deployments/chain-296.json";
-import { BuildingFactoryStorage } from "../../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory";
+import * as readline from "readline";
 
-export async function promptBuilding(): Promise<BuildingFactoryStorage.BuildingDetailsStructOutput> {
-    // get building token from building factory by passing the building address
-    const buildingFactory = await ethers.getContractAt("BuildingFactory", Deployments.factories.BuildingFactory);
-
-    // Get first building address as default
-    const defaultBuildingAddress = (await buildingFactory.getBuildingList())[0].addr;
-
-    // Prompt user for building address
-    const userInput = await new Promise<string>((resolve) => {
-        process.stdout.write(`Enter building address (press enter to use default ${defaultBuildingAddress}): `);
-        process.stdin.once("data", (data) => resolve(data.toString().trim()));
+export async function promptBuilding(): Promise<string> {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
     });
 
-    const buildingAddress = userInput || defaultBuildingAddress;
+    const buildingFactory = await ethers.getContractAt("BuildingFactory", Deployments.factories.BuildingFactory);
+    // Get first building address as default
+    let defaultBuildingAddress = undefined;
 
-    console.log("🏢 Building Address:", buildingAddress, "\n");
+    try {
+        defaultBuildingAddress = (await buildingFactory.getBuildingList())?.[0]?.addr;
+    } catch (error) {
+        console.log("No buildings deployed yet.");
+    }
 
-    return await buildingFactory.getBuildingDetails(buildingAddress);
+    return new Promise<string>((resolve) => {
+        const prompt =
+            `Enter building address` +
+            (defaultBuildingAddress ? ` (press enter to use default ${defaultBuildingAddress})` : "") +
+            ": ";
+
+        rl.question(prompt, (answer) => {
+            rl.close();
+            const result = answer.trim() || defaultBuildingAddress;
+
+            if (!result) {
+                throw new Error(`Building address is required`);
+            }
+
+            resolve(result);
+        });
+    });
 }
