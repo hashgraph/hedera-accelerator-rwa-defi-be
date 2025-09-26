@@ -90,21 +90,27 @@ class ScriptRunner {
 
         let index = 1;
         const scriptMap = new Map<number, ScriptInfo>();
+        let tableData = [];
 
         // Display scripts grouped by category
         for (const [category, scripts] of categories) {
-            console.log(`\n📁 ${category.toUpperCase()}`);
-            console.log("─".repeat(category.length + 3));
-
+            // console.group(`📁 ${category.toUpperCase()}`);
             for (const script of scripts) {
-                console.log(
-                    `${index.toString().padStart(2)}. ${script.name}` +
-                        (script.description ? ` - ${script.description}` : ""),
-                );
+                tableData.push({
+                    index: index,
+                    category: category,
+                    name: script.name,
+                    description: script.description ? `${script.description}` : "",
+                });
                 scriptMap.set(index, script);
                 index++;
             }
         }
+        const transformed = tableData.reduce((acc, { index, ...x }) => {
+            acc[index] = x;
+            return acc;
+        }, {});
+        console.table(transformed, ["name", "description"]);
 
         console.log(`\n${index}. 🔍 Search scripts`);
         console.log(`${index + 1}. 📊 Show script details`);
