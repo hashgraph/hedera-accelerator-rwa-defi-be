@@ -68,7 +68,7 @@ async function getAllocationInfo(sliceAddress: string) {
         console.log(`\n--- Allocation ${i + 1} ---`);
         console.log(`AutoCompounder (aToken): ${allocation.aToken}`);
         console.log(`Asset (ERC3643 Token): ${allocation.asset}`);
-        console.log(`Target Percentage: ${allocation.targetPercentage}%`);
+        console.log(`Target Percentage: ${allocation.targetPercentage / 100n}%`);
 
         // Get autocompounder details
         try {
@@ -353,9 +353,11 @@ async function getUniswapPoolInfo(sliceAddress: string) {
 
             const pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress);
             const reserves = await pair.getReserves();
+            const token0 = await pair.token0();
 
-            const tokenReserve = reserves[0];
-            const baseReserve = reserves[1];
+            // Uniswap sorts tokens by address, so we need to check order
+            const [tokenReserve, baseReserve] =
+                token0 === tokenAddress ? [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
 
             console.log(`Pool Address: ${pairAddress}`);
             console.log(`Token Reserve: ${ethers.formatUnits(tokenReserve, 18)}`);
@@ -416,7 +418,8 @@ async function getBuildingInfo(sliceAddress: string) {
         console.log(`Found ${matchedBuildings.length} matching building(s):`);
 
         for (let i = 0; i < matchedBuildings.length; i++) {
-            const building = matchedBuildings[i];
+            const buildingDetails = matchedBuildings[i];
+            const building = await buildingFactory.getBuildingDetails(buildingDetails.addr);
 
             console.log(`\n--- Building ${i + 1} ---`);
             console.log(`Building Address: ${building.addr}`);
