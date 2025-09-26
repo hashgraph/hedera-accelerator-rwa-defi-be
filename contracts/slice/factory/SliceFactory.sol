@@ -7,7 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 
 import {ISliceFactory} from "./interfaces/ISliceFactory.sol";
-import {Slice} from "../Slice.sol";
+import {SliceV2} from "../SliceV2.sol";
 
 /**
  * @title Slice Factory
@@ -51,7 +51,7 @@ contract SliceFactory is ISliceFactory, Ownable, ERC165 {
      * @return The the address of the contract created.
      */
     function _deploySlice(string calldata salt, SliceDetails calldata sliceDetails) private returns (address) {
-        bytes memory _code = type(Slice).creationCode;
+        bytes memory _code = type(SliceV2).creationCode;
         bytes memory _constructData = abi.encode(
             sliceDetails.uniswapRouter,
             sliceDetails.usdc,
