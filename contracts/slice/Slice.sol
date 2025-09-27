@@ -265,9 +265,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
      * @dev Adds new aToken allocation.
      * @inheritdoc ISlice
      */
-    function addAllocation(address aToken, address priceFeed, uint16 percentage) external {
+    function addAllocation(address aToken, address priceFeedAddress, uint16 percentage) external {
         require(aToken != address(0), "Slice: Invalid aToken address");
-        require(priceFeed != address(0), "Slice: Invalid price feed address");
+        require(priceFeedAddress != address(0), "Slice: Invalid price feed address");
         require(percentage != 0 && percentage != BASIS_POINTS, "Slice: Invalid allocation percentage");
         require(_allocated + percentage <= BASIS_POINTS, "Slice: Total allocation exceeds 100%");
 
@@ -287,9 +287,9 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         _allocations.push(Allocation({aToken: aToken, asset: asset, targetPercentage: percentage}));
         _allocated += percentage;
 
-        _priceFeeds[asset] = AggregatorV3Interface(priceFeed);
+        _priceFeeds[asset] = AggregatorV3Interface(priceFeedAddress);
 
-        emit AllocationAdded(aToken, asset, priceFeed, percentage);
+        emit AllocationAdded(aToken, asset, priceFeedAddress, percentage);
     }
 
     /**
@@ -396,7 +396,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             // Target amount in aToken
             aTokenTargetAmount = targetUnderlyingAmount.mulDivDown(aTokenToUnderlyingRate, PRECISION);
 
-            aTokenBalance = _balances[aToken];
+            // Use actual token balance instead of internal tracking to prevent sync issues
+            aTokenBalance = IERC20(aToken).balanceOf(address(this));
 
             if (aTokenBalance > aTokenTargetAmount) {
                 aTokenExcessAmount = aTokenBalance - aTokenTargetAmount;
@@ -410,14 +411,16 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                     _balances[baseToken()] = IERC20(baseToken()).balanceOf(address(this));
 
                     // Update internal balance tracking to reflect the withdrawal
-                    _balances[aToken] -= aTokenExcessAmount;
+                    // Use actual balance after withdrawal to prevent underflow
+                    aTokenBalance = IERC20(aToken).balanceOf(address(this));
+                    _balances[aToken] = aTokenBalance;
 
                     payloads[i] = RebalancePayload({
                         aToken: aToken,
                         asset: asset,
                         targetUnderlyingAmount: targetUnderlyingAmount,
                         aTokenTargetAmount: aTokenTargetAmount,
-                        currentBalance: aTokenBalance - aTokenExcessAmount,
+                        currentBalance: aTokenBalance,
                         availableReward: 0
                     });
                 } else {
@@ -518,7 +521,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
             // Reinvest to get aToken (only if we have underlying tokens)
             if (underlyingBalance > 0) {
                 IERC20(asset).approve(aToken, underlyingBalance);
-                _balances[aToken] += IRewardsVaultAutoCompounder(aToken).deposit(underlyingBalance, address(this));
+                IRewardsVaultAutoCompounder(aToken).deposit(underlyingBalance, address(this));
+                _balances[aToken] = IERC20(aToken).balanceOf(address(this));
             }
         }
     }
@@ -551,7 +555,8 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         view
         returns (uint256 currentValue, uint256 underlyingValue, uint256 underlyingPrice, uint256 aTokenToUnderlyingRate)
     {
-        uint256 balance = _balances[aToken];
+        // Use actual token balance instead of internal tracking for consistency
+        uint256 balance = IERC20(aToken).balanceOf(address(this));
         aTokenToUnderlyingRate = IRewardsVaultAutoCompounder(aToken).exchangeRate();
         underlyingPrice = uint256(getChainlinkDataFeedLatestAnswer(asset));
 
@@ -575,6 +580,10 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     function _tradeForToken(address token, address targetToken, uint256 amountIn) internal {
         // Skip swap if amount is too small for Uniswap
         if (amountIn == 0) return;
+
+        // Check if we have enough balance
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance >= amountIn, "Slice: Insufficient token balance for swap");
 
         address[] memory path = new address[](2);
         path[0] = token;
