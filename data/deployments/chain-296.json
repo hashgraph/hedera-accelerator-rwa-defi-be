@@ -1,30 +1,30 @@
 {
     "implementations": {
-        "ERC721Metadata": "0xDc4830Edf405Feb0cf5c841C604a9fCc339e327D",
-        "UpKeeper": "0xaD93e7EfEAb23e5eBBF3109289E26Fc66b08D85A",
-        "AuditRegistry": "0x8d89551cB09c5A2394B6e4E7Dad9C811f8B6Eb5e",
-        "OneSidedExchange": "0x4Ca1681fdA2b4F659c0919EB9f8d97D9F5FD7b5c"
+        "ERC721Metadata": "0x0E22b135fF8e072fA2baDE4064cBf5EE7B0E6Dcd",
+        "UpKeeper": "0x4734A23AfdC9a2109B0C92c83497d310ff3c1C37",
+        "AuditRegistry": "0x78673a49FB6D85DE6f929E28f4856506E5F8bd3F",
+        "OneSidedExchange": "0x46533f9c32017Fe3274E5e0bF4C2F26470eCc834"
     },
     "factories": {
-        "BuildingFactory": "0x8019083c4a3b3f7E461a2827DA044C0FeDdD9698",
-        "BuildingIdentityFactory": "0xBf2c3055197DEdD92CcfF8EaD8eD304D8076a41A",
-        "SliceFactory": "0x5E4E18c536Bb92C9159181EC415EF6797AC189eD",
-        "RewardsVault4626Factory": "0x9270bFD6E6F71d82326035ab5C76eafEDDf5c982",
-        "RewardsVaultAutoCompounderFactory": "0x1AeD152De9ec05ED819725B1584b1DE66ecE6920"
+        "BuildingFactory": "0xcb180386E884DaE5dBfad6729B1Ff7Cca26a256e",
+        "BuildingIdentityFactory": "0xA766f58d412d382e3d3232b39b46FE994199FB18",
+        "SliceFactory": "0x45893BeD7Bb0e53EAfA90a601BCcED402e53537d",
+        "RewardsVault4626Factory": "0xaBfa8D50D88eAF3CFBC7Df4281b5aAf8e9F0d377",
+        "RewardsVaultAutoCompounderFactory": "0x7495435a2EAda7a0b4CA0e5d3BeBF26ed91F4a1c"
     },
     "compliance": {
-        "RequiresNFTModule": "0x84d05b9CA242B0D96dC815cE2d9D4FACC1Bfe829",
-        "CountryAllowModule": "0xa06d56F06942b4300f103871D140392A6696FB24",
-        "MaxOwnershipByCountryModule": "0x5b7e3816267689C1Bd4Ed2E43b728A4e96DE5438",
-        "MaxTenPercentOwnershipModule": "0x4B2e149182dfFBc020AE6Fc2FbC4c594003A09Fe",
-        "OnlyUsaModule": "0xD2964732eE570E47ee8b34593f17c6F017c4fa6F",
-        "TransferLimitOneHundredModule": "0xcd117a3b15C81785adf0BC42593BDa378cdCf6D5"
+        "RequiresNFTModule": "0xa2c61bb6fA5dC94A9f110B396e7754f9855ddfab",
+        "CountryAllowModule": "0x3Dd4F569499Ef3e6374f5890FE15AB9e7Af67a71",
+        "MaxOwnershipByCountryModule": "0x3Adc1Ae898be7d46B7D7c04AEC034661E7871A06",
+        "MaxTenPercentOwnershipModule": "0x5e1872fA602b3E524cf2ade7392193a815bDAC00",
+        "OnlyUsaModule": "0x3AE841905067d1213777018d1792D323B8cf1BB5",
+        "TransferLimitOneHundredModule": "0x0fe4910b1DFDd92f7e81D99beA26c6a27b116239"
     },
     "libraries": {
-        "BuildingTokenLib": "0x86Bdf4d909d100f83541977D8220c0d9e81D0618",
-        "BuildingGovernanceLib": "0x19F6101248cB599C2430b2EAA92A02f49B6b3361",
-        "BuildingTreasuryLib": "0x714fE98A873e5Bb392D12bdb4CEa46A91b4d9F29",
-        "BuildingVaultLib": "0x826EE2E0e43736886983C539eae5aDa6208f31b0",
-        "BuildingAutoCompounderLib": "0xDFf03c969f135C3a56F97573678747D74aB60252"
+        "BuildingTokenLib": "0x656a3432cFfCd5a4d1A7C5401A469Bb2078DC18d",
+        "BuildingGovernanceLib": "0xcaf7CD58EbB8876832Fb325A0c44FD9A93479ec8",
+        "BuildingTreasuryLib": "0x15BF81ad41F7c209b5F4495f5D1f482B94404B4F",
+        "BuildingVaultLib": "0xF977F4B677935e2c0a1103ECF69c679EF5C1017e",
+        "BuildingAutoCompounderLib": "0x6AbE1ea284CF660c4653cB9c9947a50Bd4d4f0aA"
     }
 }
