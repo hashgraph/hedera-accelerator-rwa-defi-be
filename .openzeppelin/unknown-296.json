@@ -1,0 +1,867 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0xA23Feda52A5c9CAF747F0DC02FfEaEF68f927F7f",
+      "txHash": "0x6d5eebfc6e298556e2f88c48a3ad09b3a14e45ae4cf8d454ee968ca501310da8",
+      "kind": "beacon"
+    },
+    {
+      "address": "0x32948C0996eC2201CDDe83A9626EFAfaDD9b23dB",
+      "txHash": "0xc256687c9e7db494cabdc2d488a8825770af75a247a112f02d3c773b162a6ec5",
+      "kind": "beacon"
+    }
+  ],
+  "impls": {
+    "24a4b73fccd3da65440126f4122bbc67734a77eedc0585bc27b2f83315efdf76": {
+      "address": "0xb89baa543376068C88430626357c3e1011F09Ab4",
+      "txHash": "0x16dc578ecb9594d2608420032a9fca0509d1de2bd1e418ae2d08be2a00ad7963",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)1524_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)257_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "1d9482b7c6ff2ee6f566ad63745d6e51c55f6eee951d73a4aea01495ec12c2f9": {
+      "address": "0x93ba95D9E3B5C3986364190EbB09aaFF7843c065",
+      "txHash": "0x2e4f0e92e9301b4396c9140c5becfcf8cf11ac41efbf8ea74d15841a309a9195",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(BuildingDetails)7970_storage)dyn_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingDetails[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(BuildingDetails)7970_storage)": {
+            "label": "mapping(address => struct BuildingFactoryStorage.BuildingDetails)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(BuildingDetails)7970_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingDetails",
+            "members": [
+              {
+                "label": "addr",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "nftId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "tokenURI",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "auditRegistry",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "erc3643Token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "treasury",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "governance",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "vault",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "autoCompounder",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "initialOwner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "tokenMintAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "isConfigured",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
+          "t_struct(BuildingFactoryStorageData)7942_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingFactoryStorageData",
+            "members": [
+              {
+                "label": "nft",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "uniswapRouter",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "uniswapFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "buildingBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "identityFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "trexFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "treasuryBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "usdc",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "governanceBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "upkeeper",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "registryAgents",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "tokenAgents",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "buildingsList",
+                "type": "t_array(t_struct(BuildingDetails)7970_storage)dyn_storage",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "buildingDetails",
+                "type": "t_mapping(t_address,t_struct(BuildingDetails)7970_storage)",
+                "offset": 0,
+                "slot": "13"
+              }
+            ],
+            "numberOfBytes": "448"
+          },
+          "t_struct(InitializableStorage)1524_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)257_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ],
+          "erc7201:hashgraph.buildings.BuildingFactory": [
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "nft",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:7",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "uniswapRouter",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:8",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "uniswapFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:9",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:10",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "identityFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:11",
+              "offset": 0,
+              "slot": "4"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "trexFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:12",
+              "offset": 0,
+              "slot": "5"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "treasuryBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:13",
+              "offset": 0,
+              "slot": "6"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "usdc",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:14",
+              "offset": 0,
+              "slot": "7"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "governanceBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:15",
+              "offset": 0,
+              "slot": "8"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "upkeeper",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:16",
+              "offset": 0,
+              "slot": "9"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "registryAgents",
+              "type": "t_array(t_address)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:17",
+              "offset": 0,
+              "slot": "10"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "tokenAgents",
+              "type": "t_array(t_address)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:18",
+              "offset": 0,
+              "slot": "11"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingsList",
+              "type": "t_array(t_struct(BuildingDetails)7970_storage)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:19",
+              "offset": 0,
+              "slot": "12"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingDetails",
+              "type": "t_mapping(t_address,t_struct(BuildingDetails)7970_storage)",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:20",
+              "offset": 0,
+              "slot": "13"
+            }
+          ]
+        }
+      }
+    },
+    "d14a270cde0d6361227d8bfb752357473ac3e885a0c0ff9b5e969ae0d1d27d48": {
+      "address": "0x764A4e67551e083569183C03a728242b7f29d998",
+      "txHash": "0x4c349a5067a5ad9f663bb2cb431b40144654de08b6b023e3a2931b7cd0e07ee7",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(BuildingDetails)5278_storage)dyn_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingDetails[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(BuildingDetails)5278_storage)": {
+            "label": "mapping(address => struct BuildingFactoryStorage.BuildingDetails)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(BuildingDetails)5278_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingDetails",
+            "members": [
+              {
+                "label": "addr",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "nftId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "tokenURI",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "auditRegistry",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "erc3643Token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "treasury",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "governance",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "vault",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "autoCompounder",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "initialOwner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "tokenMintAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "isConfigured",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
+          "t_struct(BuildingFactoryStorageData)5250_storage": {
+            "label": "struct BuildingFactoryStorage.BuildingFactoryStorageData",
+            "members": [
+              {
+                "label": "nft",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "uniswapRouter",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "uniswapFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "buildingBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "identityFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "trexFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "treasuryBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "usdc",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "governanceBeacon",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "upkeeper",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "registryAgents",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "tokenAgents",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "buildingsList",
+                "type": "t_array(t_struct(BuildingDetails)5278_storage)dyn_storage",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "buildingDetails",
+                "type": "t_mapping(t_address,t_struct(BuildingDetails)5278_storage)",
+                "offset": 0,
+                "slot": "13"
+              }
+            ],
+            "numberOfBytes": "448"
+          },
+          "t_struct(InitializableStorage)1185_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)164_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ],
+          "erc7201:hashgraph.buildings.BuildingFactory": [
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "nft",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:7",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "uniswapRouter",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:8",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "uniswapFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:9",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:10",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "identityFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:11",
+              "offset": 0,
+              "slot": "4"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "trexFactory",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:12",
+              "offset": 0,
+              "slot": "5"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "treasuryBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:13",
+              "offset": 0,
+              "slot": "6"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "usdc",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:14",
+              "offset": 0,
+              "slot": "7"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "governanceBeacon",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:15",
+              "offset": 0,
+              "slot": "8"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "upkeeper",
+              "type": "t_address",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:16",
+              "offset": 0,
+              "slot": "9"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "registryAgents",
+              "type": "t_array(t_address)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:17",
+              "offset": 0,
+              "slot": "10"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "tokenAgents",
+              "type": "t_array(t_address)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:18",
+              "offset": 0,
+              "slot": "11"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingsList",
+              "type": "t_array(t_struct(BuildingDetails)5278_storage)dyn_storage",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:19",
+              "offset": 0,
+              "slot": "12"
+            },
+            {
+              "contract": "BuildingFactoryStorage",
+              "label": "buildingDetails",
+              "type": "t_mapping(t_address,t_struct(BuildingDetails)5278_storage)",
+              "src": "contracts/buildings/BuildingFactoryStorage.sol:20",
+              "offset": 0,
+              "slot": "13"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

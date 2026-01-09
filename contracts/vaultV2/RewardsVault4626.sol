@@ -21,6 +21,9 @@ contract RewardsVault4626 is IERC4626 {
     /// @notice Lock period in seconds
     uint256 public immutable lockPeriod;
 
+    /// @notice Minimum time deposits must be held before being eligible for rewards (anti-frontrun)
+    uint256 public constant REWARD_ELIGIBILITY_DELAY = 1 hours;
+
     /// @notice Contract owner
     address public owner;
 
@@ -305,6 +308,9 @@ contract RewardsVault4626 is IERC4626 {
     function getClaimableReward(address user, address token) external view returns (uint256) {
         if (!rewardInfo[token].exists || balanceOf[user] == 0) return 0;
 
+        // Anti-frontrunning: user must have held shares for minimum delay before claiming rewards
+        if (block.timestamp < userInfo[user].lockTimeStart + REWARD_ELIGIBILITY_DELAY) return 0;
+
         uint256 amount = rewardInfo[token].amount;
         uint256 lastClaimed = userInfo[user].lastClaimedAmountPerToken[token];
 
@@ -320,11 +326,14 @@ contract RewardsVault4626 is IERC4626 {
         tokens = new address[](length);
         amounts = new uint256[](length);
 
+        // Anti-frontrunning: user must have held shares for minimum delay before claiming rewards
+        bool isEligible = block.timestamp >= userInfo[user].lockTimeStart + REWARD_ELIGIBILITY_DELAY;
+
         for (uint256 i = 0; i < length; i++) {
             address token = rewardTokens[i];
             tokens[i] = token;
-            
-            if (!rewardInfo[token].exists || balanceOf[user] == 0) {
+
+            if (!rewardInfo[token].exists || balanceOf[user] == 0 || !isEligible) {
                 amounts[i] = 0;
             } else {
                 uint256 amount = rewardInfo[token].amount;
@@ -332,6 +341,58 @@ contract RewardsVault4626 is IERC4626 {
                 amounts[i] = (amount - lastClaimed).mulDivDown(balanceOf[user], 1e18);
             }
         }
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                        ERC20 TRANSFER OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Transfer shares with proper reward checkpoint synchronization
+    /// @dev Overrides ERC20 transfer to prevent lock bypass and reward theft
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        require(_isUnlocked(msg.sender), "Shares are locked");
+
+        // Claim sender's rewards before transfer
+        _claimAllRewards(msg.sender);
+
+        // Sync recipient's userInfo before receiving shares
+        _syncOnTransfer(msg.sender, to);
+
+        // Perform the transfer
+        balanceOf[msg.sender] -= amount;
+        unchecked {
+            balanceOf[to] += amount;
+        }
+
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    /// @notice Transfer shares from another address with proper reward checkpoint synchronization
+    /// @dev Overrides ERC20 transferFrom to prevent lock bypass and reward theft
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        require(_isUnlocked(from), "Shares are locked");
+
+        // Check and update allowance
+        uint256 allowed = allowance[from][msg.sender];
+        if (allowed != type(uint256).max) {
+            allowance[from][msg.sender] = allowed - amount;
+        }
+
+        // Claim sender's rewards before transfer
+        _claimAllRewards(from);
+
+        // Sync recipient's userInfo before receiving shares
+        _syncOnTransfer(from, to);
+
+        // Perform the transfer
+        balanceOf[from] -= amount;
+        unchecked {
+            balanceOf[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+        return true;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -351,32 +412,6 @@ contract RewardsVault4626 is IERC4626 {
         if (block.timestamp >= unlockTime) return 0;
 
         return unlockTime - block.timestamp;
-    }
-
-    /// @notice Unlock and withdraw (mimics original Vault's unlock function)
-    function unlock(uint256 startPosition, uint256 assets) external returns (uint256, uint256, uint256) {
-        require(userInfo[msg.sender].exists, "User has no deposits");
-        require(_isUnlocked(msg.sender), "You can't unlock your token because the lock period is not reached");
-
-        // Claim rewards with pagination (process 10 rewards at a time)
-        uint256 endPosition = startPosition + 10;
-        if (endPosition > rewardTokens.length) {
-            endPosition = rewardTokens.length;
-        }
-
-        for (uint256 i = startPosition; i < endPosition; i++) {
-            _claimReward(msg.sender, rewardTokens[i]);
-        }
-
-        // Then withdraw the assets
-        uint256 shares = previewWithdraw(assets);
-        _burn(msg.sender, shares);
-        _totalAssets -= assets;
-        require(asset.transfer(msg.sender, assets), "Transfer failed");
-
-        emit Withdraw(msg.sender, msg.sender, assets, shares);
-
-        return (block.timestamp, userInfo[msg.sender].lockTimeStart, lockPeriod);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -455,6 +490,25 @@ contract RewardsVault4626 is IERC4626 {
         }
     }
 
+    /// @notice Synchronize recipient's userInfo on share transfer
+    /// @dev Initializes reward checkpoints to current state to prevent historical reward theft
+    /// @param from The sender address (used for lock time inheritance)
+    /// @param to The recipient address
+    function _syncOnTransfer(address from, address to) internal {
+        // If recipient doesn't exist, initialize their userInfo
+        if (!userInfo[to].exists) {
+            userInfo[to].exists = true;
+            // Inherit lock time from sender to prevent lock bypass
+            // Recipient must wait until sender's original lock expires
+            userInfo[to].lockTimeStart = userInfo[from].lockTimeStart;
+            // Initialize reward checkpoints to current amounts (no historical rewards)
+            _initializeUserRewards(to);
+        } else {
+            // Recipient already exists - claim their pending rewards before receiving more shares
+            _claimAllRewards(to);
+        }
+    }
+
     function _claimAllRewards(address user) internal {
         for (uint256 i = 0; i < rewardTokens.length; i++) {
             _claimReward(user, rewardTokens[i]);
@@ -463,6 +517,9 @@ contract RewardsVault4626 is IERC4626 {
 
     function _claimReward(address user, address token) internal {
         if (!rewardInfo[token].exists || balanceOf[user] == 0) return;
+
+        // Anti-frontrunning: user must have held shares for minimum delay before claiming rewards
+        if (block.timestamp < userInfo[user].lockTimeStart + REWARD_ELIGIBILITY_DELAY) return;
 
         uint256 amount = rewardInfo[token].amount;
         uint256 lastClaimed = userInfo[user].lastClaimedAmountPerToken[token];

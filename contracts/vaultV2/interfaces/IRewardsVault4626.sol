@@ -123,13 +123,6 @@ interface IRewardsVault4626 {
     function claimSpecificsReward(address[] memory tokens) external returns (uint256);
 
     /*///////////////////////////////////////////////////////////////
-                        LOCK PERIOD FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Unlock and withdraw with pagination support
-    function unlock(uint256 startPosition, uint256 assets) external returns (uint256, uint256, uint256);
-
-    /*///////////////////////////////////////////////////////////////
                         OWNERSHIP FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

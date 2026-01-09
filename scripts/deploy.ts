@@ -2,7 +2,7 @@ import { ethers, upgrades } from "hardhat";
 import { writeFile } from "fs/promises";
 import TestnetDeployments from "../data/deployments/chain-296.json";
 
-import { usdcAddress, uniswapRouterAddress, trexFactoryAddress } from "../constants";
+import { usdcAddress, uniswapRouterAddress, uniswapFactoryAddress, trexFactoryAddress } from "../constants";
 import { BuildingFactoryInitStruct } from "../typechain-types/contracts/buildings/BuildingFactory.sol/BuildingFactory";
 
 // Initial function for logs and configs
@@ -178,8 +178,8 @@ async function deployBuildingFactory(contracts: Record<string, any>): Promise<Re
     await buildingFactoryBeacon.waitForDeployment();
     const buildingFactoryBeaconAddress = await buildingFactoryBeacon.getAddress();
 
-    const uniswapRouter = await ethers.getContractAt("UniswapV2Router02", uniswapRouterAddress);
-    const uniswapFactoryAddress = await uniswapRouter.factory();
+    // Use the uniswapFactoryAddress from constants directly instead of querying the router
+    // This avoids issues if the router contract isn't responding
 
     // Beacon Upgradable Pattern for Treasury
     const treasuryImplementation = await ethers.deployContract("Treasury", { gasLimit: 15000000 });
