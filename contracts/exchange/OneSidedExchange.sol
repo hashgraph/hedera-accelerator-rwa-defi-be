@@ -254,7 +254,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         }
 
         uint256 tokenASellAmount = amount * _sellPrices[tokenA].price;
-        uint256 tokenBBuyAmount = ((tokenASellAmount * _sellPrices[tokenA].price) / _buyPrices[tokenB].price);
+        uint256 tokenBBuyAmount = (tokenASellAmount / _buyPrices[tokenB].price);
         uint256 tokenADecimals = ERC20(tokenA).decimals();
         uint256 tokenBDecimals = ERC20(tokenB).decimals();
 
