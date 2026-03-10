@@ -163,11 +163,13 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         require(sTokenAmount > 0, "Slice: Invalid amount");
         require(sTokenAmount <= balanceOf(msg.sender), "Slice: Insufficient balance");
 
+        // Cache total supply before burning to avoid inflated withdrawal amounts
+        uint256 totalSupply_ = totalSupply();
+
         // Burn sTokens
         _burn(msg.sender, sTokenAmount);
 
         amounts = new uint256[](_allocations.length);
-        uint256 totalSupply_ = totalSupply();
 
         if (totalSupply_ == 0) {
             // If no total supply, return all aTokens proportionally

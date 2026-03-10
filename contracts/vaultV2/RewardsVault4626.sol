@@ -447,44 +447,6 @@ contract RewardsVault4626 is IERC4626 {
     }
 
     /*///////////////////////////////////////////////////////////////
-                        TRANSFER OVERRIDES
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Override transfer to sync reward checkpoints and enforce lock
-    function transfer(address to, uint256 amount) public override returns (bool) {
-        _syncOnTransfer(msg.sender, to);
-        return super.transfer(to, amount);
-    }
-
-    /// @notice Override transferFrom to sync reward checkpoints and enforce lock
-    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        _syncOnTransfer(from, to);
-        return super.transferFrom(from, to, amount);
-    }
-
-    /// @dev Settles rewards for both parties and initializes recipient state
-    /// @dev Reverts if sender's shares are still locked
-    function _syncOnTransfer(address from, address to) internal {
-        require(to != address(0), "Invalid recipient");
-
-        // Block transfers of locked shares
-        require(_isUnlocked(from), "Shares are still locked");
-
-        // Claim pending rewards for both parties before balance changes
-        _claimAllRewards(from);
-        if (userInfo[to].exists) {
-            _claimAllRewards(to);
-        }
-
-        // Initialize recipient's userInfo if new to prevent historical reward theft
-        if (!userInfo[to].exists) {
-            userInfo[to].exists = true;
-            userInfo[to].lockTimeStart = block.timestamp;
-            _initializeUserRewards(to);
-        }
-    }
-
-    /*///////////////////////////////////////////////////////////////
                           INTERNAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
