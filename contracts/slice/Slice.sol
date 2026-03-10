@@ -567,7 +567,7 @@ contract Slice is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         underlyingValue = balance.mulDivDown(aTokenToUnderlyingRate, PRECISION);
 
         // Get underlying value in USD
-        currentValue = (underlyingValue * underlyingPrice) / (10 ** IERC20Metadata(aToken).decimals());
+        currentValue = (underlyingValue * underlyingPrice) / (10 ** IERC20Metadata(asset).decimals());
     }
 
     /**
