@@ -199,7 +199,7 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                         ALLOCATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function addAllocation(address aToken, address priceFeedAddress, uint16 percentage) external {
+    function addAllocation(address aToken, address priceFeedAddress, uint16 percentage) external onlyOwner {
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(priceFeedAddress != address(0), "Slice: Invalid price feed address");
         require(percentage > 0 && percentage < BASIS_POINTS, "Slice: Invalid allocation percentage");
@@ -224,7 +224,7 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         emit AllocationAdded(aToken, asset, priceFeedAddress, percentage);
     }
 
-    function setAllocationPercentage(address aToken, uint16 newPercentage) external {
+    function setAllocationPercentage(address aToken, uint16 newPercentage) external onlyOwner {
         require(aToken != address(0), "Slice: Invalid aToken address");
         require(newPercentage > 0 && newPercentage < BASIS_POINTS, "Slice: Invalid percentage");
 
