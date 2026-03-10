@@ -282,13 +282,13 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
         require(_amount != 0, "HederaVault: Amount can't be zero");
         require(_token != asset() && _token != address(this), "HederaVault: Reward and Staking tokens cannot be same");
         require(_token != address(0), "HederaVault: Invalid reward token");
-        require(totalAssets() != 0, "HederaVault: No token staked yet");
+        require(totalSupply() != 0, "HederaVault: No shares minted yet");
 
         BasicVaultData storage $ = _getBasicVaultStorage();
 
         if ($.rewardTokens.length == 10) revert MaxRewardTokensAmount();
 
-        uint256 perShareRewards = _amount.mulDivDown(1e18, totalAssets());
+        uint256 perShareRewards = _amount.mulDivDown(1e18, totalSupply());
         RewardsInfo storage rewardInfo = $.tokensRewardInfo[_token];
         if (!rewardInfo.exist) {
             $.rewardTokens.push(_token);

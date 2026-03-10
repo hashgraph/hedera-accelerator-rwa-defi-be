@@ -295,13 +295,13 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
         require(_amount != 0, "AsyncVault: Amount can't be zero");
         require(_token != asset() && _token != address(this), "AsyncVault: Reward and Staking tokens cannot be same");
         require(_token != address(0), "AsyncVault: Invalid reward token");
-        require(totalAssets() != 0, "AsyncVault: No token staked yet");
+        require(totalSupply() != 0, "AsyncVault: No shares minted yet");
 
         AsyncVaultData storage $ = _getAsyncVaultStorage();
 
         if ($.rewardTokens.length == 10) revert MaxRewardTokensAmount();
 
-        uint256 perShareRewards = _amount.mulDivDown(1e18, totalAssets());
+        uint256 perShareRewards = _amount.mulDivDown(1e18, totalSupply());
         RewardsInfo storage rewardInfo = $.tokensRewardInfo[_token];
         if (!rewardInfo.exist) {
             $.rewardTokens.push(_token);
