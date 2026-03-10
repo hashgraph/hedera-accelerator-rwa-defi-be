@@ -12,6 +12,10 @@ dotenv.config();
 
 const RPC_URL = process.env.RPC_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
+
+const MAIN_RPC_URL = process.env.MAIN_RPC_URL;
+const MAIN_PRIVATE_KEY = process.env.MAIN_PRIVATE_KEY || "";
+
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY
 
 const config: HardhatUserConfig = {
@@ -28,8 +32,8 @@ const config: HardhatUserConfig = {
   networks: {
     mainnet: {
       chainId: 295, // hedera mainnet chainId
-      url: RPC_URL,
-      accounts: [PRIVATE_KEY],
+      url: MAIN_RPC_URL,
+      accounts: [MAIN_PRIVATE_KEY],
     },
     testnet: {
       chainId: 296, // hedera testnet chainId

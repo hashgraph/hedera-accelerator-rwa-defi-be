@@ -1,21 +1,10 @@
 {
   "manifestVersion": "3.2",
-  "proxies": [
-    {
-      "address": "0x59BB9e90b22412E943920B48aC60E331f1c74B82",
-      "txHash": "0x80f030d3ffb0f45a6dfdd8981263e60dcebd7414c151e9f819c84a39c0ff06dd",
-      "kind": "beacon"
-    },
-    {
-      "address": "0xAe8Db484559577fd9b7cD66a9951be2632aE84A4",
-      "txHash": "0xbb1471762e166af76297d5deecca137fe224bd82c91a6c6d00316f5859f06469",
-      "kind": "beacon"
-    }
-  ],
+  "proxies": [],
   "impls": {
     "24a4b73fccd3da65440126f4122bbc67734a77eedc0585bc27b2f83315efdf76": {
-      "address": "0x89589cb2F3f13FbE79d48a007C081edE14e37047",
-      "txHash": "0x7210231585fa4908733245f92fdafb1ca02a26e8c1cdd5cac9063cef878f1910",
+      "address": "0xe4cf7281d43e1667EFc6971Ed8E2834F9eC5C9Fb",
+      "txHash": "0xf2f5e860803827b8fae53c6e56960d14461c19e39609d7de63edc8344e80fd48",
       "layout": {
         "solcVersion": "0.8.24",
         "storage": [],
@@ -95,9 +84,9 @@
         }
       }
     },
-    "b8b1fe865b6dd2b88019d8afac47779e8ce8a1959b8932c83350257e78a662ce": {
-      "address": "0xd83902BA1991318432Fe29C668cf87a3F456E6Bf",
-      "txHash": "0x3e6ec1ca5f02295b62e0373757ef7ce9bf6a439176e4dafdb5a7324052b8ba2d",
+    "bb5643ec04533441ec7814132fc0467417576fc119cf9d246b78e23912281855": {
+      "address": "0x092f04a032b15436674F0f8859a9BC2bf9CE2F50",
+      "txHash": "0xa7cab85dee74977e89330160e8d145bd55484d713d5d82fa574132175b7bf55c",
       "layout": {
         "solcVersion": "0.8.24",
         "storage": [],
@@ -479,9 +468,9 @@
         }
       }
     },
-    "5ebfcd1c697cfd1c03e68fba2cb91758a430366c75b61ce3945ecbdb82d7d023": {
-      "address": "0x93555EFf5B4B936528eFAe769aA72F9ebFFb1601",
-      "txHash": "0xfa2d8bf70bb3c0b91b756b4ff7500fd7ab75da998ca77a24a00f9c889571be88",
+    "b1c697269d3f58bf67fd21ea5342347ac4a58adc51a04c1f6dbd80691e163d3e": {
+      "address": "0x694A962e38Cdb85b472d0d96331155BC0af1380f",
+      "txHash": "0x08c8602a9f12af9ea427ccb9fd54f07324433cd46f64166694d3e4fd5376e514",
       "layout": {
         "solcVersion": "0.8.24",
         "storage": [],
