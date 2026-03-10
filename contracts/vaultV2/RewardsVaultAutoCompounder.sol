@@ -314,7 +314,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
     }
 
     /// @notice Allows users to claim their rewards proportionally
-    /// @dev Simplified - claims all rewards and distributes them proportionally
+    /// @dev Claims all reward token types and distributes them proportionally
     function claimUserRewards() external nonReentrant {
         uint256 userShares = balanceOf[msg.sender];
         if (userShares == 0) revert InvalidAmount();
@@ -325,13 +325,17 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         // Claim all vault rewards
         VAULT.claimAllRewards();
 
-        // For simplicity, just transfer proportion of available assets
-        uint256 availableAssets = ASSET.balanceOf(address(this));
-        if (availableAssets > 0) {
-            uint256 userReward = availableAssets.mulDivDown(userProportion, 1e18);
-            if (userReward > 0) {
-                if (!ASSET.transfer(msg.sender, userReward)) revert TransferFailed();
-                emit RewardsClaimed(msg.sender, address(ASSET), userReward);
+        // Distribute all reward tokens proportionally
+        uint256 rewardTokensLength = VAULT.getRewardTokensLength();
+        for (uint256 i = 0; i < rewardTokensLength; i++) {
+            address rewardToken = VAULT.rewardTokens(i);
+            uint256 rewardBalance = IERC20(rewardToken).balanceOf(address(this));
+            if (rewardBalance > 0) {
+                uint256 userReward = rewardBalance.mulDivDown(userProportion, 1e18);
+                if (userReward > 0) {
+                    if (!IERC20(rewardToken).transfer(msg.sender, userReward)) revert TransferFailed();
+                    emit RewardsClaimed(msg.sender, rewardToken, userReward);
+                }
             }
         }
     }
