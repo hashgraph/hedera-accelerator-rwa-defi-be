@@ -436,12 +436,6 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
 
         // Apply min threshold (e.g., 1 wei reward)
         if (unclaimedAmount == 0) unclaimedAmount = MIN_REWARD;
-
-        // Fee deduction
-        if (feeConfig.feePercentage > 0) {
-            uint256 currentFee = _calculateFee(unclaimedAmount, feeConfig.feePercentage);
-            unclaimedAmount -= currentFee;
-        }
     }
 
     /**
