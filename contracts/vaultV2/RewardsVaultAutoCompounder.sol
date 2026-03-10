@@ -499,29 +499,12 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
                             ERC20 FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function transfer(address to, uint256 amount) external override returns (bool) {
-        if (to == address(0)) revert InvalidReceiver();
-
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-
-        emit Transfer(msg.sender, to, amount);
-        return true;
+    function transfer(address, uint256) external pure override returns (bool) {
+        revert("AutoCompounder: transfers disabled");
     }
 
-    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
-        if (to == address(0)) revert InvalidReceiver();
-
-        uint256 allowed = allowance[from][msg.sender];
-        if (allowed != type(uint256).max) {
-            allowance[from][msg.sender] = allowed - amount;
-        }
-
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-
-        emit Transfer(from, to, amount);
-        return true;
+    function transferFrom(address, address, uint256) external pure override returns (bool) {
+        revert("AutoCompounder: transfers disabled");
     }
 
     function approve(address spender, uint256 amount) external override returns (bool) {
