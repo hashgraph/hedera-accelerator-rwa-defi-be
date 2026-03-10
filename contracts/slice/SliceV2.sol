@@ -299,9 +299,15 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         address aToken = _allocations[index].aToken;
         address asset = _allocations[index].asset;
 
+        // Convert USD excess to underlying token amount
+        uint256 assetPrice = uint256(getChainlinkDataFeedLatestAnswer(asset));
+        require(assetPrice > 0, "Slice: Invalid price feed");
+        uint256 excessTokenAmount = (excessValue * (10 ** IERC20Metadata(asset).decimals())) / assetPrice;
+        if (excessTokenAmount == 0) return;
+
         // Calculate how much aToken to withdraw
         uint256 exchangeRate = IRewardsVaultAutoCompounder(aToken).exchangeRate();
-        uint256 aTokenToWithdraw = (excessValue * PRECISION) / exchangeRate;
+        uint256 aTokenToWithdraw = (excessTokenAmount * PRECISION) / exchangeRate;
 
         // Withdraw from autocompounder
         uint256 withdrawnAmount = _withdrawFromAutocompounder(aToken, aTokenToWithdraw);
@@ -319,8 +325,14 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         uint256 baseTokenBalance = IERC20(_baseToken).balanceOf(address(this));
         if (baseTokenBalance == 0) return;
 
+        // Convert USD deficit to token amount
+        uint256 assetPrice = uint256(getChainlinkDataFeedLatestAnswer(asset));
+        require(assetPrice > 0, "Slice: Invalid price feed");
+        uint256 deficitTokenAmount = (deficitValue * (10 ** IERC20Metadata(asset).decimals())) / assetPrice;
+        if (deficitTokenAmount == 0) return;
+
         // Calculate how much base token to use
-        uint256 baseTokenToUse = _getSwapAmount(_baseToken, asset, deficitValue);
+        uint256 baseTokenToUse = _getSwapAmount(_baseToken, asset, deficitTokenAmount);
         if (baseTokenToUse > baseTokenBalance) {
             baseTokenToUse = baseTokenBalance;
         }
