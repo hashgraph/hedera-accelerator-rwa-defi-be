@@ -62,13 +62,11 @@ describe("OneSidedExchange", function() {
     await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
     await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
 
-    // // Configure prices: 1 tokenA => 2 tokenB
-    // const block = await ethers.provider.getBlock("latest") as Block;
-    // const interval = block.timestamp + 1000;
-
-    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 2, twoDaysAfter);
-    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 2, twoDaysAfter);
+    // estimateTokenReturns requires `priceInterval <= block.timestamp`, so the
+    // configured price's interval must be in the past or now.
+    const priceInterval = 1;
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 2, priceInterval);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 2, priceInterval);
 
     // User approves tokenA
     const swapAmount = ethers.parseEther("10");
@@ -78,11 +76,11 @@ describe("OneSidedExchange", function() {
     await expect(exchange.connect(user).swap(await tokenA.getAddress(), await tokenB.getAddress(), swapAmount))
       .to.emit(exchange, "SwapSuccess");
 
-    // Verify user balances
-    // tokenASellAmount = 10 * 2 = 20
-    // tokenBBuyAmount = (20 * 2) / 2 = 20
+    // Verify user balances. Post-HAL-05 (squared-price bug fixed):
+    //   tokenASellAmount = swapAmount * sellPrice    = 10 * 2     = 20 tokenA spent
+    //   tokenBBuyAmount  = tokenASellAmount / buyPrice = 20 / 2   = 10 tokenB received
     expect(await tokenA.balanceOf(userAddress)).to.equal(ethers.parseEther("980"));
-    expect(await tokenB.balanceOf(userAddress)).to.equal(ethers.parseEther("20"));
+    expect(await tokenB.balanceOf(userAddress)).to.equal(ethers.parseEther("10"));
   });
 
   it("should enforce per-token thresholds", async function() {
@@ -91,20 +89,22 @@ describe("OneSidedExchange", function() {
     await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
     await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
 
-    // Configure prices at 1:1
-    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, twoDaysAfter);
-    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, twoDaysAfter);
+    // Prices need an interval already in the past (price-validity check).
+    const pastPriceInterval = 1;
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, pastPriceInterval);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, pastPriceInterval);
 
-    // Set a max-sell threshold of 5 tokenA
-    await exchange.connect(owner).setThreshold(await tokenA.getAddress(), 5, 1000, twoDaysAfter);
+    // Threshold: post HAL-25 the limit enforces while `block.timestamp <
+    // interval` (active window), and post HAL-45 the interval must be in the
+    // future — derive it from the latest block.
+    const latestBlock = await ethers.provider.getBlock("latest") as Block;
+    const futureInterval = latestBlock.timestamp + 2 * 24 * 60 * 60;
+    await exchange.connect(owner).setThreshold(await tokenA.getAddress(), 5, 1000, futureInterval);
 
     // Mint and approve tokenA to user
     await tokenA.connect(owner).mint(userAddress, ethers.parseEther("10"));
     const swapAmount = ethers.parseEther("6");
     await tokenA.connect(user).approve(await exchange.getAddress(), liquidity);
-
-    // await exchange.connect(user).swap(await tokenA.getAddress(), await tokenB.getAddress(), swapAmount);
 
     // Swap should exceed threshold and revert
     await expect(
@@ -161,10 +161,10 @@ describe("OneSidedExchange", function() {
     await tokenB.connect(owner).approve(await exchange.getAddress(), liquidity);
     await exchange.connect(owner).deposit(await tokenB.getAddress(), liquidity);
 
-    // configure 1:1 pricing
-    const twoDaysAfter = new Date().getSeconds() + (((24 * 60) * 60) * 2);
-    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, twoDaysAfter);
-    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, twoDaysAfter);
+    // configure 1:1 pricing (price interval must be <= block.timestamp)
+    const priceInterval = 1;
+    await exchange.connect(owner).setSellPrice(await tokenA.getAddress(), 1, priceInterval);
+    await exchange.connect(owner).setBuyPrice(await tokenB.getAddress(), 1, priceInterval);
 
     // amount to swap
     const swapAmount = ethers.parseEther("5");

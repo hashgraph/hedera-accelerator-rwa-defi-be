@@ -269,10 +269,11 @@ abstract contract ERC7540 is AsyncVaultStorage, ERC4626, IERC7540 {
     }
 
     /**
-     * @dev Performs operator and controller permission checks.
+     * @dev Performs operator and controller permission checks. Reverts unless
+     *      `msg.sender` is either the controller themselves or an approved operator.
      */
     function _validateController(address controller, bool isOperator) private view {
-        if (msg.sender != controller && isOperator) revert InvalidController();
+        if (msg.sender != controller && !isOperator) revert InvalidController();
     }
 
     /**

@@ -1,7 +1,13 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { RewardsVault4626, SimpleToken } from "../../typechain-types";
+
+// Vault enforces a 1h REWARD_ELIGIBILITY_DELAY before deposits become eligible
+// for rewards (HAL-18 anti-frontrun mitigation). Tests that add rewards
+// immediately after a deposit must advance time past this window first.
+const ELIGIBILITY_DELAY = 60 * 60 + 1;
 
 describe("RewardsVault4626", function () {
     let vault: RewardsVault4626;
@@ -81,12 +87,16 @@ describe("RewardsVault4626", function () {
         beforeEach(async function () {
             // Setup: Alice and Bob deposit
             const depositAmount = ethers.parseEther("100");
-            
+
             await asset.connect(alice).approve(await vault.getAddress(), depositAmount);
             await vault.connect(alice).deposit(depositAmount, alice.address);
-            
+
             await asset.connect(bob).approve(await vault.getAddress(), depositAmount);
             await vault.connect(bob).deposit(depositAmount, bob.address);
+
+            // Past the anti-frontrun eligibility window so subsequent
+            // addReward calls are claimable in the same test.
+            await time.increase(ELIGIBILITY_DELAY);
         });
 
         it("Should add rewards correctly", async function () {
@@ -107,11 +117,15 @@ describe("RewardsVault4626", function () {
             // Charlie deposits more after initial deposits
             const charlie = (await ethers.getSigners())[3];
             await asset.mint(charlie.address, ethers.parseEther("1000"));
-            
+
             const charlieDeposit = ethers.parseEther("200"); // Double the others
             await asset.connect(charlie).approve(await vault.getAddress(), charlieDeposit);
             await vault.connect(charlie).deposit(charlieDeposit, charlie.address);
-            
+
+            // Wait past Charlie's eligibility window so he qualifies for the
+            // upcoming reward distribution alongside Alice and Bob.
+            await time.increase(ELIGIBILITY_DELAY);
+
             // Now total is 400 (100+100+200), so ratios are 1:1:2
             const rewardAmount = ethers.parseEther("120");
             await rewardToken.approve(await vault.getAddress(), rewardAmount);
@@ -154,9 +168,12 @@ describe("RewardsVault4626", function () {
             const depositAmount = ethers.parseEther("100");
             await asset.connect(alice).approve(await vault.getAddress(), depositAmount);
             await asset.connect(bob).approve(await vault.getAddress(), depositAmount);
-            
+
             await vault.connect(alice).deposit(depositAmount, alice.address);
             await vault.connect(bob).deposit(depositAmount, bob.address);
+
+            // Past the anti-frontrun eligibility window.
+            await time.increase(ELIGIBILITY_DELAY);
         });
 
         it("Should return empty arrays for user with no balance", async function () {
@@ -212,11 +229,14 @@ describe("RewardsVault4626", function () {
             // Add a third user with different balance
             const charlie = (await ethers.getSigners())[3];
             await asset.mint(charlie.address, ethers.parseEther("1000"));
-            
+
             const charlieDeposit = ethers.parseEther("200"); // Double the others
             await asset.connect(charlie).approve(await vault.getAddress(), charlieDeposit);
             await vault.connect(charlie).deposit(charlieDeposit, charlie.address);
-            
+
+            // Wait past Charlie's eligibility window.
+            await time.increase(ELIGIBILITY_DELAY);
+
             // Add rewards
             const rewardAmount = ethers.parseEther("120");
             await rewardToken.approve(await vault.getAddress(), rewardAmount);

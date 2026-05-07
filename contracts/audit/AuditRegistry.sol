@@ -184,11 +184,27 @@ contract AuditRegistry is AccessControl {
     }
 
     /**
+     * @notice Revokes an audit record by governance (e.g. after the original auditor has been removed).
+     *
+     * @param _recordId The ID of the audit record to revoke.
+     */
+    function revokeAuditRecordByGovernance(uint256 _recordId) external onlyRole(GOVERNANCE_ROLE) {
+        AuditRecord storage record = auditRecords[_recordId];
+        require(record.building != address(0), "AuditRegistry: Record does not exist");
+        require(!record.revoked, "AuditRegistry: Already revoked");
+
+        record.revoked = true;
+
+        emit AuditRecordRevoked(_recordId, block.timestamp);
+    }
+
+    /**
      * Add an auditor tru governance voting
      * @param account account to be added as auditor
      */
     function addAuditor(address account) external onlyRole(GOVERNANCE_ROLE) {
         require(account != address(0), "Invalid address");
+        require(!hasRole(AUDITOR_ROLE, account), "AuditRegistry: Already an auditor");
         _auditors.push(account);
         _grantRole(AUDITOR_ROLE, account);
         emit AuditorAdded(account);
@@ -202,15 +218,14 @@ contract AuditRegistry is AccessControl {
         require(account != address(0), "Invalid address");
         // Check if the account is an auditor
         require(hasRole(AUDITOR_ROLE, account), "Account is not an auditor");
-        // Remove the auditor from the auditors list
-        for (uint256 i = 0; i < _auditors.length; i++)
-        {
+        // Remove the auditor from the auditors list using swap-and-pop (O(1)).
+        uint256 length = _auditors.length;
+        for (uint256 i = 0; i < length; i++) {
             if (_auditors[i] == account) {
-                // Shift elements to remove the auditor
-                for (uint256 j = i; j < _auditors.length - 1; j++) {
-                    _auditors[j] = _auditors[j + 1];
+                if (i != length - 1) {
+                    _auditors[i] = _auditors[length - 1];
                 }
-                _auditors.pop(); // Remove the last element
+                _auditors.pop();
                 break;
             }
         }

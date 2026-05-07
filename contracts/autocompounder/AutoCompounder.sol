@@ -55,8 +55,16 @@ contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 
     // Uniswap swap path to convert from USDC to underlying asset
     address[] internal _path;
 
-    // User => claimed amount
-    mapping(address => uint256) internal _userClaimedRewards;
+    // Per-share cumulative reward distributed to AC holders, scaled by 1e18.
+    // Monotonically increasing each time `_harvestVaultRewards` pulls USDC
+    // from the vault and credits it to the holder pool.
+    uint256 internal _accRewardPerShare;
+
+    // The value of `_accRewardPerShare` the user was last charged against.
+    mapping(address => uint256) internal _userRewardPerSharePaid;
+
+    // Settled-but-unclaimed reward owed to a user, denominated in USDC.
+    mapping(address => uint256) internal _userPendingReward;
 
     /**
      * @dev Initializes contract with passed parameters.
@@ -159,35 +167,69 @@ contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 
     }
 
     /**
-     * @dev Claims reward from the Vault, swap to underlying and deposit back.
+     * @dev Claims all reward tokens from the Vault, swaps every non-asset
+     *      reward to the underlying asset, and deposits the total back into the vault.
+     *      Iterating over every reward token (rather than only USDC) prevents
+     *      non-USDC rewards from being permanently stranded in this contract.
      * @inheritdoc IAutoCompounder
      */
     function claim() external {
-        // Check if reward is available
-        uint256 reward = IRewards(vault()).getUserReward(address(this), usdc());
+        IRewards vaultRewards = IRewards(vault());
+        address[] memory rewardTokens = vaultRewards.getRewardTokens();
+        require(rewardTokens.length != 0, "AutoCompounder: No reward tokens");
 
-        if (reward >= MIN_REWARD) {
-            // Claim reward
-            IRewards(vault()).claimAllReward(0, address(this));
+        // Claim every reward token registered in the vault
+        vaultRewards.claimAllReward(0, address(this));
 
-            // Swap reward for underlying
-            IERC20(usdc()).approve(uniswapV2Router(), reward);
-            uint256[] memory amounts = _uniswapV2Router.swapExactTokensForTokens(
-                reward,
-                0, // Accept any amount
-                _path,
-                address(this),
-                block.timestamp + 300 // plus 5 minutes
-            );
+        address _asset = asset();
+        address _usdcAddr = usdc();
+        uint256 totalAssetsToReinvest;
 
-            // Reinvest swapped underlying
-            IERC20(asset()).approve(vault(), amounts[1]);
-            _vault.deposit(amounts[1], address(this));
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            address rewardToken = rewardTokens[i];
+            uint256 balance = IERC20(rewardToken).balanceOf(address(this));
 
-            emit Claim(amounts[1]);
-        } else {
-            revert InsufficientReward(reward);
+            if (balance == 0) continue;
+
+            if (rewardToken == _asset) {
+                totalAssetsToReinvest += balance;
+                continue;
+            }
+
+            // Build a swap path. USDC has a direct path; other tokens route via USDC.
+            address[] memory path;
+            if (rewardToken == _usdcAddr) {
+                path = _path;
+            } else {
+                path = new address[](3);
+                path[0] = rewardToken;
+                path[1] = _usdcAddr;
+                path[2] = _asset;
+            }
+
+            IERC20(rewardToken).approve(uniswapV2Router(), balance);
+            try
+                _uniswapV2Router.swapExactTokensForTokens(
+                    balance,
+                    0,
+                    path,
+                    address(this),
+                    block.timestamp + 300
+                )
+            returns (uint256[] memory amounts) {
+                totalAssetsToReinvest += amounts[amounts.length - 1];
+            } catch {
+                // Revoke approval and skip; tokens stay claimable on next attempt
+                IERC20(rewardToken).approve(uniswapV2Router(), 0);
+            }
         }
+
+        if (totalAssetsToReinvest < MIN_REWARD) revert InsufficientReward(totalAssetsToReinvest);
+
+        IERC20(_asset).approve(vault(), totalAssetsToReinvest);
+        _vault.deposit(totalAssetsToReinvest, address(this));
+
+        emit Claim(totalAssetsToReinvest);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -195,40 +237,99 @@ contract AutoCompounder is IAutoCompounder, ERC20, ERC20Permit, Ownable, ERC165 
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Claims exact user reward share from Vault.
-     *
-     * @param receiver The reward receiver address.
+     * @dev Pulls all USDC the AutoCompounder is entitled to from the underlying
+     *      vault and credits it to the holder pool by bumping
+     *      `_accRewardPerShare`. Using a monotonic per-share accumulator
+     *      replaces the previous `_userClaimedRewards` model, which broke when
+     *      the vault's pending balance dropped below a user's lifetime
+     *      claimed amount and locked the user out of future rewards.
+     */
+    function _harvestVaultRewards() internal {
+        uint256 supply = totalSupply();
+        if (supply == 0) return;
+
+        uint256 vaultPending = IRewards(vault()).getUserReward(address(this), usdc());
+        if (vaultPending == 0) return;
+
+        uint256 balanceBefore = IERC20(usdc()).balanceOf(address(this));
+        IRewards(vault()).claimExactReward(usdc(), address(this), vaultPending);
+        uint256 received = IERC20(usdc()).balanceOf(address(this)) - balanceBefore;
+
+        if (received > 0) {
+            _accRewardPerShare += (received * PRECISION) / supply;
+        }
+    }
+
+    /**
+     * @dev Captures the user's per-share earnings since their last checkpoint
+     *      into `_userPendingReward` and snapshots the latest accumulator.
+     *      Called before any balance change (mint/burn/transfer) so reward
+     *      credit is always evaluated against the balance that earned it.
+     */
+    function _settleUserReward(address user) internal {
+        uint256 acc = _accRewardPerShare;
+        uint256 paid = _userRewardPerSharePaid[user];
+        if (acc != paid) {
+            uint256 bal = balanceOf(user);
+            if (bal > 0 && acc > paid) {
+                _userPendingReward[user] += (bal * (acc - paid)) / PRECISION;
+            }
+            _userRewardPerSharePaid[user] = acc;
+        }
+    }
+
+    /**
+     * @dev Claims any pending USDC reward for the caller and forwards it to `receiver`.
      */
     function claimExactUserReward(address receiver) public {
         require(receiver != address(0), "AutoCompounder: Invalid reward receiver address");
 
         address sender = _msgSender();
-        uint256 userReward = getPendingReward(sender);
+        _harvestVaultRewards();
+        _settleUserReward(sender);
 
-        _userClaimedRewards[sender] += userReward;
+        uint256 userReward = _userPendingReward[sender];
+        if (userReward == 0) return;
 
-        IRewards(vault()).claimExactReward(usdc(), receiver, userReward);
+        _userPendingReward[sender] = 0;
+        IERC20(usdc()).safeTransfer(receiver, userReward);
 
         emit UserClaimedReward(sender, receiver, userReward);
     }
 
     /**
-     * @dev Returns pending user reward share from Vault.
-     *
-     * @param user The compounding participant address.
-     * @return pendingReward The pending reward amount.
+     * @dev View helper: includes both already-settled pending reward and the
+     *      portion that would be settled if the user interacted right now,
+     *      including any USDC still held at the vault for this contract.
      */
     function getPendingReward(address user) public view returns (uint256 pendingReward) {
         require(user != address(0), "AutoCompounder: Invalid user address");
 
-        uint256 totalReward = IRewards(vault()).getUserReward(address(this), usdc());
+        uint256 supply = totalSupply();
+        uint256 acc = _accRewardPerShare;
+        if (supply > 0) {
+            uint256 vaultPending = IRewards(vault()).getUserReward(address(this), usdc());
+            if (vaultPending > 0) {
+                acc += (vaultPending * PRECISION) / supply;
+            }
+        }
 
-        uint256 entitled = (balanceOf(user) * totalReward) / totalSupply();
+        uint256 paid = _userRewardPerSharePaid[user];
+        pendingReward = _userPendingReward[user];
 
-        // All reward was claimed
-        if (entitled < _userClaimedRewards[user]) return 0;
+        uint256 bal = balanceOf(user);
+        if (bal > 0 && acc > paid) {
+            pendingReward += (bal * (acc - paid)) / PRECISION;
+        }
+    }
 
-        pendingReward = entitled - _userClaimedRewards[user];
+    /// @dev Settle reward for both sides of any balance change so the
+    ///      reward credit always reflects the balance that earned it.
+    ///      Replaces the prior `_userClaimedRewards` debt-transfer override.
+    function _update(address from, address to, uint256 value) internal virtual override {
+        if (from != address(0)) _settleUserReward(from);
+        if (to != address(0)) _settleUserReward(to);
+        super._update(from, to, value);
     }
 
     /**

@@ -1,8 +1,34 @@
 import { LogDescription } from 'ethers';
 import { BuildingGovernance, Safe } from '../../typechain-types';
 import { expect, ethers, upgrades } from '../setup';
-import { loadFixture, mine } from '@nomicfoundation/hardhat-network-helpers';
+import {
+  loadFixture,
+  mine,
+  setBalance,
+  impersonateAccount,
+  stopImpersonatingAccount,
+} from '@nomicfoundation/hardhat-network-helpers';
 import { network } from 'hardhat';
+
+/**
+ * After HAL-28, BuildingGovernance owns itself. `setSafeAddress` /
+ * `setMultisigThreshold` / `_authorizeUpgrade` etc. are `onlyOwner`, so they
+ * can only be invoked by `address(this)`. Going through a full
+ * propose+vote+execute flow purely to set up test fixtures would be noise;
+ * instead this helper impersonates the governance contract and runs the
+ * owner-action callback as that account.
+ */
+async function asContract<T>(governance: BuildingGovernance, fn: (signer: any) => Promise<T>): Promise<T> {
+  const addr = await governance.getAddress();
+  await setBalance(addr, ethers.parseEther('1'));
+  await impersonateAccount(addr);
+  try {
+    const signer = await ethers.getSigner(addr);
+    return await fn(signer);
+  } finally {
+    await stopImpersonatingAccount(addr);
+  }
+}
 
 // Import Safe contracts from the package
 import SafeProxyFactoryArtifact from '@safe-global/safe-contracts/build/artifacts/contracts/proxies/SafeProxyFactory.sol/SafeProxyFactory.json';
@@ -173,12 +199,15 @@ async function deployMultisigFixture() {
   const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
   const identityGatewayAddress = await identityGateway.getAddress();
 
-  // Mint and delegate tokens
+  // Mint and delegate tokens. Owner gets an extra `mintAmount` because the
+  // fixture stakes `mintAmount` into the vault — post-HAL-36 propose() requires
+  // the proposer to hold votes at propose time, so we keep a balance behind.
   const mintAmount = ethers.parseEther('1000');
-  await governanceToken.mint(owner.address, mintAmount);
+  await governanceToken.mint(owner.address, mintAmount * 2n);
   await governanceToken.mint(voter1.address, mintAmount);
   await governanceToken.mint(voter2.address, mintAmount);
   await governanceToken.mint(voter3.address, mintAmount);
+  await governanceToken.connect(owner).delegate(owner.address);
   await governanceToken.connect(voter1).delegate(voter1.address);
   await governanceToken.connect(voter2).delegate(voter2.address);
   await governanceToken.connect(voter3).delegate(voter3.address);
@@ -321,24 +350,28 @@ async function deployMultisigFixture() {
 describe('BuildingGovernance Multisig', () => {
   describe('Configuration', () => {
     it('should set multisig threshold', async () => {
-      const { governance, owner } = await loadFixture(deployMultisigFixture);
-      
+      const { governance } = await loadFixture(deployMultisigFixture);
+
       const newThreshold = ethers.parseUnits('1000', 6); // 1000 USDC
-      await expect(governance.connect(owner).setMultisigThreshold(newThreshold))
+      await expect(
+        asContract(governance, (s) => governance.connect(s).setMultisigThreshold(newThreshold))
+      )
         .to.emit(governance, 'MultisigThresholdUpdated')
         .withArgs(newThreshold);
-      
+
       expect(await governance.getMultisigThreshold()).to.equal(newThreshold);
     });
 
     it('should set safe address', async () => {
-      const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
-      
+      const { governance, safe1of1 } = await loadFixture(deployMultisigFixture);
+
       const safeAddress = await safe1of1.getAddress();
-      await expect(governance.connect(owner).setSafeAddress(safeAddress))
+      await expect(
+        asContract(governance, (s) => governance.connect(s).setSafeAddress(safeAddress))
+      )
         .to.emit(governance, 'SafeAddressUpdated')
         .withArgs(safeAddress);
-      
+
       expect(await governance.getSafeAddress()).to.equal(safeAddress);
     });
 
@@ -359,8 +392,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6)); // 500 USDC threshold
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6))); // 500 USDC threshold
       
       // Create proposal above threshold
       const amount = ethers.parseUnits('1000', 6); // 1000 USDC
@@ -379,8 +412,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6)); // 500 USDC threshold
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6))); // 500 USDC threshold
       
       // Create proposal below threshold
       const amount = ethers.parseUnits('100', 6); // 100 USDC
@@ -399,7 +432,7 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner } = await loadFixture(deployMultisigFixture);
       
       // Don't set safe address
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create proposal below threshold
       const amount = ethers.parseUnits('100', 6); // 100 USDC
@@ -421,8 +454,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe1of1, treasury, usdc, multisigOwner1 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -460,8 +493,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe1of2, treasury, usdc, multisigOwner1 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe1of2.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of2.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -494,8 +527,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe1of2, treasury, usdc, multisigOwner1, multisigOwner2 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe1of2.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of2.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -530,8 +563,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe2of2, treasury, usdc, multisigOwner1, multisigOwner2 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe2of2.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe2of2.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -564,8 +597,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe2of2, treasury, multisigOwner1 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe2of2.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe2of2.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -596,8 +629,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe2of3, treasury, usdc, multisigOwner1, multisigOwner2 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe2of3.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe2of3.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -630,8 +663,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe2of3, treasury, usdc, multisigOwner1, multisigOwner2, multisigOwner3 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe2of3.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe2of3.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -664,8 +697,8 @@ describe('BuildingGovernance Multisig', () => {
         const { governance, owner, safe2of3, treasury, multisigOwner1 } = await loadFixture(deployMultisigFixture);
         
         // Set up multisig configuration
-        await governance.connect(owner).setSafeAddress(await safe2of3.getAddress());
-        await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+        await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe2of3.target as string));
+        await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
         
         // Create multisig proposal
         const amount = ethers.parseUnits('100', 6);
@@ -697,8 +730,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // set safe address
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create multisig proposal 
       const amount = ethers.parseUnits('100', 6);
@@ -709,7 +742,7 @@ describe('BuildingGovernance Multisig', () => {
       const proposalId = await getProposalId(governance, tx.blockNumber as number);
 
       // unset safe address
-      await governance.connect(owner).setSafeAddress(ethers.ZeroAddress);
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(ethers.ZeroAddress));
       
       // Try to execute as multisig proposal
       await expect(governance.executeMultisigPaymentProposal(proposalId, "0x"))
@@ -720,8 +753,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create proposal above threshold (will be DAO proposal)
       const amount = ethers.parseUnits('1000', 6);
@@ -740,8 +773,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create proposal below threshold (will be multisig proposal)
       const amount = ethers.parseUnits('100', 6);
@@ -759,8 +792,8 @@ describe('BuildingGovernance Multisig', () => {
     it('should revert when executing non-existent proposal', async () => {
       const { governance, safe1of1 } = await loadFixture(deployMultisigFixture);
       
-      await governance.setSafeAddress(await safe1of1.getAddress());
-      
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+
       const nonExistentProposalId = ethers.keccak256(ethers.toUtf8Bytes("non-existent"));
       
       await expect(governance.executeMultisigPaymentProposal(nonExistentProposalId, "0x"))
@@ -771,8 +804,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create text proposal (not payment)
       const description = "Text proposal";
@@ -790,8 +823,8 @@ describe('BuildingGovernance Multisig', () => {
       const { governance, owner, safe1of1, treasury, usdc, multisigOwner1, voter1, voter2, voter3 } = await loadFixture(deployMultisigFixture);
       
       // Set up multisig configuration
-      await governance.connect(owner).setSafeAddress(await safe1of1.getAddress());
-      await governance.connect(owner).setMultisigThreshold(ethers.parseUnits('500', 6));
+      await asContract(governance, (s) => governance.connect(s).setSafeAddress(safe1of1.target as string));
+      await asContract(governance, (s) => governance.connect(s).setMultisigThreshold(ethers.parseUnits('500', 6)));
       
       // Create both types of proposals
       const smallAmount = ethers.parseUnits('100', 6);
@@ -819,17 +852,23 @@ describe('BuildingGovernance Multisig', () => {
       
       await governance.executeMultisigPaymentProposal(multisigProposalId, signatures);
       expect(await usdc.balanceOf(recipient1.address)).to.equal(smallAmount);
-      
+
+      // The first payment auto-forwards the excess back to the vault, leaving
+      // treasury == reserveAmount. Top it up so the second (larger) payment
+      // doesn't violate HAL-51's reserve check.
+      await usdc.mint(owner.address, largeAmount);
+      await usdc.connect(owner).transfer(await treasury.getAddress(), largeAmount);
+
       // Execute DAO proposal through normal voting process
       const votingDelay = await governance.votingDelay();
       const votingPeriod = await governance.votingPeriod();
-      
+
       await mine(votingDelay);
       await governance.connect(voter1).castVote(daoProposalId, 1);
       await governance.connect(voter2).castVote(daoProposalId, 1);
       await governance.connect(voter3).castVote(daoProposalId, 1);
       await mine(votingPeriod);
-      
+
       await governance.executePaymentProposal(daoProposalId);
       expect(await usdc.balanceOf(recipient2.address)).to.equal(largeAmount);
     });

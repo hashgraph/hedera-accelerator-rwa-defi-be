@@ -85,6 +85,32 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
     }
 
     /**
+     * getBuildingsCount returns the total number of buildings deployed.
+     */
+    function getBuildingsCount() external view returns (uint256) {
+        return _getBuildingFactoryStorage().buildingsList.length;
+    }
+
+    /**
+     * getBuildingsPaginated returns a slice of `buildingsList` starting at
+     * `offset`, with at most `limit` entries. Use this in clients that may
+     * eventually exceed gas limits with the unpaginated `getBuildingList()`.
+     */
+    function getBuildingsPaginated(uint256 offset, uint256 limit) external view returns (BuildingDetails[] memory page) {
+        BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
+        uint256 len = $.buildingsList.length;
+        if (offset >= len || limit == 0) return new BuildingDetails[](0);
+
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        uint256 size = end - offset;
+        page = new BuildingDetails[](size);
+        for (uint256 i = 0; i < size; i++) {
+            page[i] = $.buildingsList[offset + i];
+        }
+    }
+
+    /**
      * getBuildingDetails get details of building
      * @param buildingAddress address of the building contract
      */
@@ -270,6 +296,7 @@ contract BuildingFactory is BuildingFactoryStorage, Initializable, OwnableUpgrad
         BuildingFactoryStorageData storage $ = _getBuildingFactoryStorage();
 
         BuildingDetails memory building = $.buildingDetails[buildingAddress];
+        require(msg.sender == building.initialOwner, "Unauthorized: Not Building Owner");
         ITokenVotes token = ITokenVotes(building.erc3643Token);
         IBuildingIdentityFactory idFactory = IBuildingIdentityFactory($.identityFactory);
         IIdentityRegistry ir = token.identityRegistry();

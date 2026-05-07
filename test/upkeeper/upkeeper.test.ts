@@ -335,8 +335,8 @@ describe('Upkeeper', () => {
         .withArgs(keeper.address, target, selector2, 1);
     });
 
-    it('should revert if one task fails', async () => {
-      const { 
+    it('should skip failing tasks and emit TaskExecutionSkipped (HAL-24)', async () => {
+      const {
         admin,
         upkeeper,
         keeper,
@@ -345,17 +345,24 @@ describe('Upkeeper', () => {
 
       const selector1 = ethers.id('mockFunction()').slice(0, 10);
       const selector2 = ethers.id('mockFunctionRevert()').slice(0, 10);
-      
+
       const data = [];
-      data.push('0x'); // no params for the first selector
-      data.push('0x'); // no params for the second selector
+      data.push('0x');
+      data.push('0x');
 
       await upkeeper.connect(admin).registerTask(target, selector1);
       await upkeeper.connect(admin).registerTask(target, selector2);
 
-      // execute the tasks
+      const [taskId1, taskId2] = await upkeeper.getTaskList();
+
+      // Batch should NOT revert: task1 succeeds, task2 is skipped.
       await expect(upkeeper.connect(keeper).executeTasksWithArgs(data))
-        .to.be.rejectedWith('TaskExecutionFailed');
+        .to.emit(upkeeper, 'TaskExecuted')
+        .withArgs(keeper.address, target, selector1, 1)
+        .and.to.emit(upkeeper, 'TaskExecutionSkipped');
+
+      expect((await upkeeper.getTaskInfo(taskId1)).executions).to.equal(1);
+      expect((await upkeeper.getTaskInfo(taskId2)).executions).to.equal(0);
     });
 
     it('should revert when not keeper', async () => {
@@ -422,8 +429,8 @@ describe('Upkeeper', () => {
       expect(task2.executions).to.equal(1);
     });
 
-    it('should revert if one task fails', async () => {
-      const { 
+    it('should skip failing tasks and emit TaskExecutionSkipped (HAL-24)', async () => {
+      const {
         admin,
         upkeeper,
         keeper,
@@ -437,15 +444,17 @@ describe('Upkeeper', () => {
       await upkeeper.connect(admin).registerTask(target, selector1);
       await upkeeper.connect(admin).registerTask(target, selector2);
 
-      // execute the tasks
+      // Batch should NOT revert: task1 succeeds, task2 is skipped.
       await expect(upkeeper.connect(keeper).executeTasks())
-        .to.be.rejectedWith('TaskExecutionFailed');
+        .to.emit(upkeeper, 'TaskExecuted')
+        .withArgs(keeper.address, target, selector1, 1)
+        .and.to.emit(upkeeper, 'TaskExecutionSkipped');
 
-      expect(await mockKeeperTarget.callCount()).to.equal(0);
+      expect(await mockKeeperTarget.callCount()).to.equal(1);
     });
 
-    it('should revert if one task returns false', async () => {
-      const { 
+    it('should treat false-returning tasks as success (HAL-23 removed bool decode)', async () => {
+      const {
         admin,
         upkeeper,
         keeper,
@@ -458,9 +467,13 @@ describe('Upkeeper', () => {
       await upkeeper.connect(admin).registerTask(target, selector1);
       await upkeeper.connect(admin).registerTask(target, selector2);
 
-      // execute the tasks
+      // The contract no longer decodes a 32-byte return as bool, so a target
+      // that returns `false` (or `uint256(0)`) is treated as success.
       await expect(upkeeper.connect(keeper).executeTasks())
-        .to.be.rejectedWith('TaskExecutionReturnedFalse');
+        .to.emit(upkeeper, 'TaskExecuted')
+        .withArgs(keeper.address, target, selector1, 1)
+        .and.to.emit(upkeeper, 'TaskExecuted')
+        .withArgs(keeper.address, target, selector2, 1);
     });
 
     it('should execute if one task does not return a bool', async () => {

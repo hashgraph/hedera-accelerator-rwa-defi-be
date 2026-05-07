@@ -24,6 +24,10 @@ contract RewardsVault4626 is IERC4626 {
     /// @notice Minimum time deposits must be held before being eligible for rewards (anti-frontrun)
     uint256 public constant REWARD_ELIGIBILITY_DELAY = 1 hours;
 
+    /// @notice Hard cap on the number of distinct reward tokens to prevent
+    ///         deposit/withdraw loops from exceeding the block gas limit.
+    uint256 public constant MAX_REWARD_TOKENS = 50;
+
     /// @notice Contract owner
     address public owner;
 
@@ -543,11 +547,16 @@ contract RewardsVault4626 is IERC4626 {
 
         IERC20 rewardToken = IERC20(token);
 
-        // Calculate reward per share using original Vault logic
+        // Calculate reward per share using original Vault logic.
+        // If the amount is too small relative to totalSupply, perShareRewards
+        // rounds down to zero and the tokens would be transferred but never
+        // distributed; reject the call instead of silently stranding funds.
         uint256 perShareRewards = amount.mulDivDown(1e18, totalSupply);
+        require(perShareRewards > 0, "Reward amount too small");
 
         // Register token if not exists
         if (!rewardInfo[token].exists) {
+            require(rewardTokens.length < MAX_REWARD_TOKENS, "Max reward tokens reached");
             rewardTokens.push(token);
             rewardInfo[token].exists = true;
             rewardInfo[token].amount = perShareRewards;

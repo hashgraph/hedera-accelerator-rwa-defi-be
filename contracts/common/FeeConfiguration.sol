@@ -66,16 +66,20 @@ abstract contract FeeConfiguration is AccessControl {
     }
 
     /**
-     * @dev Distributes fee according to the configuration.
+     * @dev Distributes fee according to the configuration. The fee is charged
+     *      in the same token that is being claimed to avoid value mismatches when
+     *      the reward and configured fee tokens differ.
      *
+     * @param _rewardToken The token being claimed and from which the fee is taken.
      * @param _amount The amount of the claim.
      */
-    function _deductFee(uint256 _amount) internal returns (uint256) {
-        address _token = feeConfig.token;
-        uint256 fee = _calculateFee(_amount, feeConfig.feePercentage);
+    function _deductFee(address _rewardToken, uint256 _amount) internal returns (uint256) {
+        if (feeConfig.feePercentage == 0 || feeConfig.receiver == address(0)) return _amount;
 
-        require(IERC20(_token).balanceOf(address(this)) >= fee, "FC: Insufficient token balance");
-        IERC20(_token).safeTransfer(feeConfig.receiver, fee);
+        uint256 fee = _calculateFee(_amount, feeConfig.feePercentage);
+        if (fee == 0) return _amount;
+
+        IERC20(_rewardToken).safeTransfer(feeConfig.receiver, fee);
 
         return _amount - fee;
     }
@@ -102,7 +106,10 @@ abstract contract FeeConfiguration is AccessControl {
      * @param _feePercentage The fee percentage.
      */
     function _calculateFee(uint256 _amount, uint256 _feePercentage) internal pure returns (uint256) {
-        require(_amount * _feePercentage >= BASIS_POINTS, "FC: Too small amount to consider fee");
+        // For dust amounts the integer-division fee rounds to zero. Return 0
+        // instead of reverting so a single dust balance does not DoS callers
+        // that iterate every reward token (e.g. claimAllReward).
+        if (_amount * _feePercentage < BASIS_POINTS) return 0;
         return (_amount * _feePercentage) / BASIS_POINTS;
     }
 }

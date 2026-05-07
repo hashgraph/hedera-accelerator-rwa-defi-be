@@ -38,4 +38,9 @@ interface IRewards {
      * @param amount amount of tokens to add
      */
     function addReward(address token, uint256 amount) external;
+
+    /**
+     * @dev Returns the list of reward tokens registered in the vault.
+     */
+    function getRewardTokens() external view returns (address[] memory);
 }

@@ -32,6 +32,8 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     uint256 private constant PRECISION = 1e18;
     uint256 private constant BASIS_POINTS = 10000;
     uint256 private constant MAX_TOKENS_AMOUNT = 10;
+    /// @dev Maximum age of a Chainlink answer accepted as fresh, in seconds.
+    uint256 private constant PRICE_FRESHNESS = 3 hours;
 
     // State variables
     string private _metadataUri;
@@ -233,6 +235,9 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         bool found = false;
         for (uint256 i = 0; i < _allocations.length; i++) {
             if (_allocations[i].aToken == aToken) {
+                uint256 newTotal = _allocated - _allocations[i].targetPercentage + newPercentage;
+                require(newTotal <= BASIS_POINTS, "Slice: Total allocation exceeds 100%");
+                _allocated = newTotal;
                 _allocations[i].targetPercentage = newPercentage;
                 found = true;
                 break;
@@ -243,9 +248,32 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
         emit AllocationPercentageChanged(aToken, newPercentage);
     }
 
+    /// @notice Removes an allocation by swap-and-pop, freeing one of the
+    ///         scarce MAX_TOKENS_AMOUNT slots and skipping the asset on rebalance.
+    function removeAllocation(address aToken) external onlyOwner {
+        require(aToken != address(0), "Slice: Invalid aToken address");
+
+        uint256 length = _allocations.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (_allocations[i].aToken == aToken) {
+                _allocated -= _allocations[i].targetPercentage;
+                if (i != length - 1) {
+                    _allocations[i] = _allocations[length - 1];
+                }
+                _allocations.pop();
+                emit AllocationPercentageChanged(aToken, 0);
+                return;
+            }
+        }
+        revert AllocationNotFound(aToken);
+    }
+
     /*///////////////////////////////////////////////////////////////
                         REBALANCE LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Emitted at the end of a successful rebalance pass.
+    event Rebalanced(address indexed caller, uint256 totalValue, uint256 allocationsProcessed);
 
     function rebalance() external {
         if (_allocations.length == 0) return;
@@ -266,6 +294,8 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
                 _processDeficitToken(i, state.deficitAmounts[i]);
             }
         }
+
+        emit Rebalanced(msg.sender, state.totalValue, _allocations.length);
     }
 
     function _calculateRebalanceState() internal view returns (RebalanceState memory state) {
@@ -436,7 +466,12 @@ contract SliceV2 is ISlice, ERC20, ERC20Permit, Ownable, ERC165 {
     //////////////////////////////////////////////////////////////*/
 
     function getChainlinkDataFeedLatestAnswer(address token) public view returns (int) {
-        (, int answer, , , ) = _priceFeeds[token].latestRoundData();
+        (uint80 roundId, int answer, , uint256 updatedAt, uint80 answeredInRound) = _priceFeeds[token]
+            .latestRoundData();
+        require(answer > 0, "Slice: Invalid price");
+        require(updatedAt > 0, "Slice: Round not complete");
+        require(answeredInRound >= roundId, "Slice: Stale round");
+        require(block.timestamp - updatedAt <= PRICE_FRESHNESS, "Slice: Stale price");
         return answer;
     }
 

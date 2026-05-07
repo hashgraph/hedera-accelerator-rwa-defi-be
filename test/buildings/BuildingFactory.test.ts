@@ -632,18 +632,22 @@ describe('BuildingFactory', () => {
         await buildingFactory.connect(voter1).deployIdentityForWallet(voter2.address);
         await buildingFactory.connect(voter1).deployIdentityForWallet(voter3.address);
 
-        // Token Owner MUST be the one that register the identity
-        // this is per token, must be performed for every token
-        await buildingFactory.connect(voter1).registerIdentity(buildingAddress, voter1.address, 840); // 840 = US
-        await buildingFactory.connect(voter1).registerIdentity(buildingAddress, voter2.address, 840);
-        await buildingFactory.connect(voter1).registerIdentity(buildingAddress, voter3.address, 840);
+        // Token Owner MUST be the one that registers the identity (HAL-15
+        // restricts registerIdentity to building.initialOwner).
+        await buildingFactory.connect(owner).registerIdentity(buildingAddress, voter1.address, 840); // 840 = US
+        await buildingFactory.connect(owner).registerIdentity(buildingAddress, voter2.address, 840);
+        await buildingFactory.connect(owner).registerIdentity(buildingAddress, voter3.address, 840);
 
-        // mint tokens to voter to be delegated for governance voting
+        // mint tokens to voter to be delegated for governance voting. Owner
+        // gets an extra `mintAmount` since the next step stakes `mintAmount`
+        // into the vault — the post-HAL-36 propose() spam-guard requires the
+        // proposer to retain voting power.
         const mintAmount = ethers.parseEther('1000');
-        await token.mint(owner.address, mintAmount);
+        await token.mint(owner.address, mintAmount * 2n);
         await token.mint(voter1.address, mintAmount);
         await token.mint(voter2.address, mintAmount);
         await token.mint(voter3.address, mintAmount);
+        await token.connect(owner).delegate(owner.address);
         await token.connect(voter1).delegate(voter1.address);
         await token.connect(voter2).delegate(voter2.address);
         await token.connect(voter3).delegate(voter3.address);
@@ -673,18 +677,23 @@ describe('BuildingFactory', () => {
   
         const tx1 = await governance.createPaymentProposal(amount, to.address, description);
         await tx1.wait();
-  
+
         const proposalId = await getProposalId(governance, tx1.blockNumber as number);
-  
+
         // cast votes
         const votingDelay = await governance.votingDelay();
-        const votingPeriod = await governance.votingPeriod();        
+        const votingPeriod = await governance.votingPeriod();
         await mine(votingDelay) // wait voting delay to begin casting votes
         await governance.connect(voter1).castVote(proposalId, 1); // "for" vote.
         await governance.connect(voter2).castVote(proposalId, 1); // "for" vote.
         await governance.connect(voter3).castVote(proposalId, 1); // "for" vote.
-        await mine(votingPeriod); // wait for proposal voting period 
-  
+        await mine(votingPeriod); // wait for proposal voting period
+
+        // After the deposit, _forwardExcessFunds left treasury == reserve.
+        // Top it up so the payment doesn't trip HAL-51's reserve guard.
+        await usdc.mint(owner.address, amount);
+        await usdc.connect(owner).transfer(treasuryAddress, amount);
+
         // execute proposal
         await governance.executePaymentProposal(proposalId);
   
@@ -824,7 +833,11 @@ describe('BuildingFactory', () => {
 
       const amountTokenMin = tokenAmount * 95n / 100n; // 5% slippage
       const amountUsdcMin = usdcAmount * 95n / 100n;  // 5% slippage
-      const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+      // Use chain time, not wall-clock — when other test files run before
+      // this one and advance block.timestamp via time.increase, Date.now()
+      // can lag behind the EVM clock and the deadline ends up in the past.
+      const latestBlock = await ethers.provider.getBlock("latest");
+      const deadline = (latestBlock?.timestamp ?? 0) + 300; // 5 minutes
 
       const tx = await router.addLiquidity(
         tokenAddress,

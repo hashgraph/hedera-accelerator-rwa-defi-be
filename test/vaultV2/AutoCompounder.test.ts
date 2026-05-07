@@ -1,5 +1,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
+
+// Vault enforces a 1h REWARD_ELIGIBILITY_DELAY before deposits qualify for
+// rewards (HAL-18). The autocompounder is the underlying vault depositor, so
+// its own lockTimeStart must elapse before its claimAllRewards picks up
+// anything during autoCompound().
+const ELIGIBILITY_DELAY = 60 * 60 + 1;
 
 describe("RewardsVaultAutoCompounder - Advanced Tests", function () {
   let autoCompounder: any;
@@ -92,13 +99,15 @@ describe("RewardsVaultAutoCompounder - Advanced Tests", function () {
       console.log(`📥 User1 deposited: ${ethers.formatEther(deposit1)} ASSET`);
       console.log(`📥 User2 deposited: ${ethers.formatEther(deposit2)} ASSET`);
 
+      // Past the vault's REWARD_ELIGIBILITY_DELAY for the AC's underlying deposit.
+      await time.increase(ELIGIBILITY_DELAY);
+
       const totalAssetsBefore = await autoCompounder.totalAssets();
       console.log(`💰 Total assets before rewards: ${ethers.formatEther(totalAssetsBefore)}`);
 
       // Step 2: Add rewards to the vault
       const rewardAmount = ethers.parseEther("100");
       await vault.connect(owner).addReward(await rewardToken.getAddress(), rewardAmount);
-      await rewardToken.connect(owner).transfer(await vault.getAddress(), rewardAmount);
 
       console.log(`🎁 Added ${ethers.formatEther(rewardAmount)} REWARD tokens as rewards`);
 
@@ -167,12 +176,12 @@ describe("RewardsVaultAutoCompounder - Advanced Tests", function () {
       // User deposits
       await autoCompounder.connect(user1).deposit(ethers.parseEther("1000"), user1.address);
 
+      // Past the eligibility window so the AC can claim from vault.
+      await time.increase(ELIGIBILITY_DELAY);
+
       // Add both reward tokens
       await vault.connect(owner).addReward(await rewardToken.getAddress(), ethers.parseEther("50"));
       await vault.connect(owner).addReward(await rewardToken2.getAddress(), ethers.parseEther("100"));
-
-      await rewardToken.connect(owner).transfer(await vault.getAddress(), ethers.parseEther("50"));
-      await rewardToken2.connect(owner).transfer(await vault.getAddress(), ethers.parseEther("100"));
 
       // Configure swap paths
       await autoCompounder.connect(owner).setSwapPath(
@@ -203,9 +212,11 @@ describe("RewardsVaultAutoCompounder - Advanced Tests", function () {
 
       await autoCompounder.connect(user1).deposit(ethers.parseEther("1000"), user1.address);
 
+      // Past the eligibility window.
+      await time.increase(ELIGIBILITY_DELAY);
+
       // Add rewards
       await vault.connect(owner).addReward(await rewardToken.getAddress(), ethers.parseEther("50"));
-      await rewardToken.connect(owner).transfer(await vault.getAddress(), ethers.parseEther("50"));
 
       // Configure router to fail swaps
       await uniswapRouter.setShouldFail(true);
@@ -233,9 +244,11 @@ describe("RewardsVaultAutoCompounder - Advanced Tests", function () {
       const depositAmount = ethers.parseEther("1000");
       await autoCompounder.connect(user1).deposit(depositAmount, user1.address);
 
+      // Past the eligibility window.
+      await time.increase(ELIGIBILITY_DELAY);
+
       // Add rewards using reward token (not the underlying asset)
       await vault.connect(owner).addReward(await rewardToken.getAddress(), ethers.parseEther("100"));
-      await rewardToken.connect(owner).transfer(await vault.getAddress(), ethers.parseEther("100"));
 
       // Configure swap path
       await autoCompounder.connect(owner).setSwapPath(

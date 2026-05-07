@@ -15,6 +15,9 @@ interface IRewardsVaultAutoCompounder {
     event TokenSwapped(address indexed fromToken, address indexed toToken, uint256 amountIn, uint256 amountOut);
     event SwapPathUpdated(address indexed rewardToken, address[] newPath);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event RewardSwapFailed(address indexed rewardToken, uint256 amount, bytes reason);
+    event MinimumClaimThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+    event MaxSlippageUpdated(uint256 oldSlippage, uint256 newSlippage);
 
     /*///////////////////////////////////////////////////////////////
                                  ERRORS
@@ -116,8 +119,11 @@ interface IRewardsVaultAutoCompounder {
     /// @notice Removes a configured swap path
     function removeSwapPath(address rewardToken) external;
 
-    /// @notice Transfers contract ownership
+    /// @notice Nominates a new owner (step 1 of two-step transfer)
     function transferOwnership(address newOwner) external;
+
+    /// @notice Accepts pending ownership (step 2 of two-step transfer)
+    function acceptOwnership() external;
 
     /// @notice Emergency function to recover stuck tokens
     function emergencyWithdraw(address token, uint256 amount) external;

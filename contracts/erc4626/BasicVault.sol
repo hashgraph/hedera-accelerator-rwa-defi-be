@@ -33,6 +33,9 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
+    /// @notice Maximum allowed unlock duration to bound owner discretion.
+    uint256 public constant MAX_LOCK_TIME = 365 days;
+
     /**
      * @dev Initializes contract with passed parameters.
      *
@@ -167,6 +170,7 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
      * @param time The lock period.
      */
     function setSharesLockTime(uint32 time) external onlyOwner {
+        require(time <= MAX_LOCK_TIME, "BasicVault: lock too long");
         BasicVaultData storage $ = _getBasicVaultStorage();
 
         $.unlockDuration = time;
@@ -227,6 +231,18 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
      *
      * @param amount The amount of shares.
      */
+    /**
+     * @dev Disabled. Share transfers would desynchronize the per-user
+     *      `userContribution` accounting (sharesAmount, reward checkpoints,
+     *      and lock vesting state) from the ERC20 balance. Mints and burns
+     *      from deposit/withdraw flows continue to work since `from` or `to`
+     *      is the zero address in those paths.
+     */
+    function _update(address from, address to, uint256 value) internal virtual override(ERC20) {
+        require(from == address(0) || to == address(0), "BasicVault: transfers disabled");
+        super._update(from, to, value);
+    }
+
     function _afterDeposit(uint256 amount) internal {
         BasicVaultData storage $ = _getBasicVaultStorage();
         if (!$.userContribution[msg.sender].exist) {
@@ -239,6 +255,8 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
             $.userContribution[msg.sender].sharesAmount = amount;
             $.userContribution[msg.sender].totalLocked = amount;
             $.userContribution[msg.sender].depositLockCheckpoint = block.timestamp;
+            // Snapshot the unlock duration so future owner changes don't apply retroactively.
+            $.userContribution[msg.sender].depositLockDuration = $.unlockDuration;
             $.userContribution[msg.sender].exist = true;
         } else {
             $.userContribution[msg.sender].sharesAmount += amount;
@@ -258,13 +276,22 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
 
         if (block.timestamp < lockStart || currentlyLocked == 0) return 0;
 
-        uint256 lockEnd = lockStart + $.unlockDuration;
+        // Use the per-user snapshotted lock duration to prevent retroactive
+        // extension by the owner.
+        uint256 userLockDuration = info.depositLockDuration;
+        if (userLockDuration == 0) return currentlyLocked;
+        uint256 lockEnd = lockStart + userLockDuration;
 
         if (block.timestamp >= lockEnd) {
             unlocked = currentlyLocked;
         } else {
+            // Vest against the original totalLocked so prior partial releases
+            // do not accelerate the linear schedule. Subtract what was already
+            // released to obtain the currently-claimable amount.
             uint256 elapsed = block.timestamp - lockStart;
-            unlocked = (currentlyLocked * elapsed) / $.unlockDuration;
+            uint256 totalVested = (info.totalLocked * elapsed) / userLockDuration;
+            if (totalVested <= info.totalReleased) return 0;
+            unlocked = totalVested - info.totalReleased;
         }
     }
 
@@ -337,8 +364,8 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
             }
         }
 
-        // Fee management
-        if (feeConfig.token != address(0)) amount = _deductFee(amount);
+        // Fee management - fee is taken in the same reward token
+        amount = _deductFee(rewardToken, amount);
 
         IERC20(rewardToken).safeTransfer(receiver, amount);
 
@@ -355,7 +382,6 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
         BasicVaultData storage $ = _getBasicVaultStorage();
 
         uint256 _rewardTokensSize = $.rewardTokens.length;
-        address _feeToken = feeConfig.token;
         address _rewardToken;
         uint256 _reward;
 
@@ -384,10 +410,8 @@ contract BasicVault is BasicVaultStorage, ERC20Permit, ERC4626, ERC165, FeeConfi
                 }
             }
 
-            // Fee management
-            if (_feeToken != address(0)) {
-                _reward = _deductFee(_reward);
-            }
+            // Fee management - fee is taken in the same reward token
+            _reward = _deductFee(_rewardToken, _reward);
 
             IERC20(_rewardToken).safeTransfer(receiver, _reward);
 

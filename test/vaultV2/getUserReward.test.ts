@@ -1,6 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+
+// Vault enforces a 1h REWARD_ELIGIBILITY_DELAY before deposits qualify for
+// rewards (HAL-18). Tests must advance past the window before adding rewards.
+const ELIGIBILITY_DELAY = 60 * 60 + 1;
 
 describe("getUserReward Functions - Integration Tests", function () {
     let vault: any;
@@ -86,11 +91,14 @@ describe("getUserReward Functions - Integration Tests", function () {
             
             await vault.connect(alice).deposit(depositAmount, alice.address);
             await vault.connect(bob).deposit(depositAmount, bob.address);
+
+            // Past the anti-frontrun eligibility window.
+            await time.increase(ELIGIBILITY_DELAY);
         });
 
         it("Should return empty arrays for user with no balance", async function () {
             const [tokens, amounts] = await vault.getUserReward(charlie.address);
-            
+
             expect(tokens.length).to.equal(0);
             expect(amounts.length).to.equal(0);
         });
@@ -146,7 +154,10 @@ describe("getUserReward Functions - Integration Tests", function () {
             const charlieDeposit = ethers.parseEther("200"); // Double the others
             await asset.connect(charlie).approve(await vault.getAddress(), charlieDeposit);
             await vault.connect(charlie).deposit(charlieDeposit, charlie.address);
-            
+
+            // Wait past Charlie's eligibility window.
+            await time.increase(ELIGIBILITY_DELAY);
+
             // Add rewards
             const rewardAmount = ethers.parseEther("120");
             await rewardToken.approve(await vault.getAddress(), rewardAmount);
@@ -188,12 +199,16 @@ describe("getUserReward Functions - Integration Tests", function () {
         beforeEach(async function () {
             // Setup initial deposits in autocompounder
             const depositAmount = ethers.parseEther("100");
-            
+
             await asset.connect(alice).approve(await autoCompounder.getAddress(), depositAmount);
             await asset.connect(bob).approve(await autoCompounder.getAddress(), depositAmount);
-            
+
             await autoCompounder.connect(alice).deposit(depositAmount, alice.address);
             await autoCompounder.connect(bob).deposit(depositAmount, bob.address);
+
+            // Past the vault's anti-frontrun eligibility window for the
+            // autocompounder's own underlying deposit.
+            await time.increase(ELIGIBILITY_DELAY);
         });
 
         it("Should return empty arrays for user with no balance", async function () {
@@ -315,15 +330,18 @@ describe("getUserReward Functions - Integration Tests", function () {
         it("Should maintain reward consistency between vault and autocompounder", async function () {
             // Setup: Direct vault user and autocompounder user with same amounts
             const depositAmount = ethers.parseEther("100");
-            
+
             // Direct vault deposit by Alice
             await asset.connect(alice).approve(await vault.getAddress(), depositAmount);
             await vault.connect(alice).deposit(depositAmount, alice.address);
-            
+
             // AutoCompounder deposit by Bob (which deposits into same vault)
             await asset.connect(bob).approve(await autoCompounder.getAddress(), depositAmount);
             await autoCompounder.connect(bob).deposit(depositAmount, bob.address);
-            
+
+            // Past the eligibility window for both depositors.
+            await time.increase(ELIGIBILITY_DELAY);
+
             // Add rewards to vault
             const rewardAmount = ethers.parseEther("200");
             await rewardToken.approve(await vault.getAddress(), rewardAmount);

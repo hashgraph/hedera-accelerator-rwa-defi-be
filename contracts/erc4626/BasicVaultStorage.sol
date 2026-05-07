@@ -29,6 +29,10 @@ abstract contract BasicVaultStorage {
         mapping(address => uint256) rewardAmountSnapshot;
         mapping(address => uint256) lastClaimedAmountT;
         bool exist;
+        // Snapshot of the global `unlockDuration` at the user's first deposit,
+        // so subsequent owner changes to `unlockDuration` cannot retroactively
+        // extend an existing user's lock.
+        uint256 depositLockDuration;
     }
 
     // Rewards Info struct

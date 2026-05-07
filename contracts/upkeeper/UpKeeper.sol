@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -50,6 +50,31 @@ contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
     }
 
     /**
+     * @dev Returns the total number of registered tasks.
+     */
+    function getTaskCount() external view returns (uint256) {
+        return taskList.length;
+    }
+
+    /**
+     * @dev Returns a slice of the task list starting at `offset` with at most
+     *      `limit` entries. Use this from off-chain clients when `taskList`
+     *      grows beyond what `getTaskList` can return within gas limits.
+     */
+    function getTaskListPaginated(uint256 offset, uint256 limit) external view returns (bytes32[] memory page) {
+        uint256 len = taskList.length;
+        if (offset >= len || limit == 0) return new bytes32[](0);
+
+        uint256 end = offset + limit;
+        if (end > len) end = len;
+        uint256 size = end - offset;
+        page = new bytes32[](size);
+        for (uint256 i = 0; i < size; i++) {
+            page[i] = taskList[offset + i];
+        }
+    }
+
+    /**
      * 
      * @param taskId the unique identifier of the task
      * @dev This function returns the information of a specific task based on taskId.
@@ -64,6 +89,9 @@ contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
      * @dev This function allows the admin to register a task for a keeper.
      */
     function registerTask(address target, bytes4 selector) external onlyRole(TRUSTED_REGISTRY_ROLE) {
+        require(target != address(0), "UpKeeper: invalid target");
+        require(selector != bytes4(0), "UpKeeper: invalid selector");
+
         bytes32 taskId = keccak256(abi.encodePacked(target, selector));
 
         if (tasks[taskId].exists) {
@@ -131,7 +159,7 @@ contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
             bytes32 taskId = taskList[i];
             Task storage task = tasks[taskId];
             if (task.exists) {
-                _executeTask(taskId, new bytes(0));
+                _tryExecuteTask(taskId, new bytes(0));
             }
         }
     }
@@ -151,8 +179,34 @@ contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
             bytes32 taskId = taskList[i];
             Task storage task = tasks[taskId];
             if (task.exists) {
-                _executeTask(taskId, data[i]);
+                _tryExecuteTask(taskId, data[i]);
             }
+        }
+    }
+
+    /**
+     * @dev Variant of `_executeTask` that swallows individual failures so a
+     *      single bad task in a batch does not abort the whole transaction.
+     *      Successful tasks emit `TaskExecuted`; failed ones emit
+     *      `TaskExecutionSkipped(taskId, response)` and continue.
+     *
+     *      We avoid an external self-call here so the original keeper's
+     *      `msg.sender` is preserved in the `TaskExecuted` event.
+     */
+    function _tryExecuteTask(bytes32 taskId, bytes memory data) internal {
+        Task storage task = tasks[taskId];
+        if (!task.exists) {
+            emit TaskExecutionSkipped(taskId, "");
+            return;
+        }
+
+        (bool success, bytes memory response) = task.target.call(abi.encodeWithSelector(task.selector, data));
+
+        if (success) {
+            task.executions++;
+            emit TaskExecuted(msg.sender, task.target, task.selector, task.executions);
+        } else {
+            emit TaskExecutionSkipped(taskId, response);
         }
     }
 
@@ -169,18 +223,16 @@ contract UpKeeper is AccessControl, ReentrancyGuard, IUpKeeper {
             revert TaskNotFound();
         }
 
-        (bool success, bytes memory response) = task.target.call(abi.encodeWithSelector(task.selector, data));        
-
+        (bool success, bytes memory response) = task.target.call(abi.encodeWithSelector(task.selector, data));
 
         if (!success) {
             revert TaskExecutionFailed(response);
         }
 
-        if (response.length == 32) {
-            if (!abi.decode(response, (bool))) {
-                revert TaskExecutionReturnedFalse();
-            }
-        }                
+        // The previous implementation decoded any 32-byte return as a bool and
+        // reverted on `false`, which incorrectly failed targets that legitimately
+        // return `uint256(0)` or other zero-valued types. Rely solely on the
+        // call's success flag instead.
 
         task.executions++;
         emit TaskExecuted(msg.sender, task.target, task.selector, task.executions);

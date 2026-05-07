@@ -29,6 +29,9 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
+    /// @notice Maximum allowed unlock duration to bound owner discretion.
+    uint256 public constant MAX_LOCK_TIME = 365 days;
+
     /**
      * @dev Initializes contract with passed parameters.
      *
@@ -127,6 +130,12 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
      * @inheritdoc ERC7540
      */
     function requestRedeem(uint256 shares, address controller, address owner) public override {
+        // Enforce the lock at request time, against the share-holding owner.
+        // The downstream `redeem`/`withdraw` claim path defers to the parent's
+        // claimableRedeemRequest accounting so an operator can finalize the
+        // request on the user's behalf without re-checking the lock.
+        require(unlockedOf(owner) >= shares, "AsyncVault: shares are locked");
+
         AsyncVaultData storage $ = _getAsyncVaultStorage();
         super.requestRedeem(shares, controller, owner);
         _fulfillRedeemRequest(
@@ -168,6 +177,7 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
      * @param time The lock period.
      */
     function setSharesLockTime(uint32 time) external onlyOwner {
+        require(time <= MAX_LOCK_TIME, "AsyncVault: lock too long");
         AsyncVaultData storage $ = _getAsyncVaultStorage();
         $.unlockDuration = time;
         emit SetSharesLockTime(time);
@@ -241,6 +251,18 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
      *
      * @param _amount The amount of shares.
      */
+    /**
+     * @dev Disabled. Share transfers would desynchronize the per-user
+     *      `userContribution` accounting (sharesAmount, reward checkpoints,
+     *      and lock vesting state) from the ERC20 balance. Mints and burns
+     *      from deposit/withdraw flows continue to work since `from` or `to`
+     *      is the zero address in those paths.
+     */
+    function _update(address from, address to, uint256 value) internal virtual override {
+        require(from == address(0) || to == address(0), "AsyncVault: transfers disabled");
+        super._update(from, to, value);
+    }
+
     function _afterDeposit(uint256 _amount) internal {
         AsyncVaultData storage $ = _getAsyncVaultStorage();
         if (!$.userContribution[msg.sender].exist) {
@@ -253,6 +275,8 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
             $.userContribution[msg.sender].sharesAmount = _amount;
             $.userContribution[msg.sender].totalLocked = _amount;
             $.userContribution[msg.sender].depositLockCheckpoint = block.timestamp;
+            // Snapshot the unlock duration so future owner changes don't apply retroactively.
+            $.userContribution[msg.sender].depositLockDuration = $.unlockDuration;
             $.userContribution[msg.sender].exist = true;
         } else {
             $.userContribution[msg.sender].sharesAmount += _amount;
@@ -271,13 +295,22 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
 
         if (block.timestamp < lockStart || currentlyLocked == 0) return 0;
 
-        uint256 lockEnd = lockStart + $.unlockDuration;
+        // Use the per-user snapshotted lock duration to prevent retroactive
+        // extension by the owner.
+        uint256 userLockDuration = info.depositLockDuration;
+        if (userLockDuration == 0) return currentlyLocked;
+        uint256 lockEnd = lockStart + userLockDuration;
 
         if (block.timestamp >= lockEnd) {
             unlocked = currentlyLocked;
         } else {
+            // Vest against the original totalLocked so prior partial releases
+            // do not accelerate the linear schedule. Subtract what was already
+            // released to obtain the currently-claimable amount.
             uint256 elapsed = block.timestamp - lockStart;
-            unlocked = (currentlyLocked * elapsed) / $.unlockDuration;
+            uint256 totalVested = (info.totalLocked * elapsed) / userLockDuration;
+            if (totalVested <= info.totalReleased) return 0;
+            unlocked = totalVested - info.totalReleased;
         }
     }
 
@@ -350,8 +383,8 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
             }
         }
 
-        // Fee management
-        if (feeConfig.token != address(0)) amount = _deductFee(amount);
+        // Fee management - fee is taken in the same reward token
+        amount = _deductFee(rewardToken, amount);
 
         IERC20(rewardToken).safeTransfer(receiver, amount);
 
@@ -369,7 +402,6 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
         AsyncVaultData storage $ = _getAsyncVaultStorage();
 
         uint256 _rewardTokensSize = $.rewardTokens.length;
-        address _feeToken = feeConfig.token;
         address _rewardToken;
         uint256 _reward;
 
@@ -384,10 +416,8 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
 
             $.userContribution[msg.sender].lastClaimedAmountT[_rewardToken] = $.tokensRewardInfo[_rewardToken].amount;
 
-            // Fee management
-            if (_feeToken != address(0)) {
-                _reward = _deductFee(_reward);
-            }
+            // Fee management - fee is taken in the same reward token
+            _reward = _deductFee(_rewardToken, _reward);
 
             IERC20(_rewardToken).safeTransfer(_receiver, _reward);
             emit RewardClaimed(_rewardToken, _receiver, _reward);
@@ -477,17 +507,20 @@ contract AsyncVault is ERC7540, ERC20Permit, ERC165, FeeConfiguration, Ownable {
     }
 
     /**
-     * @dev Returns the max possible amount of shares to redeem.
+     * @dev Returns the max possible amount of shares to redeem against a
+     *      fulfilled redemption request. The lock is enforced at
+     *      `requestRedeem` time, so this defers to ERC7540's claimable accounting.
      */
     function maxRedeem(address owner) public view virtual override returns (uint256) {
-        return unlockedOf(owner);
+        return super.maxRedeem(owner);
     }
 
     /**
-     * @dev Returns the max possible amount of assets to withdraw.
+     * @dev Returns the max possible amount of assets to withdraw against a
+     *      fulfilled redemption request.
      */
     function maxWithdraw(address owner) public view virtual override returns (uint256 assets) {
-        return convertToAssets(unlockedOf(owner));
+        return super.maxWithdraw(owner);
     }
 
     /**

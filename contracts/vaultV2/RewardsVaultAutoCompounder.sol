@@ -2,6 +2,8 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "./IERC20.sol";
+import {IERC20 as IERC20Compat} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {RewardsVault4626} from "./RewardsVault4626.sol";
 import {FixedPointMathLib} from "../math/FixedPointMathLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -14,6 +16,7 @@ import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 /// @dev This contract allows users to deposit and automatically claims rewards to reinvest them
 contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAutoCompounder, ERC165 {
     using FixedPointMathLib for uint256;
+    using SafeERC20 for IERC20Compat;
 
     /*///////////////////////////////////////////////////////////////
                             STORAGE VARIABLES
@@ -45,6 +48,9 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
 
     /// @notice Contract owner
     address public owner;
+
+    /// @notice Pending owner from a two-step transferOwnership flow.
+    address public pendingOwner;
 
     /// @notice Minimum threshold to perform automatic claim
     uint256 public minimumClaimThreshold;
@@ -132,12 +138,13 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
 
         // Calculate shares to mint
         shares = _convertToShares(assets);
+        if (shares == 0) revert InvalidAmount();
 
         // Transfer assets from user to this contract
         if (!ASSET.transferFrom(msg.sender, address(this), assets)) revert TransferFailed();
 
         // Approve and deposit into vault
-        ASSET.approve(address(VAULT), assets);
+        IERC20Compat(address(ASSET)).forceApprove(address(VAULT), assets);
         VAULT.deposit(assets, address(this));
 
         // Mint autocompounder shares
@@ -205,7 +212,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         if (!ASSET.transferFrom(msg.sender, address(this), assets)) revert TransferFailed();
 
         // Approve and deposit into vault
-        ASSET.approve(address(VAULT), assets);
+        IERC20Compat(address(ASSET)).forceApprove(address(VAULT), assets);
         VAULT.deposit(assets, address(this));
 
         // Mint autocompounder shares
@@ -306,7 +313,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
 
         // Reinvest all obtained assets in the vault
         if (totalAssetsToReinvest > 0) {
-            ASSET.approve(address(VAULT), totalAssetsToReinvest);
+            IERC20Compat(address(ASSET)).forceApprove(address(VAULT), totalAssetsToReinvest);
             VAULT.deposit(totalAssetsToReinvest, address(this));
         }
 
@@ -366,9 +373,11 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         return (info.depositTimestamp, info.totalDeposited);
     }
 
-    /// @notice Returns if user can withdraw (based on vault's lock period)
-    function canWithdraw(address user) external view returns (bool) {
-        return VAULT.isUnlocked(user);
+    /// @notice Returns if a user can withdraw. The AutoCompounder is the
+    ///         actual vault depositor, so the relevant lock is on this
+    ///         contract's vault position, not on the user themselves.
+    function canWithdraw(address /* user */) external view returns (bool) {
+        return VAULT.isUnlocked(address(this));
     }
 
     /// @notice Get user's proportional rewards for all reward tokens
@@ -454,7 +463,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         }
 
         // Approve token for Uniswap router
-        IERC20(rewardToken).approve(address(UNISWAP_ROUTER), amount);
+        IERC20Compat(rewardToken).forceApprove(address(UNISWAP_ROUTER), amount);
 
         // Calculate minimum expected amount with slippage
         uint256[] memory amountsOut = UNISWAP_ROUTER.getAmountsOut(amount, path);
@@ -471,9 +480,12 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         returns (uint256[] memory amounts) {
             assetsObtained = amounts[amounts.length - 1];
             emit TokenSwapped(rewardToken, address(ASSET), amount, assetsObtained);
-        } catch {
-            // If swap fails, continue without this token
+        } catch (bytes memory reason) {
+            // If swap fails, surface it to off-chain keepers so backlogs are
+            // visible instead of silently growing. The reward token stays in
+            // this contract and can be retried on the next autoCompound.
             assetsObtained = 0;
+            emit RewardSwapFailed(rewardToken, amount, reason);
         }
     }
 
@@ -528,6 +540,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
 
     /// @notice Updates minimum threshold for auto-compound
     function setMinimumClaimThreshold(uint256 newThreshold) external onlyOwner {
+        emit MinimumClaimThresholdUpdated(minimumClaimThreshold, newThreshold);
         minimumClaimThreshold = newThreshold;
     }
 
@@ -535,6 +548,7 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
     /// @param newSlippage New slippage in basis points (e.g., 300 = 3%)
     function setMaxSlippage(uint256 newSlippage) external onlyOwner {
         if (newSlippage > 5000) revert InvalidSlippage(); // Max 50%
+        emit MaxSlippageUpdated(maxSlippage, newSlippage);
         maxSlippage = newSlippage;
     }
 
@@ -587,12 +601,23 @@ contract RewardsVaultAutoCompounder is IERC20, ReentrancyGuard, IRewardsVaultAut
         }
     }
 
-    /// @notice Transfers contract ownership
+    /// @notice Step 1 of a two-step ownership transfer. The current owner
+    ///         nominates `newOwner`, who must then call `acceptOwnership` to
+    ///         finalize. This guards against typo'd transfers locking out
+    ///         admin functions.
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert InvalidNewOwner();
+        pendingOwner = newOwner;
+    }
+
+    /// @notice Step 2 of the ownership transfer. Must be called by the
+    ///         pending owner.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert NotOwner();
         address oldOwner = owner;
-        owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(oldOwner, owner);
     }
 
     /// @notice Emergency function to recover stuck tokens

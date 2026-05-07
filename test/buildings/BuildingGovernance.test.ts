@@ -22,12 +22,16 @@ async function deployFixture() {
   const identityGateway = await ethers.deployContract('IdentityGateway', [await identityFactory.getAddress(), []], owner);
   const identityGatewayAddress = await identityGateway.getAddress();
 
-  // mint and delegate tokens
+  // mint and delegate tokens. Owner gets an extra `mintAmount` because the
+  // fixture later deposits `mintAmount` into the staking vault — the
+  // post-HAL-36 propose() spam-guard requires the proposer to hold votes at
+  // propose time, so we keep a balance behind for owner.
   const mintAmount = ethers.parseEther('1000');
-  await governanceToken.mint(owner.address, mintAmount);
+  await governanceToken.mint(owner.address, mintAmount * 2n);
   await governanceToken.mint(voter1.address, mintAmount);
   await governanceToken.mint(voter2.address, mintAmount);
   await governanceToken.mint(voter3.address, mintAmount);
+  await governanceToken.connect(owner).delegate(owner.address);
   await governanceToken.connect(voter1).delegate(voter1.address);
   await governanceToken.connect(voter2).delegate(voter2.address);
   await governanceToken.connect(voter3).delegate(voter3.address);
@@ -237,10 +241,11 @@ describe('BuildingGovernance', () => {
     });
 
     it('should execute payment proposal', async () => {
-      const { 
+      const {
         governance,
         treasury,
         usdc,
+        owner,
         voter1, voter2, voter3
       } = await loadFixture(deployFixture);
 
@@ -251,6 +256,12 @@ describe('BuildingGovernance', () => {
       // user should have 0 usdc balance
       expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('0', 6));
 
+      // After Treasury.deposit + _forwardExcessFunds the treasury holds
+      // exactly reserveAmount, so any payment would violate HAL-51's reserve
+      // check. Top it up via direct transfer (which bypasses auto-forward).
+      await usdc.mint(owner.address, amount);
+      await usdc.connect(owner).transfer(await treasury.getAddress(), amount);
+
       const tx1 = await governance.createPaymentProposal(amount, to.address, description);
       await tx1.wait();
 
@@ -259,12 +270,12 @@ describe('BuildingGovernance', () => {
       // cast votes
       const votingDelay = await governance.votingDelay();
       const votingPeriod = await governance.votingPeriod();
-      
+
       await mine(votingDelay) // wait voting delay to begin casting votes
       await governance.connect(voter1).castVote(proposalId, 1); // "for" vote.
       await governance.connect(voter2).castVote(proposalId, 1); // "for" vote.
       await governance.connect(voter3).castVote(proposalId, 1); // "for" vote.
-      await mine(votingPeriod); // wait for proposal voting period 
+      await mine(votingPeriod); // wait for proposal voting period
 
       // execute proposal
       const targetAbi = [
@@ -280,7 +291,7 @@ describe('BuildingGovernance', () => {
         ethers.id(description)
       );
 
-      // address should have 1 usdc balance after payment executed; 
+      // address should have 1 usdc balance after payment executed;
       expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('1', 6));
 
     });
@@ -318,9 +329,11 @@ describe('BuildingGovernance', () => {
 
   describe('.executePaymentProposal()', () => {
     it('should execute payment proposal', async () => {
-      const { 
+      const {
         governance,
+        treasury,
         usdc,
+        owner,
         voter1, voter2, voter3
       } = await loadFixture(deployFixture);
 
@@ -330,6 +343,10 @@ describe('BuildingGovernance', () => {
 
       // user should have 0 usdc balance
       expect(await usdc.balanceOf(to.address)).to.be.eq(ethers.parseUnits('0', 6));
+
+      // Top up treasury above reserve (HAL-51 requires balance - amount >= reserve).
+      await usdc.mint(owner.address, amount);
+      await usdc.connect(owner).transfer(await treasury.getAddress(), amount);
 
       const tx1 = await governance.createPaymentProposal(amount, to.address, description);
       await tx1.wait();

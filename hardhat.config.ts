@@ -32,8 +32,8 @@ const config: HardhatUserConfig = {
   networks: {
     mainnet: {
       chainId: 295, // hedera mainnet chainId
-      url: MAIN_RPC_URL,
-      accounts: [MAIN_PRIVATE_KEY],
+      url: MAIN_RPC_URL || "https://mainnet.hashio.io/api",
+      accounts: MAIN_PRIVATE_KEY ? [MAIN_PRIVATE_KEY] : [],
     },
     testnet: {
       chainId: 296, // hedera testnet chainId

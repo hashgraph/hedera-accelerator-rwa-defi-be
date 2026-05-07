@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 /**
  * @title IUpKeeper
@@ -27,6 +27,7 @@ interface IUpKeeper {
     event TaskExecuted(address indexed keeper, address indexed target, bytes4 selector, uint256 executions);
     event TaskRegistered(address indexed target, bytes4 selector);
     event TaskRemoved(address indexed target, bytes4 selector);
+    event TaskExecutionSkipped(bytes32 indexed taskId, bytes reason);
 
     /**
      * @dev This function returns the list of tasks assigned to a specific keeper.

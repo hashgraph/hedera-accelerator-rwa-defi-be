@@ -13,6 +13,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {BuildingGovernanceStorage} from "./BuildingGovernanceStorage.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
+import {ITreasury} from "../../treasury/interfaces/ITreasury.sol";
 
 contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCountingSimpleUpgradeable, GovernorVotesUpgradeable, GovernorVotesQuorumFractionUpgradeable, OwnableUpgradeable, UUPSUpgradeable, BuildingGovernanceStorage {
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -29,12 +30,16 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         }
     }
 
-    function initialize(IVotes _token, string memory name, address initialOwner, address treasury, address auditRegistry) public initializer {
+    function initialize(IVotes _token, string memory name, address /* initialOwner */, address treasury, address auditRegistry) public initializer {
         __Governor_init(name);
         __GovernorCountingSimple_init();
         __GovernorVotes_init(_token);
         __GovernorVotesQuorumFraction_init(1);
-        __Ownable_init(initialOwner);
+        // The Governor owns itself: any onlyOwner action (including
+        // _authorizeUpgrade) must be invoked through the contract's own
+        // execute() flow following a successful governance vote. This prevents
+        // the deployer from unilaterally upgrading or reconfiguring the DAO.
+        __Ownable_init(address(this));
         __UUPSUpgradeable_init();
 
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
@@ -355,9 +360,25 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         return 3600; // 1 hour voting period
     }
 
-    // Override proposalThreshold to return 0 to bypass the vote threshold check
+    // Kept at zero because the Hedera-specific `_getVotes` fallback returns 0
+    // on `getPastVotes` reverts, which would lock all addresses out of a
+    // non-zero past-vote threshold. The anti-spam check is enforced via a
+    // current-balance guard in the `propose` override below instead.
     function proposalThreshold() public pure override returns (uint256) {
         return 0;
+    }
+
+    /// @dev Anti-spam: proposers must hold voting power at propose time.
+    error NoVotingPower();
+
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) public override(GovernorUpgradeable) returns (uint256) {
+        if (token().getVotes(msg.sender) == 0) revert NoVotingPower();
+        return super.propose(targets, values, calldatas, description);
     }
 
     // Override _getVotes to handle Hedera's timestamp-based clock issues
@@ -445,6 +466,7 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
         return super.quorum(blockNumber);
     }
 
+
     // Configuration functions for multisig setup
     function setMultisigThreshold(uint256 threshold) external onlyOwner {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
@@ -455,6 +477,12 @@ contract BuildingGovernance is Initializable, GovernorUpgradeable, GovernorCount
     function setSafeAddress(address safeAddress) external onlyOwner {
         BuildingGovernanceData storage $ = _getBuildingGovernanceStorage();
         $.safeAddress = safeAddress;
+        // Multisig payment proposals execute via the Safe and call back into
+        // Treasury.makePayment, which is gated by GOVERNANCE_ROLE. Grant the
+        // Safe that role here so multisig governance is actually executable.
+        if (safeAddress != address(0) && $.treasury != address(0)) {
+            ITreasury($.treasury).grantGovernanceRole(safeAddress);
+        }
         emit SafeAddressUpdated(safeAddress);
     }
 

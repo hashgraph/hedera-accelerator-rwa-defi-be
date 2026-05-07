@@ -216,13 +216,15 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
             revert InvalidAmount("No enough tokens to buy", tokenBBuyAmount);
         }
 
-        if (tokenAThreshold.maxSellAmount != 0 && tokenAThreshold.interval < block.timestamp) {
+        // Threshold is enforced while the configured interval is still active
+        // (i.e. before its expiration timestamp), not after.
+        if (tokenAThreshold.maxSellAmount != 0 && block.timestamp < tokenAThreshold.interval) {
             if ((_sellAmounts[tokenA] + tokenASellAmount) > tokenAThreshold.maxSellAmount) {
                 revert InvalidAmount("Max sell amount of tokens exceeded", (_sellAmounts[tokenA] + tokenASellAmount));
             }
         }
 
-        if (tokenBThreshold.maxBuyAmount != 0 && tokenBThreshold.interval < block.timestamp) {
+        if (tokenBThreshold.maxBuyAmount != 0 && block.timestamp < tokenBThreshold.interval) {
             if ((_buyAmounts[tokenB] + tokenBBuyAmount) > tokenBThreshold.maxBuyAmount) {
                 revert InvalidAmount("Max buy amount of tokens exceeded", (_buyAmounts[tokenB] + tokenBBuyAmount));
             }
@@ -284,6 +286,7 @@ contract OneSidedExchange is ReentrancyGuard, Ownable {
         uint256 maxBuyAmount,
         uint256 interval
     ) public onlyOwner isValidAddress(token) isValidAmount(maxSellAmount) isValidAmount(maxBuyAmount) {
+        require(interval > block.timestamp, "Interval must be in the future");
         uint256 _decimals = ERC20(token).decimals();
 
         _thresholds[token] = PriceThreshold(
